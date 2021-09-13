@@ -1,0 +1,8 @@
+target/**
+Runs/**
+Cargo.lock
+rls*
+*.fastq
+*.pdf
+*.html
+*.bin
