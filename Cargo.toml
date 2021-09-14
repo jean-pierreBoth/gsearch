@@ -1,0 +1,63 @@
+[package]
+name = "archaea"
+version = "0.0.1"
+authors = ["jeanpierre.both@gmail.com"]
+#repository = "https://gitlab.com/jpboth/archaea"
+keywords = ["hnsw", "probminhash", "bacteria"]
+edition = "2018"
+license = "MIT OR Apache-2.0"
+description = "probminhash hnsw archaea"
+
+
+[features]
+
+
+[[bin]]
+
+name= "tohnsw"
+path= "src/main.rs"
+
+
+
+
+
+
+[dependencies]
+# default is version spec is ^ meaning can update up to max non null version number
+# cargo doc --no-deps avoid dependencies doc generation
+#
+
+serde= {version = "1.0", features = ["derive"] }
+
+
+
+
+# for //
+crossbeam-utils = {version = "0.8"}
+crossbeam-channel = {version = "0.5"}
+
+parking_lot ={version="0.11"}
+rayon = {version = "1.5"}
+num_cpus = {version = "1.13.0"}
+
+time = {version = "0.2"}
+needletail = {version = "0.4"}
+clap = {version = "2.33"}
+
+##
+
+probminhash = {version = "0.1.3"}
+#probminhash = {path = "../probminhash"}
+# hnsw_rs =  {version = "0.1.10"}
+#hnsw_rs = {path = "../hnswlib-rs"}
+
+kmerutils = {git = "https://github.com/jean-pierreBoth/kmerutils"}
+#kmerutils = {git = "https://gitlab.com/jpboth/kmerutils"}
+#kmerutils = {path = "../kmerutils"}
+lazy_static = { version = "1.4"}
+
+# decreasing order of log for debug build : (max_level_)trace debug info warn error off
+# decreasing order of log for release build (release_max_level_)  .. idem
+#log = { version = "0.4", features = ["max_level_trace", "release_max_level_trace"] }
+log = { version = "0.4"}
+env_logger = { version = "0.9"}
