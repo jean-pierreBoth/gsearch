@@ -1,5 +1,6 @@
-//! tohnsw -d dir --ps size 
-//! --ps gives the size of probminhash sketch
+//! tohnsw --dir [-d] dir --size [-s] size
+//!  --dir : the name of directory containing tree of GCF and GCA files 
+//! --size gives the size of probminhash sketch
 
 // must loop on sub directories , open gzipped files
 // extracts complete genomes possiby many in one file (get rid of capsid records if any)
@@ -10,7 +11,7 @@
 
 // hnsw should also run in a query server mode after insertion.
 
- use clap::{App, Arg, SubCommand};
+ use clap::{App, Arg};
 
  use std::io;
  use std::fs::{self, DirEntry};
@@ -28,10 +29,32 @@ fn init_log() -> u64 {
 }
 
 
+
 // returns true if file is a fasta file (possibly gzipped)
-fn is_fasta_file(&DirEntry) -> bool {
-    return false
+// filename are of type GCA[GCF]_000091165.1_genomic.fna.gz
+fn is_fasta_file(file : &DirEntry) -> bool {
+    let filename = file.file_name().into_string().unwrap();
+    if filename.ends_with("fna.gz") {
+        return true;
+    }
+    else { 
+        return false;
+    }
 }  // end of is_fasta_file
+
+
+
+
+// opens parse fna files with needletail
+// extracts records , filters out capsid
+fn process_file(file : &DirEntry) {
+    let pathb = file.path();
+    let mut reader = needletail::parse_fastx_file(&pathb).expect("expecting valid filename");
+    while let Some(record) = reader.next() {
+        // do we keep record ? we must get its id
+        // if we keep it we keep track of its id in file, we sketch it
+    }
+} // end of process_file
 
 
 
@@ -46,7 +69,9 @@ fn visit_dirs(dir: &Path, cb: &dyn Fn(&DirEntry)) -> io::Result<()> {
                 visit_dirs(&path, cb)?;
             } else {
                 // check if entry is a fasta.gz file
-                cb(&entry);
+                if is_fasta_file(&entry) {
+                    cb(&entry);
+                }
             }
         }
     }
@@ -57,5 +82,19 @@ fn visit_dirs(dir: &Path, cb: &dyn Fn(&DirEntry)) -> io::Result<()> {
 
  fn main() {
     let _ = init_log();
+    let matches = App::new("tohnsw")
+        .arg(Arg::with_name("dir")
+            .long("dir")
+            .short("d")
+            .takes_value(true)
+            .help("name of directory containing genomes to index"))
+        .arg(Arg::with_name("sketch")
+            .long("size")
+            .short("s")
+            .default_value("8")
+            .help("size of probinhash sketch, default to 8"))
+    .get_matches();
+
+    // decode matches, check for dir
 
  } // end of main
