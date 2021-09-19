@@ -58,15 +58,16 @@ fn process_file(file : &DirEntry) {
 
 
 
+// TODO This function should have a version bsed on tokio::fs
 // scan directory recursively, executing function cb.
 // taken from fd_find
-fn visit_dirs(dir: &Path, cb: &dyn Fn(&DirEntry)) -> io::Result<()> {
+fn process_dir(dir: &Path, cb: &dyn Fn(&DirEntry)) -> io::Result<()> {
     if dir.is_dir() {
         for entry in fs::read_dir(dir)? {
             let entry = entry?;
             let path = entry.path();
             if path.is_dir() {
-                visit_dirs(&path, cb)?;
+                process_dir(&path, cb)?;
             } else {
                 // check if entry is a fasta.gz file
                 if is_fasta_file(&entry) {
@@ -82,19 +83,51 @@ fn visit_dirs(dir: &Path, cb: &dyn Fn(&DirEntry)) -> io::Result<()> {
 
  fn main() {
     let _ = init_log();
+    //
     let matches = App::new("tohnsw")
         .arg(Arg::with_name("dir")
             .long("dir")
             .short("d")
             .takes_value(true)
             .help("name of directory containing genomes to index"))
-        .arg(Arg::with_name("sketch")
-            .long("size")
+        .arg(Arg::with_name("kmer_size")
+            .long("kmer")
+            .short("k")
+            .takes_value(true)
+            .help("expecting a kmer size"))
+        .arg(Arg::with_name("sketch size")
+            .long("sketch")
             .short("s")
             .default_value("8")
             .help("size of probinhash sketch, default to 8"))
     .get_matches();
 
     // decode matches, check for dir
+        let datadir;
+        if matches.is_present("dir") {
+            println!("decoding argument dir");
+            datadir = matches.value_of("dir").ok_or("").unwrap().parse::<String>().unwrap();
+            if datadir == "" {
+                println!("parsing of dir failed");
+                std::process::exit(1);
+            }
 
+        }
+        else {
+            println!("dir argument is mandatory");
+            std::process::exit(1);
+        }
+        //
+        let mut sketch_size = 8;
+        if matches.is_present("size") {
+            sketch_size = matches.value_of("size").ok_or("").unwrap().parse::<u16>().unwrap();
+            println!("sketching size {}", sketch_size);
+        }
+        else {
+            println!("using default sketch size {}", sketch_size);
+        }
+        //
+        let dirpath = Path::new(&datadir);
+        //
+        process_dir(dirpath, &process_file);
  } // end of main
