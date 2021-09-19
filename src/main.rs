@@ -1,6 +1,9 @@
-//! tohnsw --dir [-d] dir --size [-s] size
-//!  --dir : the name of directory containing tree of GCF and GCA files 
-//! --size gives the size of probminhash sketch
+//! tohnsw --dir [-d] dir --sketch [-s] size --nbng [-n] nb
+//! 
+//! --dir : the name of directory containing tree of GCF and GCA files 
+//! --sketch gives the size of probminhash sketch ()integer value)
+//! --kmer [-k] gives the size of kmer to use for generating probminhash (integer value)
+//! --nbng [-n] gives the number of neihbours required in hnsw construction
 
 // must loop on sub directories , open gzipped files
 // extracts complete genomes possiby many in one file (get rid of capsid records if any)
@@ -20,6 +23,9 @@
 
 // for logging (debug mostly, switched at compile time in cargo.toml)
 use env_logger::{Builder};
+
+use hnsw_rs::prelude::*;
+use kmerutils::base::{sequence::*};
 
 // install a logger facility
 fn init_log() -> u64 {
@@ -51,8 +57,19 @@ fn process_file(file : &DirEntry) {
     let pathb = file.path();
     let mut reader = needletail::parse_fastx_file(&pathb).expect("expecting valid filename");
     while let Some(record) = reader.next() {
+        if record.is_err() {
+            println!("got bd record in file {:?}", file.file_name());
+            std::process::exit(1);
+        }
         // do we keep record ? we must get its id
-        // if we keep it we keep track of its id in file, we sketch it
+        let seqrec = record.expect("invalid record");
+        let id = seqrec.id();
+        let strid = String::from_utf8(Vec::from(id)).unwrap();
+        if strid.find("capsid").is_none() {
+            // if we keep it we keep track of its id in file, we compress it with 2 bits paer base
+            let newseq = Sequence::new(&seqrec.seq(), 2);
+        }
+
     }
 } // end of process_file
 
@@ -100,7 +117,12 @@ fn process_dir(dir: &Path, cb: &dyn Fn(&DirEntry)) -> io::Result<()> {
             .short("s")
             .default_value("8")
             .help("size of probinhash sketch, default to 8"))
-    .get_matches();
+        .arg(Arg::with_name("neighbours")
+            .long("nbng")
+            .short("n")
+            .takes_value(true)
+            .help("must specify number of neighbours in hnsw"))
+        .get_matches();
 
     // decode matches, check for dir
         let datadir;
@@ -111,10 +133,8 @@ fn process_dir(dir: &Path, cb: &dyn Fn(&DirEntry)) -> io::Result<()> {
                 println!("parsing of dir failed");
                 std::process::exit(1);
             }
-
         }
         else {
-            println!("dir argument is mandatory");
             std::process::exit(1);
         }
         //
@@ -127,7 +147,25 @@ fn process_dir(dir: &Path, cb: &dyn Fn(&DirEntry)) -> io::Result<()> {
             println!("using default sketch size {}", sketch_size);
         }
         //
+        let nbng;
+        if matches.is_present("neighbours") {
+            nbng = matches.value_of("size").ok_or("").unwrap().parse::<u16>().unwrap();
+            println!("nb neighbours in hnsw size {}", nbng);
+        }        
+        else {
+            std::process::exit(1);
+        }
+        //
         let dirpath = Path::new(&datadir);
         //
-        process_dir(dirpath, &process_file);
+        // create Hnsw structure 
+        //
+        let max_nb_conn = 48.min(3 * nbng as usize);
+        let ef_search = 200;
+        log::info!("setting max nb conn to : {:?}", max_nb_conn);
+        log::info!("setting ef_search to : {:?}", ef_search);
+        let _hnsw = Hnsw::<u32, DistHamming>::new(max_nb_conn , 700000, 16, ef_search, DistHamming{});
+        //
+        //
+        let _ = process_dir(dirpath, &process_file);
  } // end of main
