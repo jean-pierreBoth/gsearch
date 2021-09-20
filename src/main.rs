@@ -1,10 +1,12 @@
+#![allow(dead_code)]
+#![allow(unused_variables)]
+
 //! tohnsw --dir [-d] dir --sketch [-s] size --nbng [-n] nb
 //! 
 //! --dir : the name of directory containing tree of GCF and GCA files 
 //! --sketch gives the size of probminhash sketch ()integer value)
 //! --kmer [-k] gives the size of kmer to use for generating probminhash (integer value)
 //! --nbng [-n] gives the number of neihbours required in hnsw construction
-
 // must loop on sub directories , open gzipped files
 // extracts complete genomes possiby many in one file (get rid of capsid records if any)
 // compute probminhash sketch and store in a Hnsw.
@@ -25,7 +27,8 @@
 use env_logger::{Builder};
 
 use hnsw_rs::prelude::*;
-use kmerutils::base::{sequence::*};
+use kmerutils::base::{sequence::*, KmerT, Kmer32bit};
+use kmerutils::sketching::*;
 
 // install a logger facility
 fn init_log() -> u64 {
@@ -35,6 +38,28 @@ fn init_log() -> u64 {
 }
 
 
+/// A compressed sequence compressed to 2 bit / base
+/// This structure is used for returning info from function process_file
+/// and is sent to sketcher
+pub struct IdSeq {
+    /// id of genome Sketched
+    id : String,
+    /// Sequence
+    seq : Sequence
+}  // end of IdSeq
+
+
+struct SketcherParams {
+    kmer_size : usize,
+    sketch_size : usize,
+}
+
+
+struct HnswParams {
+    nbng : usize,
+    ef_search : usize,
+    max_nb_conn : usize,
+}
 
 // returns true if file is a fasta file (possibly gzipped)
 // filename are of type GCA[GCF]_000091165.1_genomic.fna.gz
@@ -52,8 +77,10 @@ fn is_fasta_file(file : &DirEntry) -> bool {
 
 
 // opens parse fna files with needletail
-// extracts records , filters out capsid
-fn process_file(file : &DirEntry) {
+// extracts records , filters out capsid and send 2 bits compressed sequence to some sketcher
+fn process_file(file : &DirEntry)  -> Vec<IdSeq> {
+    let mut to_sketch = Vec::<IdSeq>::new();
+    //
     let pathb = file.path();
     let mut reader = needletail::parse_fastx_file(&pathb).expect("expecting valid filename");
     while let Some(record) = reader.next() {
@@ -66,29 +93,32 @@ fn process_file(file : &DirEntry) {
         let id = seqrec.id();
         let strid = String::from_utf8(Vec::from(id)).unwrap();
         if strid.find("capsid").is_none() {
-            // if we keep it we keep track of its id in file, we compress it with 2 bits paer base
+            // if we keep it we keep track of its id in file, we compress it with 2 bits per base
             let newseq = Sequence::new(&seqrec.seq(), 2);
+            let seqwithid = IdSeq{id: strid, seq: newseq};
+            to_sketch.push(seqwithid);
         }
-
     }
+    // we must send to_sketch to some sketcher
+    return to_sketch;
 } // end of process_file
 
 
 
-// TODO This function should have a version bsed on tokio::fs
+// TODO This function should have a version based on tokio::fs
 // scan directory recursively, executing function cb.
 // taken from fd_find
-fn process_dir(dir: &Path, cb: &dyn Fn(&DirEntry)) -> io::Result<()> {
+fn process_dir(dir: &Path, file_task: &dyn Fn(&DirEntry) -> Vec<IdSeq>) -> io::Result<()> {
     if dir.is_dir() {
         for entry in fs::read_dir(dir)? {
             let entry = entry?;
             let path = entry.path();
             if path.is_dir() {
-                process_dir(&path, cb)?;
+                process_dir(&path, file_task)?;
             } else {
                 // check if entry is a fasta.gz file
                 if is_fasta_file(&entry) {
-                    cb(&entry);
+                    let to_sketch = file_task(&entry);
                 }
             }
         }
@@ -98,7 +128,7 @@ fn process_dir(dir: &Path, cb: &dyn Fn(&DirEntry)) -> io::Result<()> {
 
 
 
- fn main() {
+fn main() {
     let _ = init_log();
     //
     let matches = App::new("tohnsw")
@@ -137,7 +167,7 @@ fn process_dir(dir: &Path, cb: &dyn Fn(&DirEntry)) -> io::Result<()> {
         else {
             std::process::exit(1);
         }
-        //
+        // get sketching params
         let mut sketch_size = 8;
         if matches.is_present("size") {
             sketch_size = matches.value_of("size").ok_or("").unwrap().parse::<u16>().unwrap();
@@ -146,6 +176,16 @@ fn process_dir(dir: &Path, cb: &dyn Fn(&DirEntry)) -> io::Result<()> {
         else {
             println!("using default sketch size {}", sketch_size);
         }
+        //
+        let mut kmer_size = 8;
+        if matches.is_present("kmer_size") {
+            kmer_size = matches.value_of("size").ok_or("").unwrap().parse::<u16>().unwrap();
+            println!("kmer size {}", kmer_size);
+        }
+        else {
+            println!("using default kmer size {}", kmer_size);
+        }
+        let sketch_params =  SketcherParams{kmer_size : kmer_size as usize, sketch_size : sketch_size as usize};  
         //
         let nbng;
         if matches.is_present("neighbours") {
@@ -164,8 +204,20 @@ fn process_dir(dir: &Path, cb: &dyn Fn(&DirEntry)) -> io::Result<()> {
         let ef_search = 200;
         log::info!("setting max nb conn to : {:?}", max_nb_conn);
         log::info!("setting ef_search to : {:?}", ef_search);
+        let hnswparams = HnswParams{ nbng : nbng as usize, ef_search : ef_search, max_nb_conn : max_nb_conn};
         let _hnsw = Hnsw::<u32, DistHamming>::new(max_nb_conn , 700000, 16, ef_search, DistHamming{});
         //
+        // Sketcher allocation, we need reverse complement hashing
+        //
+        let kmer_revcomp_hash_fn = | kmer : &Kmer32bit | -> u32 {
+            let canonical =  kmer.reverse_complement().min(*kmer);
+            let hashval = probminhash::invhash::int32_hash(canonical.0);
+            hashval
+        };
+        let sketcher = seqsketchjaccard::SeqSketcher::new(kmer_size as usize, sketch_size as usize);
+        // to send IdSeq to sketch from reading thread to sketcher thread
+        let (s, r) = crossbeam_channel::bounded::<IdSeq>(100_000);
+
         //
         let _ = process_dir(dirpath, &process_file);
  } // end of main
