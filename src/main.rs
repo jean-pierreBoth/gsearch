@@ -26,6 +26,11 @@ use std::collections::VecDeque;
 // for logging (debug mostly, switched at compile time in cargo.toml)
 use env_logger::{Builder};
 
+// for multithreading
+use crossbeam_utils::thread::*;
+use crossbeam_channel::*;
+
+// our crate
 use hnsw_rs::prelude::*;
 use kmerutils::base::{sequence::*, KmerT, Kmer32bit};
 use kmerutils::sketching::*;
@@ -112,18 +117,19 @@ fn process_file(file : &DirEntry)  -> Vec<IdSeq> {
 // TODO This function should have a version based on tokio::fs
 // scan directory recursively, executing function cb.
 // taken from fd_find
-fn process_dir(dir: &Path, file_task: &dyn Fn(&DirEntry) -> Vec<IdSeq>) -> io::Result<()> {
+fn process_dir(dir: &Path, file_task: &dyn Fn(&DirEntry) -> Vec<IdSeq>, sender : &crossbeam_channel::Sender::<Vec<IdSeq>>) -> io::Result<()> {
     // we checked that we have a directory
     for entry in fs::read_dir(dir)? {
         let entry = entry?;
         let path = entry.path();
         if path.is_dir() {
-            process_dir(&path, file_task)?;
+            process_dir(&path, file_task, sender)?;
         } else {
             // check if entry is a fasta.gz file
             if is_fasta_file(&entry) {
                 let to_sketch = file_task(&entry);
                 // we must send to_sketch into channel to upper thread
+                sender.send(to_sketch).unwrap();
             }
         }
     }
@@ -134,7 +140,7 @@ fn process_dir(dir: &Path, file_task: &dyn Fn(&DirEntry) -> Vec<IdSeq>) -> io::R
 // this function does the sketching and hnsw store
 fn sketchandstore(dirpath : &Path, sketcher : &SketcherParams, hnswparams : &HnswParams) {
     // a queue of signature waiting to be inserted 
-   let insertion_queue : VecDeque<idsketch::IdSketch>= VecDeque::with_capacity(10000);
+    let insertion_queue : VecDeque<idsketch::IdSketch>= VecDeque::with_capacity(10000);
     let _hnsw = Hnsw::<u32, DistHamming>::new(hnswparams.max_nb_conn , 700000, 16, hnswparams.ef_search, DistHamming{});
     //
     // Sketcher allocation, we need reverse complement hashing
@@ -146,9 +152,19 @@ fn sketchandstore(dirpath : &Path, sketcher : &SketcherParams, hnswparams : &Hns
     };
     let sketcher = seqsketchjaccard::SeqSketcher::new(sketcher.kmer_size, sketcher.sketch_size);
     // to send IdSeq to sketch from reading thread to sketcher thread
-    let (send, receive) = crossbeam_channel::bounded::<IdSeq>(10_000);
+    let (send, receive) = crossbeam_channel::bounded::<Vec<IdSeq>>(10_000);
     // launch process_dir in a thread or async
-    let _ = process_dir(dirpath, &process_file);
+    crossbeam_utils::thread::scope(|scope| {
+        // sequence sending, productor thread
+        let sender_handle = scope.spawn(move |_|   {
+            let _ = process_dir(dirpath, &process_file, &send);
+            drop(send);
+        });
+        // sequence reception, consumer thread
+        let receptor_handle = scope.spawn(move |_| {
+            // we must read messages, sketch and insert into hnsw
+        }); // end of receptor thread
+    }).unwrap();
 
     // We must dump hnsw to save "database"
 } // end of sketchandstore
