@@ -16,12 +16,12 @@
 
 // hnsw should also run in a query server mode after insertion.
 
- use clap::{App, Arg};
+use clap::{App, Arg};
 
- use std::io;
- use std::fs::{self, DirEntry};
- use std::path::Path;
-
+use std::io;
+use std::fs::{self, DirEntry};
+use std::path::Path;
+use std::collections::VecDeque;
 
 // for logging (debug mostly, switched at compile time in cargo.toml)
 use env_logger::{Builder};
@@ -29,6 +29,10 @@ use env_logger::{Builder};
 use hnsw_rs::prelude::*;
 use kmerutils::base::{sequence::*, KmerT, Kmer32bit};
 use kmerutils::sketching::*;
+
+mod idsketch;
+pub use idsketch::*;
+
 
 // install a logger facility
 fn init_log() -> u64 {
@@ -109,17 +113,17 @@ fn process_file(file : &DirEntry)  -> Vec<IdSeq> {
 // scan directory recursively, executing function cb.
 // taken from fd_find
 fn process_dir(dir: &Path, file_task: &dyn Fn(&DirEntry) -> Vec<IdSeq>) -> io::Result<()> {
-    if dir.is_dir() {
-        for entry in fs::read_dir(dir)? {
-            let entry = entry?;
-            let path = entry.path();
-            if path.is_dir() {
-                process_dir(&path, file_task)?;
-            } else {
-                // check if entry is a fasta.gz file
-                if is_fasta_file(&entry) {
-                    let to_sketch = file_task(&entry);
-                }
+    // we checked that we have a directory
+    for entry in fs::read_dir(dir)? {
+        let entry = entry?;
+        let path = entry.path();
+        if path.is_dir() {
+            process_dir(&path, file_task)?;
+        } else {
+            // check if entry is a fasta.gz file
+            if is_fasta_file(&entry) {
+                let to_sketch = file_task(&entry);
+                // we must send to_sketch into channel to upper thread
             }
         }
     }
@@ -129,7 +133,8 @@ fn process_dir(dir: &Path, file_task: &dyn Fn(&DirEntry) -> Vec<IdSeq>) -> io::R
 
 // this function does the sketching and hnsw store
 fn sketchandstore(dirpath : &Path, sketcher : &SketcherParams, hnswparams : &HnswParams) {
-
+    // a queue of signature waiting to be inserted 
+   let insertion_queue : VecDeque<idsketch::IdSketch>= VecDeque::with_capacity(10000);
     let _hnsw = Hnsw::<u32, DistHamming>::new(hnswparams.max_nb_conn , 700000, 16, hnswparams.ef_search, DistHamming{});
     //
     // Sketcher allocation, we need reverse complement hashing
@@ -140,9 +145,12 @@ fn sketchandstore(dirpath : &Path, sketcher : &SketcherParams, hnswparams : &Hns
         hashval
     };
     let sketcher = seqsketchjaccard::SeqSketcher::new(sketcher.kmer_size, sketcher.sketch_size);
-
+    // to send IdSeq to sketch from reading thread to sketcher thread
+    let (send, receive) = crossbeam_channel::bounded::<IdSeq>(10_000);
+    // launch process_dir in a thread or async
     let _ = process_dir(dirpath, &process_file);
 
+    // We must dump hnsw to save "database"
 } // end of sketchandstore
 
 
@@ -187,6 +195,11 @@ fn main() {
         else {
             std::process::exit(1);
         }
+        let dirpath = Path::new(&datadir);
+        if !dirpath.is_dir() {
+            println!("error not a directory : {:?}", datadir);
+            std::process::exit(1);
+        }
         // get sketching params
         let mut sketch_size = 8;
         if matches.is_present("size") {
@@ -220,11 +233,9 @@ fn main() {
         let ef_search = 200;
         let hnswparams = HnswParams{nbng : nbng as usize, ef_search, max_nb_conn};
         //
-        let dirpath = Path::new(&datadir);
         //
         sketchandstore(&dirpath, &sketch_params, &hnswparams);
-        // to send IdSeq to sketch from reading thread to sketcher thread
-        let (s, r) = crossbeam_channel::bounded::<IdSeq>(100_000);
+
 
         //
  } // end of main
