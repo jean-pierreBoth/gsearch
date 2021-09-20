@@ -127,6 +127,26 @@ fn process_dir(dir: &Path, file_task: &dyn Fn(&DirEntry) -> Vec<IdSeq>) -> io::R
 }  // end of visit_dirs
 
 
+// this function does the sketching and hnsw store
+fn sketchandstore(dirpath : &Path, sketcher : &SketcherParams, hnswparams : &HnswParams) {
+
+    let _hnsw = Hnsw::<u32, DistHamming>::new(hnswparams.max_nb_conn , 700000, 16, hnswparams.ef_search, DistHamming{});
+    //
+    // Sketcher allocation, we need reverse complement hashing
+    //
+    let kmer_revcomp_hash_fn = | kmer : &Kmer32bit | -> u32 {
+        let canonical =  kmer.reverse_complement().min(*kmer);
+        let hashval = probminhash::invhash::int32_hash(canonical.0);
+        hashval
+    };
+    let sketcher = seqsketchjaccard::SeqSketcher::new(sketcher.kmer_size, sketcher.sketch_size);
+
+    let _ = process_dir(dirpath, &process_file);
+
+} // end of sketchandstore
+
+
+
 
 fn main() {
     let _ = init_log();
@@ -195,29 +215,16 @@ fn main() {
         else {
             std::process::exit(1);
         }
+        // TODO pass parameters via clap
+        let max_nb_conn = 48.min(3 * nbng as usize);
+        let ef_search = 200;
+        let hnswparams = HnswParams{nbng : nbng as usize, ef_search, max_nb_conn};
         //
         let dirpath = Path::new(&datadir);
         //
-        // create Hnsw structure 
-        //
-        let max_nb_conn = 48.min(3 * nbng as usize);
-        let ef_search = 200;
-        log::info!("setting max nb conn to : {:?}", max_nb_conn);
-        log::info!("setting ef_search to : {:?}", ef_search);
-        let hnswparams = HnswParams{ nbng : nbng as usize, ef_search : ef_search, max_nb_conn : max_nb_conn};
-        let _hnsw = Hnsw::<u32, DistHamming>::new(max_nb_conn , 700000, 16, ef_search, DistHamming{});
-        //
-        // Sketcher allocation, we need reverse complement hashing
-        //
-        let kmer_revcomp_hash_fn = | kmer : &Kmer32bit | -> u32 {
-            let canonical =  kmer.reverse_complement().min(*kmer);
-            let hashval = probminhash::invhash::int32_hash(canonical.0);
-            hashval
-        };
-        let sketcher = seqsketchjaccard::SeqSketcher::new(kmer_size as usize, sketch_size as usize);
+        sketchandstore(&dirpath, &sketch_params, &hnswparams);
         // to send IdSeq to sketch from reading thread to sketcher thread
         let (s, r) = crossbeam_channel::bounded::<IdSeq>(100_000);
 
         //
-        let _ = process_dir(dirpath, &process_file);
  } // end of main
