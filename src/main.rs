@@ -21,13 +21,11 @@ use clap::{App, Arg};
 use std::io;
 use std::fs::{self, DirEntry};
 use std::path::Path;
-use std::collections::VecDeque;
 
 // for logging (debug mostly, switched at compile time in cargo.toml)
 use env_logger::{Builder};
 
 // for multithreading
-use crossbeam_utils::thread::*;
 use crossbeam_channel::*;
 
 // our crate
@@ -137,11 +135,15 @@ fn process_dir(dir: &Path, file_task: &dyn Fn(&DirEntry) -> Vec<IdSeq>, sender :
 }  // end of visit_dirs
 
 
-// this function does the sketching and hnsw store
-fn sketchandstore(dirpath : &Path, sketcher : &SketcherParams, hnswparams : &HnswParams) {
-    // a queue of signature waiting to be inserted 
-    let insertion_queue : VecDeque<idsketch::IdSketch>= VecDeque::with_capacity(10000);
-    let _hnsw = Hnsw::<u32, DistHamming>::new(hnswparams.max_nb_conn , 700000, 16, hnswparams.ef_search, DistHamming{});
+
+
+// this function does the sketching and hnsw store of a whole directory
+fn sketchandstore_dir(dirpath : &Path, sketcher_params : &SketcherParams, hnsw_params : &HnswParams) {
+    // a queue of signature waiting to be inserted , size must be sufficient to benefit from threaded probminhash and insert
+    let insertion_block_size = 1000;
+    let mut insertion_queue : Vec<IdSeq>= Vec::with_capacity(insertion_block_size);
+    // TODO must get ef_search from clap via hnswparams
+    let _hnsw = Hnsw::<u32, DistHamming>::new(hnsw_params.max_nb_conn , 700000, 16, hnsw_params.ef_search, DistHamming{});
     //
     // Sketcher allocation, we need reverse complement hashing
     //
@@ -150,7 +152,7 @@ fn sketchandstore(dirpath : &Path, sketcher : &SketcherParams, hnswparams : &Hns
         let hashval = probminhash::invhash::int32_hash(canonical.0);
         hashval
     };
-    let sketcher = seqsketchjaccard::SeqSketcher::new(sketcher.kmer_size, sketcher.sketch_size);
+    let sketcher = seqsketchjaccard::SeqSketcher::new(sketcher_params.kmer_size, sketcher_params.sketch_size);
     // to send IdSeq to sketch from reading thread to sketcher thread
     let (send, receive) = crossbeam_channel::bounded::<Vec<IdSeq>>(10_000);
     // launch process_dir in a thread or async
@@ -163,6 +165,35 @@ fn sketchandstore(dirpath : &Path, sketcher : &SketcherParams, hnswparams : &Hns
         // sequence reception, consumer thread
         let receptor_handle = scope.spawn(move |_| {
             // we must read messages, sketch and insert into hnsw
+            let mut read_more = true;
+            while read_more {
+                // try read, if error is Disconnected we stop read and both threads are finished.
+                let res_receive = receive.recv();
+                match res_receive {
+                    Err(RecvError) => { read_more = false;
+                        // sketch the content of  insertion_queue if not empty
+                        if insertion_queue.len() > 0 {
+                            let sequencegroup_ref : Vec<&Sequence> = insertion_queue.iter().map(|s| &s.seq).collect();
+                            let signatures = sketcher.sketch_probminhash3a_kmer32bit(&sequencegroup_ref, kmer_revcomp_hash_fn);                            
+                            // we have Vec<u32> signatures we must go back to a vector of IdSketch for hnsw insertion
+                        }
+                    }
+                    Ok(mut idsequences) => {
+                        // concat the new idsketch in insertion queue.
+                        insertion_queue.append(&mut idsequences);
+                        // if insertion_queue is beyond threshold size we can go to threaded sketching and threading insertion
+                        if insertion_queue.len() > insertion_block_size {
+                            let sequencegroup_ref : Vec<&Sequence> = insertion_queue.iter().map(|s| &s.seq).collect();
+                            let signatures = sketcher.sketch_probminhash3a_kmer32bit(&sequencegroup_ref, kmer_revcomp_hash_fn);
+                            // we have Vec<u32> signatures we must go back to a vector of IdSketch for hnsw insertion
+
+                            // we reset insertion_queue
+                            insertion_queue.clear();
+                        }
+                    }
+                }
+            }
+            //
         }); // end of receptor thread
     }).unwrap();
 
@@ -250,7 +281,7 @@ fn main() {
         let hnswparams = HnswParams{nbng : nbng as usize, ef_search, max_nb_conn};
         //
         //
-        sketchandstore(&dirpath, &sketch_params, &hnswparams);
+        sketchandstore_dir(&dirpath, &sketch_params, &hnswparams);
 
 
         //
