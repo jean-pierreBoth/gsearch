@@ -49,6 +49,8 @@ fn init_log() -> u64 {
 /// This structure is used for returning info from function process_file
 /// and is sent to sketcher
 pub struct IdSeq {
+    /// as read is sequential we can identify uniquely sequence in hnsw
+    rank : usize,
     /// id of genome Sketched
     id : String,
     /// Sequence
@@ -102,7 +104,7 @@ fn process_file(file : &DirEntry)  -> Vec<IdSeq> {
         if strid.find("capsid").is_none() {
             // if we keep it we keep track of its id in file, we compress it with 2 bits per base
             let newseq = Sequence::new(&seqrec.seq(), 2);
-            let seqwithid = IdSeq{id: strid, seq: newseq};
+            let seqwithid = IdSeq{rank : 0, id: strid, seq: newseq};
             to_sketch.push(seqwithid);
         }
     }
@@ -115,7 +117,9 @@ fn process_file(file : &DirEntry)  -> Vec<IdSeq> {
 // TODO This function should have a version based on tokio::fs
 // scan directory recursively, executing function cb.
 // taken from fd_find
-fn process_dir(dir: &Path, file_task: &dyn Fn(&DirEntry) -> Vec<IdSeq>, sender : &crossbeam_channel::Sender::<Vec<IdSeq>>) -> io::Result<()> {
+fn process_dir(dir: &Path, file_task: &dyn Fn(&DirEntry) -> Vec<IdSeq>, sender : &crossbeam_channel::Sender::<Vec<IdSeq>>) -> io::Result<SeqDict> {
+    let mut nb_processed = 0;
+    let mut seqdict = SeqDict::new(100000);
     // we checked that we have a directory
     for entry in fs::read_dir(dir)? {
         let entry = entry?;
@@ -125,13 +129,25 @@ fn process_dir(dir: &Path, file_task: &dyn Fn(&DirEntry) -> Vec<IdSeq>, sender :
         } else {
             // check if entry is a fasta.gz file
             if is_fasta_file(&entry) {
-                let to_sketch = file_task(&entry);
+                let mut to_sketch = file_task(&entry);
+                // put a rank id in sequences;
+                for i in 0..to_sketch.len() {
+                    to_sketch[i].rank = nb_processed + i;
+                    seqdict.0.push(to_sketch[i].id.clone());
+                }
+                nb_processed += to_sketch.len();
                 // we must send to_sketch into channel to upper thread
                 sender.send(to_sketch).unwrap();
             }
         }
     }
-    Ok(())
+    println!("processed nb sequences : {}", nb_processed);
+    //
+    drop(sender);
+    //
+    // We must serialize and dump seqdict
+    //
+    Ok(seqdict)
 }  // end of visit_dirs
 
 
@@ -143,7 +159,7 @@ fn sketchandstore_dir(dirpath : &Path, sketcher_params : &SketcherParams, hnsw_p
     let insertion_block_size = 1000;
     let mut insertion_queue : Vec<IdSeq>= Vec::with_capacity(insertion_block_size);
     // TODO must get ef_search from clap via hnswparams
-    let _hnsw = Hnsw::<u32, DistHamming>::new(hnsw_params.max_nb_conn , 700000, 16, hnsw_params.ef_search, DistHamming{});
+    let hnsw = Hnsw::<u32, DistHamming>::new(hnsw_params.max_nb_conn , 700000, 16, hnsw_params.ef_search, DistHamming{});
     //
     // Sketcher allocation, we need reverse complement hashing
     //
@@ -157,11 +173,13 @@ fn sketchandstore_dir(dirpath : &Path, sketcher_params : &SketcherParams, hnsw_p
     let (send, receive) = crossbeam_channel::bounded::<Vec<IdSeq>>(10_000);
     // launch process_dir in a thread or async
     crossbeam_utils::thread::scope(|scope| {
+        let mut join_handles = Vec::new();
         // sequence sending, productor thread
         let sender_handle = scope.spawn(move |_|   {
             let _ = process_dir(dirpath, &process_file, &send);
             drop(send);
         });
+        join_handles.push(sender_handle);
         // sequence reception, consumer thread
         let receptor_handle = scope.spawn(move |_| {
             // we must read messages, sketch and insert into hnsw
@@ -174,8 +192,15 @@ fn sketchandstore_dir(dirpath : &Path, sketcher_params : &SketcherParams, hnsw_p
                         // sketch the content of  insertion_queue if not empty
                         if insertion_queue.len() > 0 {
                             let sequencegroup_ref : Vec<&Sequence> = insertion_queue.iter().map(|s| &s.seq).collect();
+                            let seq_id :  Vec<usize> = insertion_queue.iter().map(|s| s.rank).collect();
                             let signatures = sketcher.sketch_probminhash3a_kmer32bit(&sequencegroup_ref, kmer_revcomp_hash_fn);                            
                             // we have Vec<u32> signatures we must go back to a vector of IdSketch for hnsw insertion
+                            let mut data_for_hnsw = Vec::<(&Vec<u32>, usize)>::with_capacity(signatures.len());
+                            for i in 0..signatures.len() {
+                                data_for_hnsw.push((&signatures[i], seq_id[i]));
+                            }
+                            // parallel insertion
+                            hnsw.parallel_insert(&data_for_hnsw);
                         }
                     }
                     Ok(mut idsequences) => {
@@ -184,9 +209,15 @@ fn sketchandstore_dir(dirpath : &Path, sketcher_params : &SketcherParams, hnsw_p
                         // if insertion_queue is beyond threshold size we can go to threaded sketching and threading insertion
                         if insertion_queue.len() > insertion_block_size {
                             let sequencegroup_ref : Vec<&Sequence> = insertion_queue.iter().map(|s| &s.seq).collect();
+                            let seq_id :  Vec<usize> = insertion_queue.iter().map(|s| s.rank).collect();
                             let signatures = sketcher.sketch_probminhash3a_kmer32bit(&sequencegroup_ref, kmer_revcomp_hash_fn);
-                            // we have Vec<u32> signatures we must go back to a vector of IdSketch for hnsw insertion
-
+                            // we have Vec<u32> signatures we must go back to a vector of IdSketch, inserting unique id, for hnsw insertion
+                            let mut data_for_hnsw = Vec::<(&Vec<u32>, usize)>::with_capacity(signatures.len());
+                            for i in 0..signatures.len() {
+                                data_for_hnsw.push((&signatures[i], seq_id[i]));
+                            }
+                            // parallel insertion
+                            hnsw.parallel_insert(&data_for_hnsw);
                             // we reset insertion_queue
                             insertion_queue.clear();
                         }
@@ -195,8 +226,8 @@ fn sketchandstore_dir(dirpath : &Path, sketcher_params : &SketcherParams, hnsw_p
             }
             //
         }); // end of receptor thread
+        join_handles.push(receptor_handle);
     }).unwrap();
-
     // We must dump hnsw to save "database"
 } // end of sketchandstore
 
