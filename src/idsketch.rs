@@ -1,20 +1,28 @@
 //! The module gathers structures used to identify sequences stroed in Hnsw (with probminhash hash data) from a id
 
-
+use serde::{Deserialize, Serialize};
 use serde_json::{to_writer};
 
 use std::path::{PathBuf};
 use std::fs::OpenOptions;
 use std::io::{BufReader, BufWriter};
+use std::ffi::OsString;
 
 /// magic number identifying beginning of SeqDict dump
 const MAGIC_SEQDICT : u32 = 0x56E289;
 
-
+#[derive(Serialize,Deserialize)]
+pub struct Id {
+    /// path where seq was
+    path : OsString,
+    ///
+    fasta_id : String,
+}
 
 /// to keep track of sequence id by their rank. 
 /// So we can retrieve Seq description from Hnsw and the dictionary 
 /// TODO to be serialized and dumped
+/// 
 pub struct SeqDict(pub Vec<String>);
 
 

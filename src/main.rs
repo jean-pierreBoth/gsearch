@@ -20,6 +20,7 @@ use clap::{App, Arg};
 
 use std::io;
 use std::fs::{self, DirEntry};
+use std::ffi::OsString;
 use std::path::Path;
 
 // for logging (debug mostly, switched at compile time in cargo.toml)
@@ -45,15 +46,17 @@ fn init_log() -> u64 {
 }
 
 
-/// A compressed sequence compressed to 2 bit / base
+/// 
 /// This structure is used for returning info from function process_file
 /// and is sent to sketcher
 pub struct IdSeq {
     /// as read is sequential we can identify uniquely sequence in hnsw
     rank : usize,
-    /// id of genome Sketched
+    /// But we do not know in which order files are read, so we strore filename
+    path : OsString,
+    /// id of genome Sketched as read in head of fasta record.
     id : String,
-    /// Sequence
+    /// Sequence compressed to 2 bit / base
     seq : Sequence
 }  // end of IdSeq
 
@@ -83,6 +86,11 @@ fn is_fasta_file(file : &DirEntry) -> bool {
 }  // end of is_fasta_file
 
 
+/* // TODO
+ group process_file and process_dir in a structure that would maintain number of processed file
+ This structure would maintain a triplet association (filename, rank in file, seqid) 
+ So it could be easy to have the sequence knowing the triplet
+*/
 
 
 // opens parse fna files with needletail
@@ -104,7 +112,8 @@ fn process_file(file : &DirEntry)  -> Vec<IdSeq> {
         if strid.find("capsid").is_none() {
             // if we keep it we keep track of its id in file, we compress it with 2 bits per base
             let newseq = Sequence::new(&seqrec.seq(), 2);
-            let seqwithid = IdSeq{rank : 0, id: strid, seq: newseq};
+            // recall rank is set in process_dir beccause we should a have struct gatheing the 2 functions process_dir and process_file
+            let seqwithid = IdSeq{rank : 0, path : pathb.as_os_str().to_os_string(), id: strid, seq: newseq};
             to_sketch.push(seqwithid);
         }
     }
@@ -130,9 +139,10 @@ fn process_dir(dir: &Path, file_task: &dyn Fn(&DirEntry) -> Vec<IdSeq>, sender :
             // check if entry is a fasta.gz file
             if is_fasta_file(&entry) {
                 let mut to_sketch = file_task(&entry);
-                // put a rank id in sequences;
+                // put a rank id in sequences, now we have full information of where do the sequence come from
                 for i in 0..to_sketch.len() {
                     to_sketch[i].rank = nb_processed + i;
+                    // TODO we should store fname also. rank is in fact the rank of message sent but not really useful
                     seqdict.0.push(to_sketch[i].id.clone());
                 }
                 nb_processed += to_sketch.len();
