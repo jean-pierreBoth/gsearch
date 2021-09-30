@@ -1,5 +1,5 @@
-#![allow(dead_code)]
-#![allow(unused_variables)]
+//#![allow(dead_code)]
+//#![allow(unused_variables)]
 
 //! tohnsw --dir [-d] dir --sketch [-s] size --nbng [-n] nb
 //! 
@@ -20,7 +20,6 @@ use clap::{App, Arg};
 
 use std::io;
 use std::fs::{self, DirEntry};
-use std::ffi::OsString;
 use std::path::Path;
 
 // for logging (debug mostly, switched at compile time in cargo.toml)
@@ -35,7 +34,7 @@ use kmerutils::base::{sequence::*, KmerT, Kmer32bit};
 use kmerutils::sketching::*;
 
 mod idsketch;
-pub use idsketch::*;
+pub use idsketch::{SeqDict,Id};
 
 
 // install a logger facility
@@ -48,17 +47,32 @@ fn init_log() -> u64 {
 
 /// 
 /// This structure is used for returning info from function process_file
-/// and is sent to sketcher
+/// It stores all info on sequence.
+/// 
 pub struct IdSeq {
     /// as read is sequential we can identify uniquely sequence in hnsw
     rank : usize,
     /// But we do not know in which order files are read, so we strore filename
-    path : OsString,
+    path : String,
     /// id of genome Sketched as read in head of fasta record.
     id : String,
     /// Sequence compressed to 2 bit / base
     seq : Sequence
 }  // end of IdSeq
+
+impl IdSeq {
+    /// get file path 
+    pub fn get_path(&self) -> &String {
+        &self.path
+    }
+    
+    /// get fasta id
+    pub fn get_fasta_id(&self) -> &String {
+        &self.id
+    }
+
+} // end of impl IdSea
+
 
 
 struct SketcherParams {
@@ -68,7 +82,10 @@ struct SketcherParams {
 
 
 struct HnswParams {
+    #[allow(dead_code)]
     nbng : usize,
+    /// expected number of sequences to store
+    capacity : usize,
     ef_search : usize,
     max_nb_conn : usize,
 }
@@ -113,7 +130,7 @@ fn process_file(file : &DirEntry)  -> Vec<IdSeq> {
             // if we keep it we keep track of its id in file, we compress it with 2 bits per base
             let newseq = Sequence::new(&seqrec.seq(), 2);
             // recall rank is set in process_dir beccause we should a have struct gatheing the 2 functions process_dir and process_file
-            let seqwithid = IdSeq{rank : 0, path : pathb.as_os_str().to_os_string(), id: strid, seq: newseq};
+            let seqwithid = IdSeq{rank : 0, path : pathb.to_str().unwrap().to_string(), id: strid, seq: newseq};
             to_sketch.push(seqwithid);
         }
     }
@@ -123,12 +140,10 @@ fn process_file(file : &DirEntry)  -> Vec<IdSeq> {
 
 
 
-// TODO This function should have a version based on tokio::fs
-// scan directory recursively, executing function cb.
-// taken from fd_find
-fn process_dir(dir: &Path, file_task: &dyn Fn(&DirEntry) -> Vec<IdSeq>, sender : &crossbeam_channel::Sender::<Vec<IdSeq>>) -> io::Result<SeqDict> {
+// scan directory recursively, executing function file_task on each file.
+// adapted from from crate fd_find
+fn process_dir(dir: &Path, file_task: &dyn Fn(&DirEntry) -> Vec<IdSeq>, sender : &crossbeam_channel::Sender::<Vec<IdSeq>>) -> io::Result<usize> {
     let mut nb_processed = 0;
-    let mut seqdict = SeqDict::new(100000);
     // we checked that we have a directory
     for entry in fs::read_dir(dir)? {
         let entry = entry?;
@@ -142,8 +157,6 @@ fn process_dir(dir: &Path, file_task: &dyn Fn(&DirEntry) -> Vec<IdSeq>, sender :
                 // put a rank id in sequences, now we have full information of where do the sequence come from
                 for i in 0..to_sketch.len() {
                     to_sketch[i].rank = nb_processed + i;
-                    // TODO we should store fname also. rank is in fact the rank of message sent but not really useful
-                    seqdict.0.push(to_sketch[i].id.clone());
                 }
                 nb_processed += to_sketch.len();
                 // we must send to_sketch into channel to upper thread
@@ -155,9 +168,7 @@ fn process_dir(dir: &Path, file_task: &dyn Fn(&DirEntry) -> Vec<IdSeq>, sender :
     //
     drop(sender);
     //
-    // We must serialize and dump seqdict
-    //
-    Ok(seqdict)
+    Ok(nb_processed)
 }  // end of visit_dirs
 
 
@@ -166,10 +177,10 @@ fn process_dir(dir: &Path, file_task: &dyn Fn(&DirEntry) -> Vec<IdSeq>, sender :
 // this function does the sketching and hnsw store of a whole directory
 fn sketchandstore_dir(dirpath : &Path, sketcher_params : &SketcherParams, hnsw_params : &HnswParams) {
     // a queue of signature waiting to be inserted , size must be sufficient to benefit from threaded probminhash and insert
-    let insertion_block_size = 1000;
+    let insertion_block_size = 5000;
     let mut insertion_queue : Vec<IdSeq>= Vec::with_capacity(insertion_block_size);
     // TODO must get ef_search from clap via hnswparams
-    let hnsw = Hnsw::<u32, DistHamming>::new(hnsw_params.max_nb_conn , 700000, 16, hnsw_params.ef_search, DistHamming{});
+    let hnsw = Hnsw::<u32, DistHamming>::new(hnsw_params.max_nb_conn , hnsw_params.capacity , 16, hnsw_params.ef_search, DistHamming{});
     //
     // Sketcher allocation, we need reverse complement hashing
     //
@@ -192,6 +203,7 @@ fn sketchandstore_dir(dirpath : &Path, sketcher_params : &SketcherParams, hnsw_p
         join_handles.push(sender_handle);
         // sequence reception, consumer thread
         let receptor_handle = scope.spawn(move |_| {
+            let mut seqdict = SeqDict::new(100000);
             // we must read messages, sketch and insert into hnsw
             let mut read_more = true;
             while read_more {
@@ -202,12 +214,16 @@ fn sketchandstore_dir(dirpath : &Path, sketcher_params : &SketcherParams, hnsw_p
                         // sketch the content of  insertion_queue if not empty
                         if insertion_queue.len() > 0 {
                             let sequencegroup_ref : Vec<&Sequence> = insertion_queue.iter().map(|s| &s.seq).collect();
-                            let seq_id :  Vec<usize> = insertion_queue.iter().map(|s| s.rank).collect();
+                            // collect rank
+                            let seq_rank :  Vec<usize> = insertion_queue.iter().map(|s| s.rank).collect();
+                            // collect Id
+                            let mut seq_id :  Vec<Id> = insertion_queue.iter().map(|s| Id::new(s.get_path(), s.get_fasta_id())).collect();
+                            seqdict.0.append(&mut seq_id);
                             let signatures = sketcher.sketch_probminhash3a_kmer32bit(&sequencegroup_ref, kmer_revcomp_hash_fn);                            
                             // we have Vec<u32> signatures we must go back to a vector of IdSketch for hnsw insertion
                             let mut data_for_hnsw = Vec::<(&Vec<u32>, usize)>::with_capacity(signatures.len());
                             for i in 0..signatures.len() {
-                                data_for_hnsw.push((&signatures[i], seq_id[i]));
+                                data_for_hnsw.push((&signatures[i], seq_rank[i]));
                             }
                             // parallel insertion
                             hnsw.parallel_insert(&data_for_hnsw);
@@ -219,12 +235,16 @@ fn sketchandstore_dir(dirpath : &Path, sketcher_params : &SketcherParams, hnsw_p
                         // if insertion_queue is beyond threshold size we can go to threaded sketching and threading insertion
                         if insertion_queue.len() > insertion_block_size {
                             let sequencegroup_ref : Vec<&Sequence> = insertion_queue.iter().map(|s| &s.seq).collect();
-                            let seq_id :  Vec<usize> = insertion_queue.iter().map(|s| s.rank).collect();
+                            let seq_rank :  Vec<usize> = insertion_queue.iter().map(|s| s.rank).collect();
+                            // collect Id
+                            let mut seq_id :  Vec<Id> = insertion_queue.iter().map(|s| Id::new(s.get_path(), s.get_fasta_id())).collect();
+                            seqdict.0.append(&mut seq_id);
+                            // computes hash signature
                             let signatures = sketcher.sketch_probminhash3a_kmer32bit(&sequencegroup_ref, kmer_revcomp_hash_fn);
                             // we have Vec<u32> signatures we must go back to a vector of IdSketch, inserting unique id, for hnsw insertion
                             let mut data_for_hnsw = Vec::<(&Vec<u32>, usize)>::with_capacity(signatures.len());
                             for i in 0..signatures.len() {
-                                data_for_hnsw.push((&signatures[i], seq_id[i]));
+                                data_for_hnsw.push((&signatures[i], seq_rank[i]));
                             }
                             // parallel insertion
                             hnsw.parallel_insert(&data_for_hnsw);
@@ -235,10 +255,22 @@ fn sketchandstore_dir(dirpath : &Path, sketcher_params : &SketcherParams, hnsw_p
                 }
             }
             //
+            // We must dump hnsw to save "database"
+            //
+            let hnswdumpname = String::from("hnswdump");
+            log::info!("going to dump hnsw");
+            let resdump = hnsw.file_dump(&hnswdumpname);
+            match resdump {
+                Err(msg) => {
+                    println!("dump failed error msg : {}", msg);
+                },
+                _ =>  { println!("dump of hnsw ended");}
+            };
+            //
         }); // end of receptor thread
         join_handles.push(receptor_handle);
     }).unwrap();
-    // We must dump hnsw to save "database"
+
 } // end of sketchandstore
 
 
@@ -316,10 +348,10 @@ fn main() {
         else {
             std::process::exit(1);
         }
-        // TODO pass parameters via clap
-        let max_nb_conn = 48.min(3 * nbng as usize);
+        // max_nb_conn must be adapted to the number of neighbours we will want in searches.
+        let max_nb_conn = 64.min(2 * nbng as usize);
         let ef_search = 200;
-        let hnswparams = HnswParams{nbng : nbng as usize, ef_search, max_nb_conn};
+        let hnswparams = HnswParams{nbng : nbng as usize, capacity : 70000, ef_search, max_nb_conn};
         //
         //
         sketchandstore_dir(&dirpath, &sketch_params, &hnswparams);

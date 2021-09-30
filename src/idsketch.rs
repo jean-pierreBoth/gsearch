@@ -6,24 +6,31 @@ use serde_json::{to_writer};
 use std::path::{PathBuf};
 use std::fs::OpenOptions;
 use std::io::{BufReader, BufWriter};
-use std::ffi::OsString;
 
-/// magic number identifying beginning of SeqDict dump
-const MAGIC_SEQDICT : u32 = 0x56E289;
 
+
+/// This structure is a summary of struct IdSeq
+/// It is sent to sketcher thread, serialized and dump in a file so that its rank in dump file
+/// is the data id used in Hnsw. So we can go back from a neighbour returned by hnsw to identity of sequence.
 #[derive(Serialize,Deserialize)]
 pub struct Id {
     /// path where seq was
-    path : OsString,
+    path : String,
     ///
     fasta_id : String,
 }
 
+impl Id {
+    pub fn new(path : &String, id : &String) -> Self {
+        Id{ path : path.clone(), fasta_id : id.clone()}
+    }
+
+} // end of impl Id
+
 /// to keep track of sequence id by their rank. 
 /// So we can retrieve Seq description from Hnsw and the dictionary 
-/// TODO to be serialized and dumped
 /// 
-pub struct SeqDict(pub Vec<String>);
+pub struct SeqDict(pub Vec<Id>);
 
 
 
@@ -44,8 +51,8 @@ impl SeqDict {
         }
         let mut writer = BufWriter::new(fileres.unwrap());
         for v in &self.0 {
-            let id_str = serde_json::to_value(v).unwrap();
-            let _ = to_writer(&mut writer, &MAGIC_SEQDICT).unwrap();
+            // v is and Id struct
+            let _ = to_writer(&mut writer, &v).unwrap();
         }
         //
         println!("SeqDict dumped sequence dictionary, nb seq : {}", self.0.len());
@@ -58,7 +65,7 @@ impl SeqDict {
     /// To be used with reload of Hnsw structure to run as a service
     pub fn reload(filename : String) -> Result<SeqDict, String>  {
         //
-        let mut sequences =  Vec::<String>::with_capacity(100000);
+        let mut sequences =  Vec::<Id>::with_capacity(100000);
         let filepath = PathBuf::from(filename);
         let fileres = OpenOptions::new().read(true).open(&filepath);
         if fileres.is_err() {
@@ -69,12 +76,13 @@ impl SeqDict {
         //
         let mut nbloaded = 0;
         let loadfile = fileres.unwrap();
-        let reader = BufReader::new(loadfile); 
-        let stream = serde_json::Deserializer::from_reader(reader).into_iter::<serde_json::Value>();
+        let reader = BufReader::new(loadfile);
+        // we must deserialize Id structs 
+        let stream = serde_json::Deserializer::from_reader(reader).into_iter::<Id>();
         for value in stream {
-            sequences.push(value.unwrap().to_string());
+            sequences.push(value.unwrap());
             if log::log_enabled!(log::Level::Debug) && nbloaded <= 3 {
-                log::debug!(" nbloaded : {:?}, sesqid : {:?}", nbloaded, sequences[nbloaded]);
+                log::debug!(" nbloaded : {:?}, sesqid path : ({}, {})", nbloaded, sequences[nbloaded].path,sequences[nbloaded].fasta_id);
             }
             nbloaded += 1;
         } 
@@ -86,13 +94,3 @@ impl SeqDict {
 
 }  // end of impl SeqDict
 
-
-/// The structure to be embedded in Hnsw.
-/// The distance declared in Hnsw will be be on IdSketch, operating on the field sig
-/// The id is provided by reading thread and is stored separetely in a Dictionary to be serialized and dumped as the Hnsw structure.
-pub struct IdSketch {
-    /// (unique) id of genome Sketched
-    id : usize,
-    /// probminhash signature
-    sig : Vec<u32>,
-} // end of IdSketch
