@@ -116,6 +116,7 @@ fn process_file(file : &DirEntry)  -> Vec<IdSeq> {
     let mut to_sketch = Vec::<IdSeq>::new();
     //
     let pathb = file.path();
+    log::trace!("processing file {}", pathb.to_str().unwrap());
     let mut reader = needletail::parse_fastx_file(&pathb).expect("expecting valid filename");
     while let Some(record) = reader.next() {
         if record.is_err() {
@@ -132,6 +133,9 @@ fn process_file(file : &DirEntry)  -> Vec<IdSeq> {
             // recall rank is set in process_dir beccause we should a have struct gatheing the 2 functions process_dir and process_file
             let seqwithid = IdSeq{rank : 0, path : pathb.to_str().unwrap().to_string(), id: strid, seq: newseq};
             to_sketch.push(seqwithid);
+            if log::log_enabled!(log::Level::Trace) {
+                log::trace!("process_file, nb_sketched {} ", to_sketch.len());
+            }
         }
     }
     // we must send to_sketch to some sketcher
@@ -144,6 +148,7 @@ fn process_file(file : &DirEntry)  -> Vec<IdSeq> {
 // adapted from from crate fd_find
 fn process_dir(dir: &Path, file_task: &dyn Fn(&DirEntry) -> Vec<IdSeq>, sender : &crossbeam_channel::Sender::<Vec<IdSeq>>) -> io::Result<usize> {
     let mut nb_processed = 0;
+    log::trace!("processing_dir {}", dir.to_str().unwrap());
     // we checked that we have a directory
     for entry in fs::read_dir(dir)? {
         let entry = entry?;
@@ -176,6 +181,8 @@ fn process_dir(dir: &Path, file_task: &dyn Fn(&DirEntry) -> Vec<IdSeq>, sender :
 
 // this function does the sketching and hnsw store of a whole directory
 fn sketchandstore_dir(dirpath : &Path, sketcher_params : &SketcherParams, hnsw_params : &HnswParams) {
+    //
+    log::trace!("sketchandstore_dir processing dir {}", dirpath.to_str().unwrap());
     // a queue of signature waiting to be inserted , size must be sufficient to benefit from threaded probminhash and insert
     let insertion_block_size = 5000;
     let mut insertion_queue : Vec<IdSeq>= Vec::with_capacity(insertion_block_size);
@@ -194,13 +201,22 @@ fn sketchandstore_dir(dirpath : &Path, sketcher_params : &SketcherParams, hnsw_p
     let (send, receive) = crossbeam_channel::bounded::<Vec<IdSeq>>(10_000);
     // launch process_dir in a thread or async
     crossbeam_utils::thread::scope(|scope| {
-        let mut join_handles = Vec::new();
         // sequence sending, productor thread
+        let mut nb_sent = 0;
         let sender_handle = scope.spawn(move |_|   {
-            let _ = process_dir(dirpath, &process_file, &send);
+            let res_nb_sent = process_dir(dirpath, &process_file, &send);
+            match res_nb_sent {
+                Ok(nb_really_sent) => {
+                    nb_sent = nb_really_sent;
+                    println!("process_dir processed nb sequences : {}", nb_sent);
+                }
+                Err(_) => {
+                    println!("some error occured in process_dir");
+                }
+            };
             drop(send);
+            Box::new(nb_sent)
         });
-        join_handles.push(sender_handle);
         // sequence reception, consumer thread
         let receptor_handle = scope.spawn(move |_| {
             let mut seqdict = SeqDict::new(100000);
@@ -255,21 +271,32 @@ fn sketchandstore_dir(dirpath : &Path, sketcher_params : &SketcherParams, hnsw_p
                 }
             }
             //
-            // We must dump hnsw to save "database"
+            // We must dump hnsw to save "database" if not empty
+            // TODO we must have a method hnsw.get_nb_point()
             //
-            let hnswdumpname = String::from("hnswdump");
-            log::info!("going to dump hnsw");
-            let resdump = hnsw.file_dump(&hnswdumpname);
-            match resdump {
-                Err(msg) => {
-                    println!("dump failed error msg : {}", msg);
-                },
-                _ =>  { println!("dump of hnsw ended");}
-            };
+            if seqdict.0.len() > 0 {
+                let hnswdumpname = String::from("hnswdump");
+                log::info!("going to dump hnsw");
+                let resdump = hnsw.file_dump(&hnswdumpname);
+                match resdump {
+                    Err(msg) => {
+                        println!("dump failed error msg : {}", msg);
+                    },
+                    _ =>  { println!("dump of hnsw ended");}
+                };
+            }
+            else {
+                log::info!("no dumping hnsw, no data points");
+            }
             //
+            Box::new(seqdict.0.len())
         }); // end of receptor thread
-        join_handles.push(receptor_handle);
-    }).unwrap();
+        // now we must join handles
+        let nb_sent = sender_handle.join().unwrap();
+        let nb_received = receptor_handle.join().unwrap();
+        log::debug!("sketchandstore, nb_sent = {}, nb_received = {}", nb_sent, nb_received);
+        assert_eq!(nb_sent, nb_received);
+    }).unwrap();  // end of scope
 
 } // end of sketchandstore
 
@@ -313,6 +340,7 @@ fn main() {
             }
         }
         else {
+            println!("-d dirname is mandatory");
             std::process::exit(1);
         }
         let dirpath = Path::new(&datadir);
@@ -342,10 +370,11 @@ fn main() {
         //
         let nbng;
         if matches.is_present("neighbours") {
-            nbng = matches.value_of("size").ok_or("").unwrap().parse::<u16>().unwrap();
-            println!("nb neighbours in hnsw size {}", nbng);
+            nbng = matches.value_of("neighbours").ok_or("").unwrap().parse::<u16>().unwrap();
+            println!("nb neighbours you will need in hnsw requests {}", nbng);
         }        
         else {
+            println!("-n nbng is mandatory");
             std::process::exit(1);
         }
         // max_nb_conn must be adapted to the number of neighbours we will want in searches.
