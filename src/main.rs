@@ -129,7 +129,7 @@ fn process_file(file : &DirEntry)  -> Vec<IdSeq> {
         let strid = String::from_utf8(Vec::from(id)).unwrap();
         if strid.find("capsid").is_none() {
             // if we keep it we keep track of its id in file, we compress it with 2 bits per base
-            let newseq = Sequence::new(&seqrec.seq(), 2);
+            let newseq = Sequence::new(&seqrec.seq(), 4);
             // recall rank is set in process_dir beccause we should a have struct gatheing the 2 functions process_dir and process_file
             let seqwithid = IdSeq{rank : 0, path : pathb.to_str().unwrap().to_string(), id: strid, seq: newseq};
             to_sketch.push(seqwithid);
@@ -284,6 +284,14 @@ fn sketchandstore_dir(dirpath : &Path, sketcher_params : &SketcherParams, hnsw_p
                     },
                     _ =>  { println!("dump of hnsw ended");}
                 };
+                // dumping dictionary
+                let resdump = seqdict.dump(String::from("seqdict.json"));
+                match resdump {
+                    Err(msg) => {
+                        println!("seqdict dump failed error msg : {}", msg);
+                    },
+                    _ =>  { println!("dump of seqdict ended OK");}
+                };                
             }
             else {
                 log::info!("no dumping hnsw, no data points");
