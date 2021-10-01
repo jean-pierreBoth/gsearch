@@ -25,12 +25,16 @@ use std::path::Path;
 // for logging (debug mostly, switched at compile time in cargo.toml)
 use env_logger::{Builder};
 
+//
+use std::time::{SystemTime};
+use cpu_time::ProcessTime;
+
 // for multithreading
 use crossbeam_channel::*;
 
 // our crate
 use hnsw_rs::prelude::*;
-use kmerutils::base::{sequence::*, KmerT, Kmer32bit};
+use kmerutils::base::{sequence::*, Kmer32bit};
 use kmerutils::sketching::*;
 
 mod idsketch;
@@ -47,7 +51,7 @@ fn init_log() -> u64 {
 
 /// 
 /// This structure is used for returning info from function process_file
-/// It stores all info on sequence.
+/// It stores all info on sequence. 
 /// 
 pub struct IdSeq {
     /// as read is sequential we can identify uniquely sequence in hnsw
@@ -94,7 +98,7 @@ struct HnswParams {
 // filename are of type GCA[GCF]_000091165.1_genomic.fna.gz
 fn is_fasta_file(file : &DirEntry) -> bool {
     let filename = file.file_name().into_string().unwrap();
-    if filename.ends_with("fna.gz") {
+    if filename.ends_with("fna.gz")|| filename.ends_with("fa.gz") || filename.ends_with("fasta.gz") {
         return true;
     }
     else { 
@@ -107,7 +111,7 @@ fn is_fasta_file(file : &DirEntry) -> bool {
 fn filter_out_n(seq : &[u8]) -> Vec<u8> {
     let mut filtered = Vec::<u8>::with_capacity(seq.len());
     for c in seq {
-        if *c != 'N' as u8 {
+        if ['A','C', 'T', 'G'].contains(&(*c as char))  {
             filtered.push(*c);
         }
     }
@@ -146,7 +150,8 @@ fn process_file(file : &DirEntry)  -> Vec<IdSeq> {
             let filtered = filter_out_n(&seqrec.seq());
             let newseq = Sequence::new(&filtered, 2);
             if log::log_enabled!(log::Level::Trace) && filtered.len() < seqrec.seq().len() {
-                log::trace!("filtered nb non ACTG {}", seqrec.seq().len() - filtered.len());
+                let nb_n = seqrec.seq().len() - filtered.len();
+                log::trace!("filtered nb non ACTG {}, fraction  {:1.3e}", seqrec.seq().len() - filtered.len(), nb_n as f32/seqrec.seq().len() as f32);
             }
             // recall rank is set in process_dir beccause we should a have struct gatheing the 2 functions process_dir and process_file
             let seqwithid = IdSeq{rank : 0, path : pathb.to_str().unwrap().to_string(), id: strid, seq: newseq};
@@ -165,33 +170,36 @@ fn process_file(file : &DirEntry)  -> Vec<IdSeq> {
 // scan directory recursively, executing function file_task on each file.
 // adapted from from crate fd_find
 fn process_dir(dir: &Path, file_task: &dyn Fn(&DirEntry) -> Vec<IdSeq>, sender : &crossbeam_channel::Sender::<Vec<IdSeq>>) -> io::Result<usize> {
-    let mut nb_processed = 0;
-    log::trace!("processing_dir {}", dir.to_str().unwrap());
+    let mut nb_seq_processed = 0;
+    //
     // we checked that we have a directory
     for entry in fs::read_dir(dir)? {
         let entry = entry?;
         let path = entry.path();
         if path.is_dir() {
-            process_dir(&path, file_task, sender)?;
+            nb_seq_processed += process_dir(&path, file_task, sender)?;
         } else {
             // check if entry is a fasta.gz file
             if is_fasta_file(&entry) {
                 let mut to_sketch = file_task(&entry);
                 // put a rank id in sequences, now we have full information of where do the sequence come from
                 for i in 0..to_sketch.len() {
-                    to_sketch[i].rank = nb_processed + i;
+                    to_sketch[i].rank = nb_seq_processed + i;
                 }
-                nb_processed += to_sketch.len();
+                nb_seq_processed += to_sketch.len();
                 // we must send to_sketch into channel to upper thread
                 sender.send(to_sketch).unwrap();
             }
         }
     }
-    println!("processed nb sequences : {}", nb_processed);
+    if nb_seq_processed > 0 && nb_seq_processed % 50000 == 0 {
+        log::info!("processed nb sequences : {}", nb_seq_processed);
+    }
+    log::trace!("processed nb sequences : {}", nb_seq_processed);
     //
     drop(sender);
     //
-    Ok(nb_processed)
+    Ok(nb_seq_processed)
 }  // end of visit_dirs
 
 
@@ -201,17 +209,20 @@ fn process_dir(dir: &Path, file_task: &dyn Fn(&DirEntry) -> Vec<IdSeq>, sender :
 fn sketchandstore_dir(dirpath : &Path, sketcher_params : &SketcherParams, hnsw_params : &HnswParams) {
     //
     log::trace!("sketchandstore_dir processing dir {}", dirpath.to_str().unwrap());
+    log::info!("sketchandstore_dir {}", dirpath.to_str().unwrap());
+    let start_t = SystemTime::now();
+    let cpu_start = ProcessTime::now();
+    //
     // a queue of signature waiting to be inserted , size must be sufficient to benefit from threaded probminhash and insert
     let insertion_block_size = 5000;
     let mut insertion_queue : Vec<IdSeq>= Vec::with_capacity(insertion_block_size);
     // TODO must get ef_search from clap via hnswparams
     let hnsw = Hnsw::<u32, DistHamming>::new(hnsw_params.max_nb_conn , hnsw_params.capacity , 16, hnsw_params.ef_search, DistHamming{});
     //
-    // Sketcher allocation, we need reverse complement hashing
+    // Sketcher allocation, we do not need reverse complement hashing as we sketch assembled genomes. (Jianshu Zhao)
     //
-    let kmer_revcomp_hash_fn = | kmer : &Kmer32bit | -> u32 {
-        let canonical =  kmer.reverse_complement().min(*kmer);
-        let hashval = probminhash::invhash::int32_hash(canonical.0);
+    let kmer_hash_fn = | kmer : &Kmer32bit | -> u32 {
+        let hashval = probminhash::invhash::int32_hash(kmer.0);
         hashval
     };
     let sketcher = seqsketchjaccard::SeqSketcher::new(sketcher_params.kmer_size, sketcher_params.sketch_size);
@@ -253,7 +264,7 @@ fn sketchandstore_dir(dirpath : &Path, sketcher_params : &SketcherParams, hnsw_p
                             // collect Id
                             let mut seq_id :  Vec<Id> = insertion_queue.iter().map(|s| Id::new(s.get_path(), s.get_fasta_id())).collect();
                             seqdict.0.append(&mut seq_id);
-                            let signatures = sketcher.sketch_probminhash3a_kmer32bit(&sequencegroup_ref, kmer_revcomp_hash_fn);                            
+                            let signatures = sketcher.sketch_probminhash3a_kmer32bit(&sequencegroup_ref, kmer_hash_fn);                            
                             // we have Vec<u32> signatures we must go back to a vector of IdSketch for hnsw insertion
                             let mut data_for_hnsw = Vec::<(&Vec<u32>, usize)>::with_capacity(signatures.len());
                             for i in 0..signatures.len() {
@@ -274,7 +285,7 @@ fn sketchandstore_dir(dirpath : &Path, sketcher_params : &SketcherParams, hnsw_p
                             let mut seq_id :  Vec<Id> = insertion_queue.iter().map(|s| Id::new(s.get_path(), s.get_fasta_id())).collect();
                             seqdict.0.append(&mut seq_id);
                             // computes hash signature
-                            let signatures = sketcher.sketch_probminhash3a_kmer32bit(&sequencegroup_ref, kmer_revcomp_hash_fn);
+                            let signatures = sketcher.sketch_probminhash3a_kmer32bit(&sequencegroup_ref, kmer_hash_fn);
                             // we have Vec<u32> signatures we must go back to a vector of IdSketch, inserting unique id, for hnsw insertion
                             let mut data_for_hnsw = Vec::<(&Vec<u32>, usize)>::with_capacity(signatures.len());
                             for i in 0..signatures.len() {
@@ -321,9 +332,15 @@ fn sketchandstore_dir(dirpath : &Path, sketcher_params : &SketcherParams, hnsw_p
         let nb_sent = sender_handle.join().unwrap();
         let nb_received = receptor_handle.join().unwrap();
         log::debug!("sketchandstore, nb_sent = {}, nb_received = {}", nb_sent, nb_received);
-        assert_eq!(nb_sent, nb_received);
+        if nb_sent != nb_received {
+            log::error!("an error occurred  nb msg sent : {}, nb msg received : {}", nb_sent, nb_received);
+        }
     }).unwrap();  // end of scope
-
+    //
+    let cpu_time = cpu_start.elapsed().as_secs();
+    log::info!("process_dir : cpu time(s) {}", cpu_time);
+    let elapsed_t = start_t.elapsed().unwrap().as_secs() as f32;
+    log::info!("process_dir : elapsed time(s) {}", elapsed_t);
 } // end of sketchandstore
 
 
