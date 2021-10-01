@@ -42,7 +42,10 @@ impl SeqDict {
     /// serialize and dump
     /// At head of file we insert a Magic MAGIC_SEQDICT
     pub fn dump(&self, filename : String) -> Result<(), String> {
-        let filepath = PathBuf::from(filename);
+        let filepath = PathBuf::from(filename.clone());
+        //
+        log::info!("dumping sequence dicitionary in json file : {}", filename);
+        //
         let fileres = OpenOptions::new().write(true).create(true).truncate(true).open(&filepath);
         if fileres.is_err() {
             log::error!("SeqDict dump : dump could not open file {:?}", filepath.as_os_str());

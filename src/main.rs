@@ -103,6 +103,19 @@ fn is_fasta_file(file : &DirEntry) -> bool {
 }  // end of is_fasta_file
 
 
+#[inline]
+fn filter_out_n(seq : &[u8]) -> Vec<u8> {
+    let mut filtered = Vec::<u8>::with_capacity(seq.len());
+    for c in seq {
+        if *c != 'N' as u8 {
+            filtered.push(*c);
+        }
+    }
+    return filtered;
+}  // end of keep_atcg
+
+
+
 /* // TODO
  group process_file and process_dir in a structure that would maintain number of processed file
  This structure would maintain a triplet association (filename, rank in file, seqid) 
@@ -128,8 +141,13 @@ fn process_file(file : &DirEntry)  -> Vec<IdSeq> {
         let id = seqrec.id();
         let strid = String::from_utf8(Vec::from(id)).unwrap();
         if strid.find("capsid").is_none() {
-            // if we keep it we keep track of its id in file, we compress it with 2 bits per base
-            let newseq = Sequence::new(&seqrec.seq(), 4);
+            // Our Kmers are 2bits encoded so we need to be able to encode sequence in 2 bits, so there is 
+            // this hack,  causing reallocation. seqrec.seq is Cow so drain does not seem an option.
+            let filtered = filter_out_n(&seqrec.seq());
+            let newseq = Sequence::new(&filtered, 2);
+            if log::log_enabled!(log::Level::Trace) && filtered.len() < seqrec.seq().len() {
+                log::trace!("filtered nb non ACTG {}", seqrec.seq().len() - filtered.len());
+            }
             // recall rank is set in process_dir beccause we should a have struct gatheing the 2 functions process_dir and process_file
             let seqwithid = IdSeq{rank : 0, path : pathb.to_str().unwrap().to_string(), id: strid, seq: newseq};
             to_sketch.push(seqwithid);
