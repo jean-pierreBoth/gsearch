@@ -17,9 +17,14 @@ description = "probminhash hnsw archaea"
 name= "tohnsw"
 path= "src/main.rs"
 
+[[bin]]
+name= "request"
+path= "src/bin/request.rs"
 
 
+[lib]
 
+path = "src/lib.rs"
 
 
 [dependencies]
@@ -42,7 +47,6 @@ rayon = {version = "1.5"}
 num_cpus = {version = "1.13.0"}
 
 cpu-time = {version = "1.0"}
-time = {version = "0.2"}
 needletail = {version = "0.4"}
 clap = {version = "2.33"}
 

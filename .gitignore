@@ -6,3 +6,5 @@ rls*
 *.pdf
 *.html
 *.bin
+hnswdump*
+seqdict.json
