@@ -1,4 +1,5 @@
 //! The module gathers structures used to identify sequences stroed in Hnsw (with probminhash hash data) from a id
+#![allow(unused)]
 
 use serde::{Deserialize, Serialize};
 use serde_json::{to_writer};
@@ -7,6 +8,7 @@ use std::path::{PathBuf};
 use std::fs::OpenOptions;
 use std::io::{BufReader, BufWriter};
 
+use kmerutils::base::{sequence::*};
 
 
 /// This structure is a summary of struct IdSeq
@@ -26,6 +28,73 @@ impl Id {
     }
 
 } // end of impl Id
+
+
+
+/// parameters used in constructing database and for requests.
+/// The same values must be used for construction and requests so the structure is json serialized
+#[derive(Serialize,Deserialize)]
+pub struct SketcherParams {
+    kmer_size : usize,
+    sketch_size : usize,
+}
+
+impl SketcherParams {
+    /// allocator
+    pub fn new(kmer_size : usize, sketch_size : usize) -> Self {
+        SketcherParams{kmer_size,sketch_size}
+    }
+    /// returns kmer size
+    pub fn get_kmer_size(&self) -> usize {
+        self.kmer_size
+    }
+
+    /// return sketch size
+    pub fn get_sketch_size(&self) -> usize {
+        self.sketch_size
+    }    
+}
+
+/// 
+/// This structure is used for returning info from function process_file
+/// It stores all info on sequence. 
+/// 
+pub struct IdSeq {
+    /// as read is sequential we can identify uniquely sequence in hnsw
+    pub(crate) rank : usize,
+    /// But we do not know in which order files are read, so we strore filename
+    path : String,
+    /// id of genome Sketched as read in head of fasta record.
+    id : String,
+    /// Sequence compressed to 2 bit / base
+    seq : Sequence
+}  // end of IdSeq
+
+
+impl IdSeq {
+    ///
+    pub fn new(path : String, id: String, seq : Sequence) -> Self {
+        IdSeq{rank : 0, path, id, seq}
+    }
+    /// get file path 
+    pub fn get_path(&self) -> &String {
+        &self.path
+    }
+    
+    /// get fasta id
+    pub fn get_fasta_id(&self) -> &String {
+        &self.id
+    }
+
+    pub fn get_rank(&self) -> usize {
+        self.rank
+    }
+
+    pub fn get_sequence(&self) -> &Sequence {
+        &self.seq
+    }
+} // end of impl IdSea
+
 
 /// to keep track of sequence id by their rank. 
 /// So we can retrieve Seq description from Hnsw and the dictionary 
