@@ -7,4 +7,4 @@ rls*
 *.html
 *.bin
 hnswdump*
-seqdict.json
+*.json
