@@ -178,6 +178,8 @@ fn sketchandstore_dir(dirpath : &Path, sketcher_params : &SketcherParams, hnsw_p
             else {
                 log::info!("no dumping hnsw, no data points");
             }
+            // and finally dump sketchparams
+            let _ = sketcher_params.dump_json(&"sketchparams_dump.json".to_string());
             //
             Box::new(seqdict.0.len())
         }); // end of receptor thread
