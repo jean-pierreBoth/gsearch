@@ -35,11 +35,9 @@ use hnsw_rs::prelude::*;
 use kmerutils::base::{sequence::*, Kmer32bit};
 use kmerutils::sketching::*;
 
-mod idsketch;
-pub use idsketch::{SeqDict,Id, IdSeq, SketcherParams};
+use archaea::utils::idsketch::{SeqDict,Id, IdSeq, SketcherParams};
 
-mod files;
-use files::{process_dir,process_file};
+use archaea::utils::files::{process_dir,process_file};
 
 
 
@@ -247,7 +245,7 @@ fn main() {
             std::process::exit(1);
         }
         // get sketching params
-        let mut sketch_size = 8;
+        let mut sketch_size = 96;
         if matches.is_present("size") {
             sketch_size = matches.value_of("size").ok_or("").unwrap().parse::<u16>().unwrap();
             println!("sketching size {}", sketch_size);

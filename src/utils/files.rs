@@ -6,7 +6,7 @@ use std::fs::{self, DirEntry};
 use std::path::Path;
 use kmerutils::base::{sequence::*};
 
-use crate::idsketch::{IdSeq};
+use super::idsketch::{IdSeq};
 
 
 // returns true if file is a fasta file (possibly gzipped)

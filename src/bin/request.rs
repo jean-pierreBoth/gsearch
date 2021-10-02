@@ -30,9 +30,9 @@ use std::path::Path;
 use kmerutils::base::{sequence::*, Kmer32bit};
 use kmerutils::sketching::*;
 
-use archaea::idsketch::{SeqDict, Id, IdSeq, SketcherParams};
+use archaea::utils::idsketch::{SeqDict, Id, IdSeq, SketcherParams};
 //mod files;
-use archaea::files::{process_dir,process_file};
+use archaea::utils::files::{process_dir,process_file};
 
 
 // install a logger facility
@@ -93,7 +93,7 @@ fn sketch_and_request_dir(dirpath : &Path, sketcher_params : &SketcherParams) {
                 // try read, if error is Disconnected we stop read and both threads are finished.
                 let res_receive = receive.recv();
                 match res_receive {
-                    Err(RecvError) => { read_more = false;
+                    Err(_) => { read_more = false;
                         // sketch the content of  insertion_queue if not empty
                         if insertion_queue.len() > 0 {
                             let sequencegroup_ref : Vec<&Sequence> = insertion_queue.iter().map(|s| s.get_sequence()).collect();
@@ -108,7 +108,7 @@ fn sketch_and_request_dir(dirpath : &Path, sketcher_params : &SketcherParams) {
                             for i in 0..signatures.len() {
                                 data_for_hnsw.push((&signatures[i], seq_rank[i]));
                             }
-                            // parallel insertion
+                            // TODO parallel search
 //                            hnsw.parallel_insert(&data_for_hnsw);
                         }
                     }
@@ -129,7 +129,7 @@ fn sketch_and_request_dir(dirpath : &Path, sketcher_params : &SketcherParams) {
                             for i in 0..signatures.len() {
                                 data_for_hnsw.push((&signatures[i], seq_rank[i]));
                             }
-                            // parallel insertion
+                            // TODO parallel search
 //                            hnsw.parallel_insert(&data_for_hnsw);
                             // we reset insertion_queue
                             insertion_queue.clear();
@@ -145,7 +145,7 @@ fn sketch_and_request_dir(dirpath : &Path, sketcher_params : &SketcherParams) {
         // now we must join handles
         let nb_sent = sender_handle.join().unwrap();
         let nb_received = receptor_handle.join().unwrap();
-        log::debug!("sketchandstore, nb_sent = {}, nb_received = {}", nb_sent, nb_received);
+        log::debug!("sketch_and_request_dir, nb_sent = {}, nb_received = {}", nb_sent, nb_received);
         if nb_sent != nb_received {
             log::error!("an error occurred  nb msg sent : {}, nb msg received : {}", nb_sent, nb_received);
         }
@@ -155,7 +155,7 @@ fn sketch_and_request_dir(dirpath : &Path, sketcher_params : &SketcherParams) {
     log::info!("process_dir : cpu time(s) {}", cpu_time);
     let elapsed_t = start_t.elapsed().unwrap().as_secs() as f32;
     log::info!("process_dir : elapsed time(s) {}", elapsed_t);
-} // end of sketchandstore
+} // end of sketch_and_request_dir 
 
 
 
@@ -208,13 +208,13 @@ fn main() {
             std::process::exit(1);
         }
         // get sketching params
-        let mut sketch_size = 8;
+        let mut sketch_size = 96;
         if matches.is_present("size") {
             sketch_size = matches.value_of("size").ok_or("").unwrap().parse::<u16>().unwrap();
-            println!("sketching size {}", sketch_size);
+            println!("do you know what you are doing, sketching size {}", sketch_size);
         }
         else {
-            println!("using default sketch size {}", sketch_size);
+            println!("will use dumped sketch size");
         }
         //
         let mut kmer_size = 8;
@@ -223,10 +223,10 @@ fn main() {
             println!("kmer size {}", kmer_size);
         }
         else {
-            println!("using default kmer size {}", kmer_size);
+            println!("will use dumped kmer size");
         }
 
-        // in fact sketch_params must be initialized from the dup directory
+        // in fact sketch_params must be initialized from the dump directory
         let sketch_params =  SketcherParams::new(kmer_size as usize, sketch_size as usize);  
         //
         let nbng;
@@ -238,4 +238,7 @@ fn main() {
             println!("-n nbng is mandatory");
             std::process::exit(1);
         }
+
+        sketch_and_request_dir(&dirpath, &sketch_params);
+
 }  // end of main

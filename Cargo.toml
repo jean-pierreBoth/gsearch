@@ -15,7 +15,7 @@ description = "probminhash hnsw archaea"
 [[bin]]
 
 name= "tohnsw"
-path= "src/main.rs"
+path= "src/bin/tohnsw.rs"
 
 [[bin]]
 name= "request"
