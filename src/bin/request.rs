@@ -25,8 +25,9 @@ use env_logger::{Builder};
 use std::time::{SystemTime};
 use cpu_time::ProcessTime;
 use std::path::Path;
+use std::fs::OpenOptions;
 
-
+use hnsw_rs::prelude::*;
 use kmerutils::base::{sequence::*, Kmer32bit};
 use kmerutils::sketching::*;
 
@@ -43,19 +44,18 @@ pub fn init_log() -> u64 {
 }
 
 
-// this function does the sketching and hnsw store of a whole directory
-fn sketch_and_request_dir(dirpath : &Path, sketcher_params : &SketcherParams) {
+/// this function does the sketching and hnsw store of a whole directory
+/// dumpdir_path is the path to directory containing dump of Hnsw, database sequence dictionary and sketchparams.
+/// request_dirpath is the directory containing the fasta files which are the requests.
+fn sketch_and_request_dir(request_dirpath : &Path, hnsw : &Hnsw<u32,DistHamming>, sketcher_params : &SketcherParams, knbn : usize, ef_search : usize) {
     //
-    log::trace!("sketch_and_request_dir processing dir {}", dirpath.to_str().unwrap());
-    log::info!("sketch_and_request_dir {}", dirpath.to_str().unwrap());
+    log::trace!("sketch_and_request_dir processing dir {}", request_dirpath.to_str().unwrap());
+    log::info!("sketch_and_request_dir {}", request_dirpath.to_str().unwrap());
     let start_t = SystemTime::now();
     let cpu_start = ProcessTime::now();
-    //
-    // a queue of signature waiting to be inserted , size must be sufficient to benefit from threaded probminhash and insert
-    let insertion_block_size = 5000;
-    let mut insertion_queue : Vec<IdSeq>= Vec::with_capacity(insertion_block_size);
-    // reload hnsw
-//    let hnsw = Hnsw::<u32, DistHamming>::new(hnsw_params.max_nb_conn , hnsw_params.capacity , 16, hnsw_params.ef_search, DistHamming{});
+    // a queue of signature request , size must be sufficient to benefit from threaded probminhash and search
+    let request_block_size = 500;
+    let mut request_queue : Vec<IdSeq>= Vec::with_capacity(request_block_size);
     //
     // Sketcher allocation, we do not need reverse complement hashing as we sketch assembled genomes. (Jianshu Zhao)
     //
@@ -71,7 +71,7 @@ fn sketch_and_request_dir(dirpath : &Path, sketcher_params : &SketcherParams) {
         // sequence sending, productor thread
         let mut nb_sent = 0;
         let sender_handle = scope.spawn(move |_|   {
-            let res_nb_sent = process_dir(dirpath, &process_file, &send);
+            let res_nb_sent = process_dir(request_dirpath, &process_file, &send);
             match res_nb_sent {
                 Ok(nb_really_sent) => {
                     nb_sent = nb_really_sent;
@@ -95,12 +95,12 @@ fn sketch_and_request_dir(dirpath : &Path, sketcher_params : &SketcherParams) {
                 match res_receive {
                     Err(_) => { read_more = false;
                         // sketch the content of  insertion_queue if not empty
-                        if insertion_queue.len() > 0 {
-                            let sequencegroup_ref : Vec<&Sequence> = insertion_queue.iter().map(|s| s.get_sequence()).collect();
+                        if request_queue.len() > 0 {
+                            let sequencegroup_ref : Vec<&Sequence> = request_queue.iter().map(|s| s.get_sequence()).collect();
                             // collect rank
-                            let seq_rank :  Vec<usize> = insertion_queue.iter().map(|s| s.get_rank()).collect();
+                            let seq_rank :  Vec<usize> = request_queue.iter().map(|s| s.get_rank()).collect();
                             // collect Id
-                            let mut seq_id :  Vec<Id> = insertion_queue.iter().map(|s| Id::new(s.get_path(), s.get_fasta_id())).collect();
+                            let mut seq_id :  Vec<Id> = request_queue.iter().map(|s| Id::new(s.get_path(), s.get_fasta_id())).collect();
                             seqdict.0.append(&mut seq_id);
                             let signatures = sketcher.sketch_probminhash3a_kmer32bit(&sequencegroup_ref, kmer_hash_fn);                            
                             // we have Vec<u32> signatures we must go back to a vector of IdSketch for hnsw insertion
@@ -114,13 +114,13 @@ fn sketch_and_request_dir(dirpath : &Path, sketcher_params : &SketcherParams) {
                     }
                     Ok(mut idsequences) => {
                         // concat the new idsketch in insertion queue.
-                        insertion_queue.append(&mut idsequences);
-                        // if insertion_queue is beyond threshold size we can go to threaded sketching and threading insertion
-                        if insertion_queue.len() > insertion_block_size {
-                            let sequencegroup_ref : Vec<&Sequence> = insertion_queue.iter().map(|s| s.get_sequence()).collect();
-                            let seq_rank :  Vec<usize> = insertion_queue.iter().map(|s| s.get_rank()).collect();
+                        request_queue.append(&mut idsequences);
+                        // if request_queue is beyond threshold size we can go to threaded sketching and threading insertion
+                        if request_queue.len() > request_block_size {
+                            let sequencegroup_ref : Vec<&Sequence> = request_queue.iter().map(|s| s.get_sequence()).collect();
+                            let seq_rank :  Vec<usize> = request_queue.iter().map(|s| s.get_rank()).collect();
                             // collect Id
-                            let mut seq_id :  Vec<Id> = insertion_queue.iter().map(|s| Id::new(s.get_path(), s.get_fasta_id())).collect();
+                            let mut seq_id :  Vec<Id> = request_queue.iter().map(|s| Id::new(s.get_path(), s.get_fasta_id())).collect();
                             seqdict.0.append(&mut seq_id);
                             // computes hash signature
                             let signatures = sketcher.sketch_probminhash3a_kmer32bit(&sequencegroup_ref, kmer_hash_fn);
@@ -130,9 +130,11 @@ fn sketch_and_request_dir(dirpath : &Path, sketcher_params : &SketcherParams) {
                                 data_for_hnsw.push((&signatures[i], seq_rank[i]));
                             }
                             // TODO parallel search
+                            let knn_neighbours  = hnsw.parallel_search(&anndata.test_data, knbn, ef_search);
+
 //                            hnsw.parallel_insert(&data_for_hnsw);
                             // we reset insertion_queue
-                            insertion_queue.clear();
+                            request_queue.clear();
                         }
                     }
                 }
@@ -159,6 +161,22 @@ fn sketch_and_request_dir(dirpath : &Path, sketcher_params : &SketcherParams) {
 
 
 
+/// reload hnsw from dump directory
+/// We know filename : hnswdump.hnsw.data and hnswdump.hnsw.graph
+fn reload_hnsw(dump_dirpath : &Path) -> Option<Hnsw<u32, DistHamming>> {
+    // just concat dirpath to filenames and get pathbuf
+    let graph_path = dump_dirpath.join("/hnswdump.hnsw.graph");
+    let graphfile = OpenOptions::new().read(true).open(&graph_path);
+    if graphfile.is_err() {
+        println!("test_dump_reload: could not open file {:?}", graph_path.as_os_str());
+        std::panic::panic_any("test_dump_reload: could not open file".to_string());            
+    }
+    let graphfile = graphfile.unwrap();
+    //
+    let data_path = dump_dirpath.join("/hnswdump.hnsw.data");
+    //  
+    None
+} // end of reload_hnsw
 
 
 
@@ -166,11 +184,16 @@ fn main() {
     let _ = init_log();
     //
     let matches = App::new("request")
-        .arg(Arg::with_name("dir")
-            .long("dir")
-            .short("d")
+        .arg(Arg::with_name("request_dir")
+            .long("reqdir")
+            .short("r")
             .takes_value(true)
-            .help("name of directory containing genomes to index"))
+            .help("name of directory containing request genomes to index"))
+        .arg(Arg::with_name("database_dir")
+            .long("datadir")
+            .short("b")
+            .takes_value(true)
+            .help("name of directory containing database reference genomes"))            
         .arg(Arg::with_name("kmer_size")
             .long("kmer")
             .short("k")
@@ -188,25 +211,48 @@ fn main() {
             .help("must specify number of neighbours in hnsw"))
         .get_matches();
 
-    // decode matches, check for dir
-        let datadir;
-        if matches.is_present("dir") {
+        // decode matches, check for request_dir
+        let request_dir;
+        if matches.is_present("request_dir") {
             println!("decoding argument dir");
-            datadir = matches.value_of("dir").ok_or("").unwrap().parse::<String>().unwrap();
-            if datadir == "" {
-                println!("parsing of dir failed");
+            request_dir = matches.value_of("reqdir").ok_or("").unwrap().parse::<String>().unwrap();
+            if request_dir == "" {
+                println!("parsing of request_dir failed");
                 std::process::exit(1);
             }
         }
         else {
-            println!("-d dirname is mandatory");
+            println!("-r request_dir is mandatory");
             std::process::exit(1);
         }
-        let dirpath = Path::new(&datadir);
-        if !dirpath.is_dir() {
-            println!("error not a directory : {:?}", datadir);
+        let request_dirpath = Path::new(&request_dir);
+        if !request_dirpath.is_dir() {
+            println!("error not a directory : {:?}", request_dirpath);
             std::process::exit(1);
         }
+
+        // parse database dir
+        let database_dir;
+        if matches.is_present("database_dir") {
+            println!("decoding argument dir");
+            database_dir = matches.value_of("datadir").ok_or("").unwrap().parse::<String>().unwrap();
+            if database_dir == "" {
+                println!("parsing of database_dir failed");
+                std::process::exit(1);
+            }
+        }
+        else {
+            println!("-r database_dir is mandatory");
+            std::process::exit(1);
+        }
+        let database_dirpath = Path::new(&database_dir);
+        if !database_dirpath.is_dir() {
+            println!("error not a directory : {:?}", database_dirpath);
+            std::process::exit(1);
+        }
+
+
+
         // get sketching params
         let mut sketch_size = 96;
         if matches.is_present("size") {
@@ -238,7 +284,20 @@ fn main() {
             println!("-n nbng is mandatory");
             std::process::exit(1);
         }
-
-        sketch_and_request_dir(&dirpath, &sketch_params);
+        //
+        // Do all dump reload, first Hns
+        //
+        let hnsw = reload_hnsw(database_dirpath);
+        let hnsw = match hnsw {
+            Some(hnsw) => hnsw,
+            _ => {
+                panic!("hnsw reload from dump dir {} failed", database_dirpath.to_str().unwrap());
+            }
+        };
+        // reload Sketchparams
+        // reloat SeqDict
+        // 
+        let ef_search = 200;
+        sketch_and_request_dir(&request_dirpath, &hnsw, &sketch_params, nbng as usize, ef_search);
 
 }  // end of main
