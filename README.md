@@ -1,6 +1,8 @@
-# A Simple database of primitive genoma
+# A rust classifier based on HNSW for prokaryotic genomes
 
-This package (**currently in development**) compute probminhash signature of  bacteria and archaea genomes and stores the id of bacteria and probminhash signature in a Hnsw structure
+archaea stands for: <u>a<u> <u>r<u>ust <u>c<u>lassifier <u>H<u>i<u>e<u>rarchical N<u>a<u>vigable SW graphs
+
+This package (**currently in development**) compute probminhash signature of  bacteria and archaea genomes and stores the id of bacteria and probminhash signature in a Hnsw structure for searching of new request genomes
 
 This package is developped in collaboration with Jianshu Zhao
 
@@ -34,7 +36,11 @@ The Dictionary is dumped in a json file *seqdict.json*
 
 For requests  the module ***request*** is being used. It reloads the dumped files, hnsw and seqdict related
 takes a list of fasta files containing requests and for each fasta file dumps the asked number of nearest neighbours.
+  
+## Classify
+ The classify module is used to assign taxonomy information from requested neighbours to query genomes. Average nucleitide identity will be calculated
 
 ## compilation
 
 cargo build --release --bin tohnsw
+cargo build --release --bin request
