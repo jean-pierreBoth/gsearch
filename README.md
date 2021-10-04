@@ -4,6 +4,22 @@ This package (**currently in development**) compute probminhash signature of  ba
 
 This package is developped in collaboration with Jianshu Zhao
 
+# Dependencies
+Two libraries, zeromq, libsodium are required to successfully compile. 
+
+```
+### if you are using Linux (ubuntu for example), install them first
+sudo apt-get install libzmq-dev libsodium-dev
+
+### if you are using MacOS
+brew install zeromq
+brew install libsodium
+
+### if you are using conda or on a server, you can install them first, but remember to add library configuration path and dynamic library config path to you environmental variables
+conda install -c anaconda zeromq libsodium
+export PKG_CONFIG_PATH="~/miniconda3/lib/pkgconfig:$PKG_CONFIG_PATH"
+export LD_CONFIG_PATH="~/miniconda3/lib:$LD_CONFIG_PATH"
+```
 ## Sketching of genomes
 
 The sketching and database is done by the module ***tohnsw***.
