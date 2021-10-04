@@ -4,7 +4,7 @@
 use serde::{Deserialize, Serialize};
 use serde_json::{to_writer};
 
-use std::path::{PathBuf};
+use std::path::{Path, PathBuf};
 use std::fs::OpenOptions;
 use std::io::{BufReader, BufWriter};
 
@@ -18,7 +18,7 @@ use kmerutils::base::{sequence::*};
 pub struct Id {
     /// path where seq was
     path : String,
-    ///
+    /// fasta id 
     fasta_id : String,
 }
 
@@ -27,6 +27,9 @@ impl Id {
         Id{ path : path.clone(), fasta_id : id.clone()}
     }
 
+    pub fn get_fasta_id(&self) -> &String {
+        return &self.fasta_id;
+    }
 } // end of impl Id
 
 
@@ -76,8 +79,8 @@ impl SketcherParams {
 
 
     /// reload from a json dump
-    pub fn reload_json(filename : String) -> Result<SketcherParams, String> {
-        let filepath = PathBuf::from(filename);
+    pub fn reload_json(dirpath : &Path) -> Result<SketcherParams, String> {
+        let filepath = dirpath.join("/sketchparams_dump.json");
         let fileres = OpenOptions::new().read(true).open(&filepath);
         if fileres.is_err() {
             log::error!("SketcherParams reload_json : reload could not open file {:?}", filepath.as_os_str());
@@ -87,9 +90,12 @@ impl SketcherParams {
         //
         let loadfile = fileres.unwrap();
         let reader = BufReader::new(loadfile);
-        let sketch_params:SketcherParams = serde_json::from_reader(reader).unwrap();      
+        let sketch_params:SketcherParams = serde_json::from_reader(reader).unwrap();
         //
-        Err("not yet implemented".to_string())
+        log::info!("SketchParams reload, kmer_size : {}, sketch_size : {}", 
+            sketch_params.get_kmer_size(), sketch_params.get_sketch_size());     
+        //
+        Ok(sketch_params)
     } // end of reload_json
 
 
@@ -104,7 +110,7 @@ impl SketcherParams {
 pub struct IdSeq {
     /// as read is sequential we can identify uniquely sequence in hnsw
     pub(crate) rank : usize,
-    /// But we do not know in which order files are read, so we strore filename
+    /// But we do not know in which order files are read, so we store filename
     path : String,
     /// id of genome Sketched as read in head of fasta record.
     id : String,
@@ -177,7 +183,7 @@ impl SeqDict {
 
     /// reload from dump to avoid parsing again files. 
     /// To be used with reload of Hnsw structure to run as a service
-    pub fn reload(filename : String) -> Result<SeqDict, String>  {
+    pub fn reload(filename : &String) -> Result<SeqDict, String>  {
         //
         let mut sequences =  Vec::<Id>::with_capacity(100000);
         let filepath = PathBuf::from(filename);

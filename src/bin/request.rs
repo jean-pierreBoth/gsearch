@@ -24,10 +24,14 @@ use env_logger::{Builder};
 //
 use std::time::{SystemTime};
 use cpu_time::ProcessTime;
-use std::path::Path;
-use std::fs::OpenOptions;
+
+
+use std::path::{Path, PathBuf};
+use std::fs::{OpenOptions, File};
+use std::io::{Write,BufWriter};
 
 use hnsw_rs::prelude::*;
+use hnsw_rs::hnswio::{load_description, load_hnsw};
 use kmerutils::base::{sequence::*, Kmer32bit};
 use kmerutils::sketching::*;
 
@@ -44,13 +48,61 @@ pub fn init_log() -> u64 {
 }
 
 
+/// An answer hs a rank (in which it is processed), the fasta Id corresponding to request sequence, and
+/// the asked list of neighbours.
+/// The neighbours are identified by an id in the database. To retrieve the fasta identity 
+/// of the neighbour we will need the SeqDict
+pub struct ReqAnswer {
+    rank : usize,
+    /// fasta id of the request
+    fasta_id : String,
+    ///
+    neighbours : Vec<Neighbour>,
+}
+
+
+impl ReqAnswer{
+    pub fn new(rank : usize, fasta_id : String, neighbours : Vec<Neighbour>) -> Self {
+        ReqAnswer { rank, fasta_id, neighbours}
+    }
+
+    /// dump answers to a File.
+    fn dump_answer(&self, seqdict : Option<&SeqDict>, out : &mut BufWriter<File>) -> std::io::Result<()> {
+        // dump rank , fasta_id
+        write!(out, "\n\n {} fasta_id {}", self.rank, self. fasta_id)?;
+        for n in &self.neighbours {
+            // get id of sequence with its rank
+            let id = seqdict.unwrap().0[self.rank].get_fasta_id();
+            write!(out, "distance : {:.3E} id {}", n.distance, id)?;
+        }
+        Ok(())
+    } // end of dump_answer
+
+}   // end of ReqAnswer
+
+
+
+// TODO : possiblyy modify the way we pass requests via a whole directory.
 /// this function does the sketching and hnsw store of a whole directory
 /// dumpdir_path is the path to directory containing dump of Hnsw, database sequence dictionary and sketchparams.
 /// request_dirpath is the directory containing the fasta files which are the requests.
-fn sketch_and_request_dir(request_dirpath : &Path, hnsw : &Hnsw<u32,DistHamming>, sketcher_params : &SketcherParams, knbn : usize, ef_search : usize) {
+/// 
+fn sketch_and_request_dir(request_dirpath : &Path, hnsw : &Hnsw<u32,DistHamming>, seqdict : &SeqDict, 
+                sketcher_params : &SketcherParams, knbn : usize, ef_search : usize) {
     //
     log::trace!("sketch_and_request_dir processing dir {}", request_dirpath.to_str().unwrap());
     log::info!("sketch_and_request_dir {}", request_dirpath.to_str().unwrap());
+    // creating an output file in the 
+    let outname = "archea.answers";
+    let filepath = PathBuf::from(outname.clone());
+    let fileres = OpenOptions::new().write(true).create(true).truncate(false).open(&filepath);
+    if fileres.is_err() {
+        log::error!("SeqDict dump : dump could not open file {:?}", filepath.as_os_str());
+        println!("SeqDict dump: could not open file {:?}", filepath.as_os_str());
+        return Err("SeqDict Deserializer dump failed").unwrap();
+    }    
+    log::info!("dumping request answers in : {}", outname);
+    //
     let start_t = SystemTime::now();
     let cpu_start = ProcessTime::now();
     // a queue of signature request , size must be sufficient to benefit from threaded probminhash and search
@@ -86,6 +138,7 @@ fn sketch_and_request_dir(request_dirpath : &Path, hnsw : &Hnsw<u32,DistHamming>
         });
         // sequence reception, consumer thread
         let receptor_handle = scope.spawn(move |_| {
+            let mut nb_request = 0;
             let mut seqdict = SeqDict::new(100000);
             // we must read messages, sketch and insert into hnsw
             let mut read_more = true;
@@ -97,19 +150,17 @@ fn sketch_and_request_dir(request_dirpath : &Path, hnsw : &Hnsw<u32,DistHamming>
                         // sketch the content of  insertion_queue if not empty
                         if request_queue.len() > 0 {
                             let sequencegroup_ref : Vec<&Sequence> = request_queue.iter().map(|s| s.get_sequence()).collect();
-                            // collect rank
-                            let seq_rank :  Vec<usize> = request_queue.iter().map(|s| s.get_rank()).collect();
-                            // collect Id
                             let mut seq_id :  Vec<Id> = request_queue.iter().map(|s| Id::new(s.get_path(), s.get_fasta_id())).collect();
                             seqdict.0.append(&mut seq_id);
                             let signatures = sketcher.sketch_probminhash3a_kmer32bit(&sequencegroup_ref, kmer_hash_fn);                            
                             // we have Vec<u32> signatures we must go back to a vector of IdSketch for hnsw insertion
-                            let mut data_for_hnsw = Vec::<(&Vec<u32>, usize)>::with_capacity(signatures.len());
-                            for i in 0..signatures.len() {
-                                data_for_hnsw.push((&signatures[i], seq_rank[i]));
+                            let knn_neighbours  = hnsw.parallel_search(&signatures, knbn, ef_search);
+                            for i in 0..knn_neighbours.len() {
+                                let answer = ReqAnswer::new(nb_request+i, seq_id[i].get_fasta_id().clone(), knn_neighbours[i].clone());
+                                
                             }
-                            // TODO parallel search
-//                            hnsw.parallel_insert(&data_for_hnsw);
+                            //  dump results
+                            nb_request += signatures.len();
                         }
                     }
                     Ok(mut idsequences) => {
@@ -118,29 +169,24 @@ fn sketch_and_request_dir(request_dirpath : &Path, hnsw : &Hnsw<u32,DistHamming>
                         // if request_queue is beyond threshold size we can go to threaded sketching and threading insertion
                         if request_queue.len() > request_block_size {
                             let sequencegroup_ref : Vec<&Sequence> = request_queue.iter().map(|s| s.get_sequence()).collect();
-                            let seq_rank :  Vec<usize> = request_queue.iter().map(|s| s.get_rank()).collect();
                             // collect Id
                             let mut seq_id :  Vec<Id> = request_queue.iter().map(|s| Id::new(s.get_path(), s.get_fasta_id())).collect();
                             seqdict.0.append(&mut seq_id);
                             // computes hash signature
                             let signatures = sketcher.sketch_probminhash3a_kmer32bit(&sequencegroup_ref, kmer_hash_fn);
                             // we have Vec<u32> signatures we must go back to a vector of IdSketch, inserting unique id, for hnsw insertion
-                            let mut data_for_hnsw = Vec::<(&Vec<u32>, usize)>::with_capacity(signatures.len());
-                            for i in 0..signatures.len() {
-                                data_for_hnsw.push((&signatures[i], seq_rank[i]));
-                            }
-                            // TODO parallel search
-                            let knn_neighbours  = hnsw.parallel_search(&anndata.test_data, knbn, ef_search);
-
-//                            hnsw.parallel_insert(&data_for_hnsw);
-                            // we reset insertion_queue
+                            // parallel search
+                            let knn_neighbours  = hnsw.parallel_search(&signatures, knbn, ef_search);
+                            // construct answers
+                            //
+                            //  dump results
+                            //
+                            nb_request += signatures.len();
                             request_queue.clear();
                         }
                     }
                 }
-            }
-            //
-
+            } // end while 
             //
             Box::new(seqdict.0.len())
         }); // end of receptor thread
@@ -169,14 +215,24 @@ fn reload_hnsw(dump_dirpath : &Path) -> Option<Hnsw<u32, DistHamming>> {
     let graphfile = OpenOptions::new().read(true).open(&graph_path);
     if graphfile.is_err() {
         println!("test_dump_reload: could not open file {:?}", graph_path.as_os_str());
-        std::panic::panic_any("test_dump_reload: could not open file".to_string());            
+        return None;
     }
-    let graphfile = graphfile.unwrap();
+    let mut graphfile = graphfile.unwrap();
     //
     let data_path = dump_dirpath.join("/hnswdump.hnsw.data");
+    let datafile = OpenOptions::new().read(true).open(&data_path);
+    if datafile.is_err() {
+        println!("test_dump_reload: could not open file {:?}", data_path.as_os_str());
+        return None;
+    }
+    let mut datafile = datafile.unwrap();
+    let hnsw_description = load_description(&mut graphfile).unwrap();
+    let hnsw : Hnsw<u32, DistHamming>= load_hnsw(&mut graphfile, &hnsw_description, &mut datafile).unwrap();
+    return Some(hnsw);
     //  
-    None
 } // end of reload_hnsw
+
+
 
 
 
@@ -295,9 +351,25 @@ fn main() {
             }
         };
         // reload Sketchparams
-        // reloat SeqDict
+        let sk_params = SketcherParams::reload_json(database_dirpath);
+        let sk_params = match sk_params {
+            Ok(sk_params) => sk_params,
+            _ => {
+                panic!("SketchParams reload from dump dir {} failed", database_dirpath.to_str().unwrap());
+            }
+        };
+        // reload SeqDict
+        let mut seqname = database_dir.clone();
+        seqname.push_str("/sketchparams_dump.json");
+        let seqdict = SeqDict::reload(&seqname);
+        let seqdict = match seqdict {
+            Ok(seqdict ) => seqdict ,
+            _ => {
+                panic!("SeqDict reload from dump file  {} failed", seqname);
+            }            
+        };
         // 
         let ef_search = 200;
-        sketch_and_request_dir(&request_dirpath, &hnsw, &sketch_params, nbng as usize, ef_search);
+        sketch_and_request_dir(&request_dirpath, &hnsw, &seqdict, &sketch_params, nbng as usize, ef_search);
 
 }  // end of main
