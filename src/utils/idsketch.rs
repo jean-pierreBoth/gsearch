@@ -7,6 +7,7 @@ use serde_json::{to_writer};
 use std::path::{Path, PathBuf};
 use std::fs::OpenOptions;
 use std::io::{BufReader, BufWriter};
+use std::time::{SystemTime};
 
 use kmerutils::base::{sequence::*};
 
@@ -80,7 +81,9 @@ impl SketcherParams {
 
     /// reload from a json dump
     pub fn reload_json(dirpath : &Path) -> Result<SketcherParams, String> {
-        let filepath = dirpath.join("/sketchparams_dump.json");
+        log::info!("in reload_json");
+        //
+        let filepath = dirpath.join("sketchparams_dump.json");
         let fileres = OpenOptions::new().read(true).open(&filepath);
         if fileres.is_err() {
             log::error!("SketcherParams reload_json : reload could not open file {:?}", filepath.as_os_str());
@@ -185,6 +188,10 @@ impl SeqDict {
     /// To be used with reload of Hnsw structure to run as a service
     pub fn reload(filename : &String) -> Result<SeqDict, String>  {
         //
+        log::info!("reloading database ids from : {}", filename);
+        let start_t = SystemTime::now();
+        //
+        println!("reloading database ids from : {}", filename);
         let mut sequences =  Vec::<Id>::with_capacity(100000);
         let filepath = PathBuf::from(filename);
         let fileres = OpenOptions::new().read(true).open(&filepath);
@@ -200,6 +207,11 @@ impl SeqDict {
         // we must deserialize Id structs 
         let stream = serde_json::Deserializer::from_reader(reader).into_iter::<Id>();
         for value in stream {
+            if value.is_err() {
+                println!("nb id loaded {}", nbloaded);
+                log::error!("nb id loaded {}", nbloaded);
+                return Err(String::from("parsing error"));
+            }
             sequences.push(value.unwrap());
             if log::log_enabled!(log::Level::Debug) && nbloaded <= 3 {
                 log::debug!(" nbloaded : {:?}, sesqid path : ({}, {})", nbloaded, sequences[nbloaded].path,sequences[nbloaded].fasta_id);
@@ -208,6 +220,8 @@ impl SeqDict {
         } 
         //
         log::info!("SeqDict, reloaded nb sequences : {:?}", nbloaded);
+        let elapsed_t = start_t.elapsed().unwrap().as_secs() as f32;
+        log::info!("SeqDict::reload : elapsed system time(s) {}", elapsed_t);
         //        
         return Ok(SeqDict{0:sequences});
     } // end of reload

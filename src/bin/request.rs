@@ -52,31 +52,31 @@ pub fn init_log() -> u64 {
 /// the asked list of neighbours.
 /// The neighbours are identified by an id in the database. To retrieve the fasta identity 
 /// of the neighbour we will need the SeqDict
-pub struct ReqAnswer {
+struct ReqAnswer<'a> {
     rank : usize,
     /// fasta id of the request
     fasta_id : String,
     ///
-    neighbours : Vec<Neighbour>,
+    neighbours : &'a Vec<Neighbour>,
 }
 
 
-impl ReqAnswer{
-    pub fn new(rank : usize, fasta_id : String, neighbours : Vec<Neighbour>) -> Self {
+impl <'a> ReqAnswer<'a> {
+    pub fn new(rank : usize, fasta_id : String, neighbours : &'a Vec<Neighbour>) -> Self {
         ReqAnswer { rank, fasta_id, neighbours}
     }
 
     /// dump answers to a File.
-    fn dump_answer(&self, seqdict : Option<&SeqDict>, out : &mut BufWriter<File>) -> std::io::Result<()> {
+    fn dump(&self, seqdict : &SeqDict, out : &mut BufWriter<File>) -> std::io::Result<()> {
         // dump rank , fasta_id
-        write!(out, "\n\n {} fasta_id {}", self.rank, self. fasta_id)?;
-        for n in &self.neighbours {
-            // get id of sequence with its rank
-            let id = seqdict.unwrap().0[self.rank].get_fasta_id();
-            write!(out, "distance : {:.3E} id {}", n.distance, id)?;
+        write!(out, "\n\n {} fasta_id {}", self.rank, self.fasta_id)?;
+        for n in self.neighbours {
+            // get database identification of neighbour
+            let database_id = seqdict.0[n.d_id].get_fasta_id();
+            write!(out, "\t distance : {:.3E}  answer fasta id {}", n.distance, database_id)?;
         }
         Ok(())
-    } // end of dump_answer
+    } // end of dump
 
 }   // end of ReqAnswer
 
@@ -94,13 +94,14 @@ fn sketch_and_request_dir(request_dirpath : &Path, hnsw : &Hnsw<u32,DistHamming>
     log::info!("sketch_and_request_dir {}", request_dirpath.to_str().unwrap());
     // creating an output file in the 
     let outname = "archea.answers";
-    let filepath = PathBuf::from(outname.clone());
-    let fileres = OpenOptions::new().write(true).create(true).truncate(false).open(&filepath);
-    if fileres.is_err() {
-        log::error!("SeqDict dump : dump could not open file {:?}", filepath.as_os_str());
-        println!("SeqDict dump: could not open file {:?}", filepath.as_os_str());
+    let outpath = PathBuf::from(outname.clone());
+    let outfile = OpenOptions::new().write(true).create(true).truncate(false).open(&outpath);
+    if outfile.is_err() {
+        log::error!("SeqDict dump : dump could not open file {:?}", outpath.as_os_str());
+        println!("SeqDict dump: could not open file {:?}", outpath.as_os_str());
         return Err("SeqDict Deserializer dump failed").unwrap();
     }    
+    let mut outfile = BufWriter::new(outfile.unwrap());
     log::info!("dumping request answers in : {}", outname);
     //
     let start_t = SystemTime::now();
@@ -139,7 +140,6 @@ fn sketch_and_request_dir(request_dirpath : &Path, hnsw : &Hnsw<u32,DistHamming>
         // sequence reception, consumer thread
         let receptor_handle = scope.spawn(move |_| {
             let mut nb_request = 0;
-            let mut seqdict = SeqDict::new(100000);
             // we must read messages, sketch and insert into hnsw
             let mut read_more = true;
             while read_more {
@@ -150,14 +150,15 @@ fn sketch_and_request_dir(request_dirpath : &Path, hnsw : &Hnsw<u32,DistHamming>
                         // sketch the content of  insertion_queue if not empty
                         if request_queue.len() > 0 {
                             let sequencegroup_ref : Vec<&Sequence> = request_queue.iter().map(|s| s.get_sequence()).collect();
-                            let mut seq_id :  Vec<Id> = request_queue.iter().map(|s| Id::new(s.get_path(), s.get_fasta_id())).collect();
-                            seqdict.0.append(&mut seq_id);
+                            let seq_id :  Vec<Id> = request_queue.iter().map(|s| Id::new(s.get_path(), s.get_fasta_id())).collect();
                             let signatures = sketcher.sketch_probminhash3a_kmer32bit(&sequencegroup_ref, kmer_hash_fn);                            
                             // we have Vec<u32> signatures we must go back to a vector of IdSketch for hnsw insertion
                             let knn_neighbours  = hnsw.parallel_search(&signatures, knbn, ef_search);
                             for i in 0..knn_neighbours.len() {
-                                let answer = ReqAnswer::new(nb_request+i, seq_id[i].get_fasta_id().clone(), knn_neighbours[i].clone());
-                                
+                                let answer = ReqAnswer::new(nb_request+i, seq_id[i].get_fasta_id().clone(), &knn_neighbours[i]);
+                                if answer.dump(&seqdict, &mut outfile).is_err() {
+                                    log::info!("could not dump answer for request id {}", answer.fasta_id);
+                                }
                             }
                             //  dump results
                             nb_request += signatures.len();
@@ -170,17 +171,19 @@ fn sketch_and_request_dir(request_dirpath : &Path, hnsw : &Hnsw<u32,DistHamming>
                         if request_queue.len() > request_block_size {
                             let sequencegroup_ref : Vec<&Sequence> = request_queue.iter().map(|s| s.get_sequence()).collect();
                             // collect Id
-                            let mut seq_id :  Vec<Id> = request_queue.iter().map(|s| Id::new(s.get_path(), s.get_fasta_id())).collect();
-                            seqdict.0.append(&mut seq_id);
+                            let seq_id :  Vec<Id> = request_queue.iter().map(|s| Id::new(s.get_path(), s.get_fasta_id())).collect();
                             // computes hash signature
                             let signatures = sketcher.sketch_probminhash3a_kmer32bit(&sequencegroup_ref, kmer_hash_fn);
                             // we have Vec<u32> signatures we must go back to a vector of IdSketch, inserting unique id, for hnsw insertion
                             // parallel search
                             let knn_neighbours  = hnsw.parallel_search(&signatures, knbn, ef_search);
-                            // construct answers
-                            //
-                            //  dump results
-                            //
+                            // construct and dump answers
+                            for i in 0..knn_neighbours.len() {
+                                let answer = ReqAnswer::new(nb_request+i, seq_id[i].get_fasta_id().clone(), &knn_neighbours[i]);
+                                if answer.dump(&seqdict, &mut outfile).is_err() {
+                                    log::info!("could not dump answer for request id {}", answer.fasta_id);
+                                }
+                            }
                             nb_request += signatures.len();
                             request_queue.clear();
                         }
@@ -211,7 +214,8 @@ fn sketch_and_request_dir(request_dirpath : &Path, hnsw : &Hnsw<u32,DistHamming>
 /// We know filename : hnswdump.hnsw.data and hnswdump.hnsw.graph
 fn reload_hnsw(dump_dirpath : &Path) -> Option<Hnsw<u32, DistHamming>> {
     // just concat dirpath to filenames and get pathbuf
-    let graph_path = dump_dirpath.join("/hnswdump.hnsw.graph");
+    let graph_path = dump_dirpath.join("hnswdump.hnsw.graph");
+    log::info!("reload_hnsw, loading graph from {}",graph_path.to_str().unwrap());
     let graphfile = OpenOptions::new().read(true).open(&graph_path);
     if graphfile.is_err() {
         println!("test_dump_reload: could not open file {:?}", graph_path.as_os_str());
@@ -219,15 +223,21 @@ fn reload_hnsw(dump_dirpath : &Path) -> Option<Hnsw<u32, DistHamming>> {
     }
     let mut graphfile = graphfile.unwrap();
     //
-    let data_path = dump_dirpath.join("/hnswdump.hnsw.data");
+    let data_path = dump_dirpath.join("hnswdump.hnsw.data");
+    log::info!("reload_hnsw, loading data from {}",data_path.to_str().unwrap());
     let datafile = OpenOptions::new().read(true).open(&data_path);
     if datafile.is_err() {
         println!("test_dump_reload: could not open file {:?}", data_path.as_os_str());
         return None;
     }
     let mut datafile = datafile.unwrap();
+    //
+    let start_t = SystemTime::now();
     let hnsw_description = load_description(&mut graphfile).unwrap();
     let hnsw : Hnsw<u32, DistHamming>= load_hnsw(&mut graphfile, &hnsw_description, &mut datafile).unwrap();
+    let elapsed_t = start_t.elapsed().unwrap().as_secs() as f32;
+    log::info!("reload_hnsw : elapsed system time(s) {}", elapsed_t);
+    //
     return Some(hnsw);
     //  
 } // end of reload_hnsw
@@ -271,7 +281,7 @@ fn main() {
         let request_dir;
         if matches.is_present("request_dir") {
             println!("decoding argument dir");
-            request_dir = matches.value_of("reqdir").ok_or("").unwrap().parse::<String>().unwrap();
+            request_dir = matches.value_of("request_dir").ok_or("").unwrap().parse::<String>().unwrap();
             if request_dir == "" {
                 println!("parsing of request_dir failed");
                 std::process::exit(1);
@@ -291,7 +301,7 @@ fn main() {
         let database_dir;
         if matches.is_present("database_dir") {
             println!("decoding argument dir");
-            database_dir = matches.value_of("datadir").ok_or("").unwrap().parse::<String>().unwrap();
+            database_dir = matches.value_of("database_dir").ok_or("").unwrap().parse::<String>().unwrap();
             if database_dir == "" {
                 println!("parsing of database_dir failed");
                 std::process::exit(1);
@@ -329,7 +339,7 @@ fn main() {
         }
 
         // in fact sketch_params must be initialized from the dump directory
-        let sketch_params =  SketcherParams::new(kmer_size as usize, sketch_size as usize);  
+        let _sketch_params =  SketcherParams::new(kmer_size as usize, sketch_size as usize);  
         //
         let nbng;
         if matches.is_present("neighbours") {
@@ -341,16 +351,9 @@ fn main() {
             std::process::exit(1);
         }
         //
-        // Do all dump reload, first Hns
+        // Do all dump reload, first sketch params. We reload smaller files first 
+        // so that path errors are found early 
         //
-        let hnsw = reload_hnsw(database_dirpath);
-        let hnsw = match hnsw {
-            Some(hnsw) => hnsw,
-            _ => {
-                panic!("hnsw reload from dump dir {} failed", database_dirpath.to_str().unwrap());
-            }
-        };
-        // reload Sketchparams
         let sk_params = SketcherParams::reload_json(database_dirpath);
         let sk_params = match sk_params {
             Ok(sk_params) => sk_params,
@@ -358,9 +361,10 @@ fn main() {
                 panic!("SketchParams reload from dump dir {} failed", database_dirpath.to_str().unwrap());
             }
         };
+        log::info!("sketch params reloaded kmer size : {}, sketch size {}", sk_params.get_kmer_size(), sk_params.get_sketch_size());
         // reload SeqDict
         let mut seqname = database_dir.clone();
-        seqname.push_str("/sketchparams_dump.json");
+        seqname.push_str("seqdict.json");
         let seqdict = SeqDict::reload(&seqname);
         let seqdict = match seqdict {
             Ok(seqdict ) => seqdict ,
@@ -368,8 +372,17 @@ fn main() {
                 panic!("SeqDict reload from dump file  {} failed", seqname);
             }            
         };
+        // reload hnsw
+        let hnsw = reload_hnsw(database_dirpath);
+        let hnsw = match hnsw {
+            Some(hnsw) => hnsw,
+            _ => {
+                panic!("hnsw reload from dump dir {} failed", database_dirpath.to_str().unwrap());
+            }
+        };
+
         // 
         let ef_search = 200;
-        sketch_and_request_dir(&request_dirpath, &hnsw, &seqdict, &sketch_params, nbng as usize, ef_search);
+        sketch_and_request_dir(&request_dirpath, &hnsw, &seqdict, &sk_params, nbng as usize, ef_search);
 
 }  // end of main
