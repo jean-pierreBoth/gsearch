@@ -6,7 +6,7 @@ This package (**currently in development**) compute probminhash signature of  ba
 
 This package is developped in collaboration with Jianshu Zhao
 
-# Dependencies
+# Dependencies and Installation
 Two libraries, zeromq, libsodium are required to successfully compile. 
 
 ```
@@ -21,6 +21,13 @@ brew install libsodium
 conda install -c anaconda zeromq libsodium
 export PKG_CONFIG_PATH="~/miniconda3/lib/pkgconfig:$PKG_CONFIG_PATH"
 export LD_CONFIG_PATH="~/miniconda3/lib:$LD_CONFIG_PATH"
+  
+## Clone hnsw-rs and probminhash
+git clone https://github.com/jean-pierreBoth/hnswlib-rs.git
+git clone https://github.com/jean-pierreBoth/probminhash
+git clone https://github.com/jean-pierreBoth/archaea
+cd archaea
+cargo build --release
 ```
 ## Sketching of genomes
 
@@ -40,7 +47,9 @@ takes a list of fasta files containing requests and for each fasta file dumps th
 ## Classify
  The classify module is used to assign taxonomy information from requested neighbours to query genomes. Average nucleitide identity will be calculated
 
-## compilation
-
+## compilation single module
+```
 cargo build --release --bin tohnsw
 cargo build --release --bin request
+
+```
