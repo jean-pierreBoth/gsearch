@@ -33,7 +33,7 @@ impl Id {
     }
 } // end of impl Id
 
-
+/* 
 
 /// parameters used in constructing database and for requests.
 /// The same values must be used for construction and requests so the structure is json serialized
@@ -104,7 +104,7 @@ impl SketcherParams {
 
 } // end of impl SketcherParams
 
-
+ */
 
 /// 
 /// This structure is used for returning info from function process_file

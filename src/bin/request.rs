@@ -1,7 +1,7 @@
 //! Module request
 //! try to match fasta sequence with repsect to database
 //! 
-//! request --database [-d] dirname --query [-q]  requestdir --nbsearch [-n] nbanswers
+//! request --database [-b] basedirname --query [-r]  requestdir --nbsearch [-n] nbanswers
 //! 
 //! - database is the name of directory containing hnsw dump files and seqdict dump
 //! - requestdir is a file containing list of fasta file containing sequence to search for
@@ -32,10 +32,11 @@ use std::io::{Write,BufWriter};
 
 use hnsw_rs::prelude::*;
 use hnsw_rs::hnswio::{load_description, load_hnsw};
-use kmerutils::base::{sequence::*, Kmer32bit};
+use kmerutils::base::{sequence::*, Kmer32bit, KmerT};
 use kmerutils::sketching::*;
+use kmerutils::sketching::seqsketchjaccard::*;
 
-use archaea::utils::idsketch::{SeqDict, Id, IdSeq, SketcherParams};
+use archaea::utils::idsketch::{SeqDict, Id, IdSeq};
 //mod files;
 use archaea::utils::files::{process_dir,process_file};
 
@@ -73,7 +74,7 @@ impl <'a> ReqAnswer<'a> {
         for n in self.neighbours {
             // get database identification of neighbour
             let database_id = seqdict.0[n.d_id].get_fasta_id();
-            write!(out, "\t distance : {:.3E}  answer fasta id {}", n.distance, database_id)?;
+            write!(out, "\n\t distance : {:.3E}  answer fasta id {}", n.distance, database_id)?;
         }
         Ok(())
     } // end of dump
@@ -88,10 +89,12 @@ impl <'a> ReqAnswer<'a> {
 /// request_dirpath is the directory containing the fasta files which are the requests.
 /// 
 fn sketch_and_request_dir(request_dirpath : &Path, hnsw : &Hnsw<u32,DistHamming>, seqdict : &SeqDict, 
-                sketcher_params : &SketcherParams, knbn : usize, ef_search : usize) {
+                sketcher_params : &SeqSketcher, knbn : usize, ef_search : usize) {
     //
     log::trace!("sketch_and_request_dir processing dir {}", request_dirpath.to_str().unwrap());
     log::info!("sketch_and_request_dir {}", request_dirpath.to_str().unwrap());
+    log::info!("sketch_and_request kmer size  {}  sketch size {} ", 
+            sketcher_params.get_kmer_size(), sketcher_params.get_sketch_size());
     // creating an output file in the 
     let outname = "archea.answers";
     let outpath = PathBuf::from(outname.clone());
@@ -113,7 +116,8 @@ fn sketch_and_request_dir(request_dirpath : &Path, hnsw : &Hnsw<u32,DistHamming>
     // Sketcher allocation, we do not need reverse complement hashing as we sketch assembled genomes. (Jianshu Zhao)
     //
     let kmer_hash_fn = | kmer : &Kmer32bit | -> u32 {
-        let hashval = probminhash::invhash::int32_hash(kmer.0);
+        let value_mask :u32 = (0b1 << (2*kmer.get_nb_base())) - 1;
+        let hashval = kmer.0 & value_mask;
         hashval
     };
     let sketcher = seqsketchjaccard::SeqSketcher::new(sketcher_params.get_kmer_size(), sketcher_params.get_sketch_size());
@@ -191,7 +195,7 @@ fn sketch_and_request_dir(request_dirpath : &Path, hnsw : &Hnsw<u32,DistHamming>
                 }
             } // end while 
             //
-            Box::new(seqdict.0.len())
+            Box::new(nb_request)
         }); // end of receptor thread
         // now we must join handles
         let nb_sent = sender_handle.join().unwrap();
@@ -339,7 +343,7 @@ fn main() {
         }
 
         // in fact sketch_params must be initialized from the dump directory
-        let _sketch_params =  SketcherParams::new(kmer_size as usize, sketch_size as usize);  
+        let _sketch_params =  SeqSketcher::new(kmer_size as usize, sketch_size as usize);  
         //
         let nbng;
         if matches.is_present("neighbours") {
@@ -354,7 +358,7 @@ fn main() {
         // Do all dump reload, first sketch params. We reload smaller files first 
         // so that path errors are found early 
         //
-        let sk_params = SketcherParams::reload_json(database_dirpath);
+        let sk_params = SeqSketcher::reload_json(database_dirpath);
         let sk_params = match sk_params {
             Ok(sk_params) => sk_params,
             _ => {
@@ -364,7 +368,7 @@ fn main() {
         log::info!("sketch params reloaded kmer size : {}, sketch size {}", sk_params.get_kmer_size(), sk_params.get_sketch_size());
         // reload SeqDict
         let mut seqname = database_dir.clone();
-        seqname.push_str("seqdict.json");
+        seqname.push_str("/seqdict.json");
         let seqdict = SeqDict::reload(&seqname);
         let seqdict = match seqdict {
             Ok(seqdict ) => seqdict ,

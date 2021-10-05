@@ -32,10 +32,12 @@ use crossbeam_channel::*;
 
 // our crate
 use hnsw_rs::prelude::*;
-use kmerutils::base::{sequence::*, Kmer32bit};
+use kmerutils::base::{sequence::*, Kmer32bit, KmerT};
 use kmerutils::sketching::*;
+use kmerutils::sketching::seqsketchjaccard::SeqSketcher;
 
-use archaea::utils::idsketch::{SeqDict,Id, IdSeq, SketcherParams};
+
+use archaea::utils::idsketch::{SeqDict,Id, IdSeq};
 
 use archaea::utils::files::{process_dir,process_file};
 
@@ -59,7 +61,7 @@ pub fn init_log() -> u64 {
 }
 
 // this function does the sketching and hnsw store of a whole directory
-fn sketchandstore_dir(dirpath : &Path, sketcher_params : &SketcherParams, hnsw_params : &HnswParams) {
+fn sketchandstore_dir(dirpath : &Path, sketcher_params : &SeqSketcher, hnsw_params : &HnswParams) {
     //
     log::trace!("sketchandstore_dir processing dir {}", dirpath.to_str().unwrap());
     log::info!("sketchandstore_dir {}", dirpath.to_str().unwrap());
@@ -75,7 +77,8 @@ fn sketchandstore_dir(dirpath : &Path, sketcher_params : &SketcherParams, hnsw_p
     // Sketcher allocation, we do not need reverse complement hashing as we sketch assembled genomes. (Jianshu Zhao)
     //
     let kmer_hash_fn = | kmer : &Kmer32bit | -> u32 {
-        let hashval = probminhash::invhash::int32_hash(kmer.0);
+        let value_mask :u32 = (0b1 << (2*kmer.get_nb_base())) - 1;
+        let hashval = kmer.0 & value_mask;
         hashval
     };
     let sketcher = seqsketchjaccard::SeqSketcher::new(sketcher_params.get_kmer_size(), sketcher_params.get_sketch_size());
@@ -154,9 +157,8 @@ fn sketchandstore_dir(dirpath : &Path, sketcher_params : &SketcherParams, hnsw_p
             }
             //
             // We must dump hnsw to save "database" if not empty
-            // TODO we must have a method hnsw.get_nb_point()
             //
-            if seqdict.0.len() > 0 {
+            if  hnsw.get_nb_point() > 0 {
                 let hnswdumpname = String::from("hnswdump");
                 log::info!("going to dump hnsw");
                 let resdump = hnsw.file_dump(&hnswdumpname);
@@ -166,6 +168,8 @@ fn sketchandstore_dir(dirpath : &Path, sketcher_params : &SketcherParams, hnsw_p
                     },
                     _ =>  { println!("dump of hnsw ended");}
                 };
+                // dump some info on layer structure
+                hnsw.dump_layer_info();
                 // dumping dictionary
                 let resdump = seqdict.dump(String::from("seqdict.json"));
                 match resdump {
@@ -247,7 +251,7 @@ fn main() {
             std::process::exit(1);
         }
         // get sketching params
-        let mut sketch_size = 96;
+        let mut sketch_size = 256;
         if matches.is_present("size") {
             sketch_size = matches.value_of("size").ok_or("").unwrap().parse::<u16>().unwrap();
             println!("sketching size {}", sketch_size);
@@ -256,15 +260,15 @@ fn main() {
             println!("using default sketch size {}", sketch_size);
         }
         //
-        let mut kmer_size = 8;
+        let mut kmer_size = 6;
         if matches.is_present("kmer_size") {
-            kmer_size = matches.value_of("size").ok_or("").unwrap().parse::<u16>().unwrap();
+            kmer_size = matches.value_of("kmer_size").ok_or("").unwrap().parse::<u16>().unwrap();
             println!("kmer size {}", kmer_size);
         }
         else {
             println!("using default kmer size {}", kmer_size);
         }
-        let sketch_params =  SketcherParams::new(kmer_size as usize, sketch_size as usize);  
+        let sketch_params =  SeqSketcher::new(kmer_size as usize, sketch_size as usize);  
         //
         let nbng;
         if matches.is_present("neighbours") {
@@ -276,9 +280,9 @@ fn main() {
             std::process::exit(1);
         }
         // max_nb_conn must be adapted to the number of neighbours we will want in searches.
-        let max_nb_conn = 64.min(2 * nbng as usize);
+        let max_nb_conn = 128.min(2 * nbng as usize);
         let ef_search = 200;
-        let hnswparams = HnswParams{nbng : nbng as usize, capacity : 70000, ef_search, max_nb_conn};
+        let hnswparams = HnswParams{nbng : nbng as usize, capacity : 700000, ef_search, max_nb_conn};
         //
         //
         sketchandstore_dir(&dirpath, &sketch_params, &hnswparams);
