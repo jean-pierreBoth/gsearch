@@ -55,25 +55,25 @@ pub fn init_log() -> u64 {
 /// of the neighbour we will need the SeqDict
 struct ReqAnswer<'a> {
     rank : usize,
-    /// fasta id of the request
-    fasta_id : String,
+    /// request id
+    req_id : Id,
     ///
     neighbours : &'a Vec<Neighbour>,
 }
 
 
 impl <'a> ReqAnswer<'a> {
-    pub fn new(rank : usize, fasta_id : String, neighbours : &'a Vec<Neighbour>) -> Self {
-        ReqAnswer { rank, fasta_id, neighbours}
+    pub fn new(rank : usize, req_id : Id, neighbours : &'a Vec<Neighbour>) -> Self {
+        ReqAnswer { rank, req_id, neighbours}
     }
 
     /// dump answers to a File.
     fn dump(&self, seqdict : &SeqDict, out : &mut BufWriter<File>) -> std::io::Result<()> {
         // dump rank , fasta_id
-        write!(out, "\n\n {} fasta_id {}", self.rank, self.fasta_id)?;
+        write!(out, "\n\n {} path {}, fasta_id {}", self.rank, self.req_id.get_path(), self.req_id.get_fasta_id())?;
         for n in self.neighbours {
             // get database identification of neighbour
-            let database_id = seqdict.0[n.d_id].get_fasta_id();
+            let database_id = seqdict.0[n.d_id].get_path();
             write!(out, "\n\t distance : {:.3E}  answer fasta id {}", n.distance, database_id)?;
         }
         Ok(())
@@ -98,7 +98,7 @@ fn sketch_and_request_dir(request_dirpath : &Path, hnsw : &Hnsw<u32,DistHamming>
     // creating an output file in the 
     let outname = "archea.answers";
     let outpath = PathBuf::from(outname.clone());
-    let outfile = OpenOptions::new().write(true).create(true).truncate(false).open(&outpath);
+    let outfile = OpenOptions::new().write(true).create(true).truncate(true).open(&outpath);
     if outfile.is_err() {
         log::error!("SeqDict dump : dump could not open file {:?}", outpath.as_os_str());
         println!("SeqDict dump: could not open file {:?}", outpath.as_os_str());
@@ -159,9 +159,9 @@ fn sketch_and_request_dir(request_dirpath : &Path, hnsw : &Hnsw<u32,DistHamming>
                             // we have Vec<u32> signatures we must go back to a vector of IdSketch for hnsw insertion
                             let knn_neighbours  = hnsw.parallel_search(&signatures, knbn, ef_search);
                             for i in 0..knn_neighbours.len() {
-                                let answer = ReqAnswer::new(nb_request+i, seq_id[i].get_fasta_id().clone(), &knn_neighbours[i]);
+                                let answer = ReqAnswer::new(nb_request+i, seq_id[i].clone(), &knn_neighbours[i]);
                                 if answer.dump(&seqdict, &mut outfile).is_err() {
-                                    log::info!("could not dump answer for request id {}", answer.fasta_id);
+                                    log::info!("could not dump answer for request id {}", answer.req_id.get_fasta_id());
                                 }
                             }
                             //  dump results
@@ -183,9 +183,9 @@ fn sketch_and_request_dir(request_dirpath : &Path, hnsw : &Hnsw<u32,DistHamming>
                             let knn_neighbours  = hnsw.parallel_search(&signatures, knbn, ef_search);
                             // construct and dump answers
                             for i in 0..knn_neighbours.len() {
-                                let answer = ReqAnswer::new(nb_request+i, seq_id[i].get_fasta_id().clone(), &knn_neighbours[i]);
+                                let answer = ReqAnswer::new(nb_request+i, seq_id[i].clone(), &knn_neighbours[i]);
                                 if answer.dump(&seqdict, &mut outfile).is_err() {
-                                    log::info!("could not dump answer for request id {}", answer.fasta_id);
+                                    log::info!("could not dump answer for request id {}", answer.req_id.get_fasta_id());
                                 }
                             }
                             nb_request += signatures.len();

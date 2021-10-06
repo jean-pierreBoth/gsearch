@@ -15,7 +15,7 @@ use kmerutils::base::{sequence::*};
 /// This structure is a summary of struct IdSeq
 /// It is sent to sketcher thread, serialized and dump in a file so that its rank in dump file
 /// is the data id used in Hnsw. So we can go back from a neighbour returned by hnsw to identity of sequence.
-#[derive(Serialize,Deserialize)]
+#[derive(Serialize,Deserialize, Clone)]
 pub struct Id {
     /// path where seq was
     path : String,
@@ -28,83 +28,18 @@ impl Id {
         Id{ path : path.clone(), fasta_id : id.clone()}
     }
 
+    /// get file path 
+    pub fn get_path(&self) -> &String {
+        &self.path
+    }
+    
+    /// get sequence id in fasta file
     pub fn get_fasta_id(&self) -> &String {
         return &self.fasta_id;
     }
 } // end of impl Id
 
-/* 
 
-/// parameters used in constructing database and for requests.
-/// The same values must be used for construction and requests so the structure is json serialized
-#[derive(Serialize,Deserialize)]
-pub struct SketcherParams {
-    kmer_size : usize,
-    sketch_size : usize,
-}
-
-impl SketcherParams {
-    /// allocator
-    pub fn new(kmer_size : usize, sketch_size : usize) -> Self {
-        SketcherParams{kmer_size,sketch_size}
-    }
-    /// returns kmer size
-    pub fn get_kmer_size(&self) -> usize {
-        self.kmer_size
-    }
-
-    /// return sketch size
-    pub fn get_sketch_size(&self) -> usize {
-        self.sketch_size
-    }  
-    
-    /// serialized dump
-    pub fn dump_json(&self, filename : &String) -> Result<(), String> {
-        //
-        let filepath = PathBuf::from(filename.clone());
-        //
-        log::info!("dumping sketching parameters in json file : {}", filename);
-        //
-        let fileres = OpenOptions::new().write(true).create(true).truncate(true).open(&filepath);
-        if fileres.is_err() {
-            log::error!("SketcherParams dump : dump could not open file {:?}", filepath.as_os_str());
-            println!("SketcherParams dump: could not open file {:?}", filepath.as_os_str());
-            return Err("SketcherParams dump failed".to_string());
-        }
-        // 
-        let mut writer = BufWriter::new(fileres.unwrap());
-        let _ = to_writer(&mut writer, &self).unwrap();
-        //
-        Ok(())
-    } // end of dump
-
-
-    /// reload from a json dump
-    pub fn reload_json(dirpath : &Path) -> Result<SketcherParams, String> {
-        log::info!("in reload_json");
-        //
-        let filepath = dirpath.join("sketchparams_dump.json");
-        let fileres = OpenOptions::new().read(true).open(&filepath);
-        if fileres.is_err() {
-            log::error!("SketcherParams reload_json : reload could not open file {:?}", filepath.as_os_str());
-            println!("SketcherParams reload_json: could not open file {:?}", filepath.as_os_str());
-            return Err("SketcherParams reload_json could not open file".to_string());            
-        }
-        //
-        let loadfile = fileres.unwrap();
-        let reader = BufReader::new(loadfile);
-        let sketch_params:SketcherParams = serde_json::from_reader(reader).unwrap();
-        //
-        log::info!("SketchParams reload, kmer_size : {}, sketch_size : {}", 
-            sketch_params.get_kmer_size(), sketch_params.get_sketch_size());     
-        //
-        Ok(sketch_params)
-    } // end of reload_json
-
-
-} // end of impl SketcherParams
-
- */
 
 /// 
 /// This structure is used for returning info from function process_file
