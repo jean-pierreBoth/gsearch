@@ -28,7 +28,7 @@ use cpu_time::ProcessTime;
 
 use std::path::{Path, PathBuf};
 use std::fs::{OpenOptions, File};
-use std::io::{Write,BufWriter};
+use std::io::{Write,BufWriter, BufReader};
 
 use hnsw_rs::prelude::*;
 use hnsw_rs::hnswio::{load_description, load_hnsw};
@@ -225,7 +225,8 @@ fn reload_hnsw(dump_dirpath : &Path) -> Option<Hnsw<u32, DistHamming>> {
         println!("test_dump_reload: could not open file {:?}", graph_path.as_os_str());
         return None;
     }
-    let mut graphfile = graphfile.unwrap();
+    let graphfile = graphfile.unwrap();
+    let mut graphfile = BufReader::with_capacity(50_000_000, graphfile);
     //
     let data_path = dump_dirpath.join("hnswdump.hnsw.data");
     log::info!("reload_hnsw, loading data from {}",data_path.to_str().unwrap());
@@ -234,13 +235,19 @@ fn reload_hnsw(dump_dirpath : &Path) -> Option<Hnsw<u32, DistHamming>> {
         println!("test_dump_reload: could not open file {:?}", data_path.as_os_str());
         return None;
     }
-    let mut datafile = datafile.unwrap();
+    let datafile = datafile.unwrap();
+    let mut datafile = BufReader::with_capacity(50_000_000,datafile);
     //
     let start_t = SystemTime::now();
     let hnsw_description = load_description(&mut graphfile).unwrap();
     let hnsw : Hnsw<u32, DistHamming>= load_hnsw(&mut graphfile, &hnsw_description, &mut datafile).unwrap();
     let elapsed_t = start_t.elapsed().unwrap().as_secs() as f32;
-    log::info!("reload_hnsw : elapsed system time(s) {}", elapsed_t);
+    if log::log_enabled!(log::Level::Info) {
+        log::info!("reload_hnsw : elapsed system time(s) {}", elapsed_t);
+    }
+    else {
+        println!("reload_hnsw : elapsed system time(s) {}", elapsed_t);
+    }
     //
     return Some(hnsw);
     //  
@@ -369,6 +376,7 @@ fn main() {
         // reload SeqDict
         let mut seqname = database_dir.clone();
         seqname.push_str("/seqdict.json");
+        log::info!("\n reloaded sequence dictionary from {}", &seqname);
         let seqdict = SeqDict::reload(&seqname);
         let seqdict = match seqdict {
             Ok(seqdict ) => seqdict ,
@@ -376,7 +384,9 @@ fn main() {
                 panic!("SeqDict reload from dump file  {} failed", seqname);
             }            
         };
+        log::info!("reloading sequence dictionary from {} done", &seqname);
         // reload hnsw
+        log::info!("\n reloading hnsw from {}", database_dirpath.to_str().unwrap());
         let hnsw = reload_hnsw(database_dirpath);
         let hnsw = match hnsw {
             Some(hnsw) => hnsw,

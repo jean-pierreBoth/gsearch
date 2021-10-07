@@ -1,12 +1,14 @@
 //#![allow(dead_code)]
 //#![allow(unused_variables)]
 
-//! tohnsw --dir [-d] dir --sketch [-s] size --nbng [-n] nb
+//! tohnsw --dir [-d] dir --sketch [-s] size --nbng [-n] nb --ef m
 //! 
 //! --dir : the name of directory containing tree of GCF and GCA files 
 //! --sketch gives the size of probminhash sketch ()integer value)
 //! --kmer [-k] gives the size of kmer to use for generating probminhash (integer value)
 //! --nbng [-n] gives the number of neihbours required in hnsw construction
+//! -- ef optional integer value to optimize hnsw structure creation (default to 200)
+
 // must loop on sub directories , open gzipped files
 // extracts complete genomes possiby many in one file (get rid of capsid records if any)
 // compute probminhash sketch and store in a Hnsw.
@@ -49,8 +51,8 @@ struct HnswParams {
     nbng : usize,
     /// expected number of sequences to store
     capacity : usize,
-    ef_search : usize,
-    max_nb_conn : usize,
+    ef : usize,
+    max_nb_conn : u8,
 }
 
 // install a logger facility
@@ -72,7 +74,7 @@ fn sketchandstore_dir(dirpath : &Path, sketcher_params : &SeqSketcher, hnsw_para
     let insertion_block_size = 5000;
     let mut insertion_queue : Vec<IdSeq>= Vec::with_capacity(insertion_block_size);
     // TODO must get ef_search from clap via hnswparams
-    let hnsw = Hnsw::<u32, DistHamming>::new(hnsw_params.max_nb_conn , hnsw_params.capacity , 16, hnsw_params.ef_search, DistHamming{});
+    let hnsw = Hnsw::<u32, DistHamming>::new(hnsw_params.max_nb_conn as usize , hnsw_params.capacity , 16, hnsw_params.ef, DistHamming{});
     //
     // Sketcher allocation, we do not need reverse complement hashing as we sketch assembled genomes. (Jianshu Zhao)
     //
@@ -197,9 +199,15 @@ fn sketchandstore_dir(dirpath : &Path, sketcher_params : &SeqSketcher, hnsw_para
     }).unwrap();  // end of scope
     //
     let cpu_time = cpu_start.elapsed().as_secs();
-    log::info!("process_dir : cpu time(s) {}", cpu_time);
     let elapsed_t = start_t.elapsed().unwrap().as_secs() as f32;
-    log::info!("process_dir : elapsed time(s) {}", elapsed_t);
+    if log::log_enabled!(log::Level::Info) {
+        log::info!("process_dir : cpu time(s) {}", cpu_time);
+        log::info!("process_dir : elapsed time(s) {}", elapsed_t);
+    }
+    else {
+        println!("process_dir : cpu time(s) {}", cpu_time);
+        println!("process_dir : elapsed time(s) {}", elapsed_t);
+    }
 } // end of sketchandstore
 
 
@@ -229,6 +237,10 @@ fn main() {
             .short("n")
             .takes_value(true)
             .help("must specify number of neighbours in hnsw"))
+        .arg(Arg::with_name("ef")
+            .long("ef")
+            .default_value("200")
+            .help("parameters neighbour search at creation"))
         .get_matches();
 
     // decode matches, check for dir
@@ -279,10 +291,15 @@ fn main() {
             println!("-n nbng is mandatory");
             std::process::exit(1);
         }
+        //
+        let mut ef_construction = 200;
+        if matches.is_present("ef") {
+            ef_construction = matches.value_of("ef").ok_or("").unwrap().parse::<usize>().unwrap();
+            println!("ef construction parameters in hnsw construction {}", ef_construction);
+        }           
         // max_nb_conn must be adapted to the number of neighbours we will want in searches.
-        let max_nb_conn = 128.min(2 * nbng as usize);
-        let ef_search = 200;
-        let hnswparams = HnswParams{nbng : nbng as usize, capacity : 700000, ef_search, max_nb_conn};
+        let max_nb_conn : u8 = 128.min(nbng as u8);
+        let hnswparams = HnswParams{nbng : nbng as usize, capacity : 700_000, ef : ef_construction, max_nb_conn};
         //
         //
         sketchandstore_dir(&dirpath, &sketch_params, &hnswparams);
