@@ -6,8 +6,9 @@
 //! --dir : the name of directory containing tree of GCF and GCA files 
 //! --sketch gives the size of probminhash sketch ()integer value)
 //! --kmer [-k] gives the size of kmer to use for generating probminhash (integer value)
-//! --nbng [-n] gives the number of neihbours required in hnsw construction
-//! -- ef optional integer value to optimize hnsw structure creation (default to 200)
+//! --nbng [-n] gives the number of neihbours required in hnsw construction at each layer, in the range 24-64 is usual
+//!             it doest not means you cannot ask for more neighbours in request.
+//! -- ef optional integer value to optimize hnsw structure creation (default to 400)
 
 // must loop on sub directories , open gzipped files
 // extracts complete genomes possiby many in one file (get rid of capsid records if any)
@@ -239,7 +240,7 @@ fn main() {
             .help("must specify number of neighbours in hnsw"))
         .arg(Arg::with_name("ef")
             .long("ef")
-            .default_value("200")
+            .default_value("400")
             .help("parameters neighbour search at creation"))
         .get_matches();
 
@@ -292,10 +293,13 @@ fn main() {
             std::process::exit(1);
         }
         //
-        let mut ef_construction = 200;
+        let mut ef_construction = 400;
         if matches.is_present("ef") {
             ef_construction = matches.value_of("ef").ok_or("").unwrap().parse::<usize>().unwrap();
             println!("ef construction parameters in hnsw construction {}", ef_construction);
+        }
+        else {
+            println!("ef default used in construction {}", ef_construction);
         }           
         // max_nb_conn must be adapted to the number of neighbours we will want in searches.
         let max_nb_conn : u8 = 128.min(nbng as u8);
