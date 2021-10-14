@@ -38,7 +38,7 @@ use kmerutils::sketching::seqsketchjaccard::*;
 
 use archaea::utils::idsketch::{SeqDict, Id, IdSeq};
 //mod files;
-use archaea::utils::files::{process_dir,process_file};
+use archaea::utils::files::{process_dir,process_file, FilterParams};
 
 
 // install a logger facility
@@ -75,6 +75,7 @@ impl <'a> ReqAnswer<'a> {
             // get database identification of neighbour
             let database_id = seqdict.0[n.d_id].get_path();
             write!(out, "\n\t distance : {:.3E}  answer fasta id {}", n.distance, database_id)?;
+            write!(out, "\n\t\t answer fasta id {}", seqdict.0[n.d_id].get_fasta_id() )?;
         }
         Ok(())
     } // end of dump
@@ -88,8 +89,9 @@ impl <'a> ReqAnswer<'a> {
 /// dumpdir_path is the path to directory containing dump of Hnsw, database sequence dictionary and sketchparams.
 /// request_dirpath is the directory containing the fasta files which are the requests.
 /// 
-fn sketch_and_request_dir(request_dirpath : &Path, hnsw : &Hnsw<u32,DistHamming>, seqdict : &SeqDict, 
-                sketcher_params : &SeqSketcher, knbn : usize, ef_search : usize) {
+fn sketch_and_request_dir(request_dirpath : &Path, filter_params: &FilterParams, seqdict : &SeqDict, 
+                sketcher_params : &SeqSketcher, hnsw : &Hnsw<u32,DistHamming>,  
+                knbn : usize, ef_search : usize) {
     //
     log::trace!("sketch_and_request_dir processing dir {}", request_dirpath.to_str().unwrap());
     log::info!("sketch_and_request_dir {}", request_dirpath.to_str().unwrap());
@@ -128,7 +130,7 @@ fn sketch_and_request_dir(request_dirpath : &Path, hnsw : &Hnsw<u32,DistHamming>
         // sequence sending, productor thread
         let mut nb_sent = 0;
         let sender_handle = scope.spawn(move |_|   {
-            let res_nb_sent = process_dir(request_dirpath, &process_file, &send);
+            let res_nb_sent = process_dir(request_dirpath, &filter_params, &process_file, &send);
             match res_nb_sent {
                 Ok(nb_really_sent) => {
                     nb_sent = nb_really_sent;
@@ -396,7 +398,7 @@ fn main() {
         };
 
         // 
-        let ef_search = 200;
-        sketch_and_request_dir(&request_dirpath, &hnsw, &seqdict, &sk_params, nbng as usize, ef_search);
-
+        let ef_search = 800;
+        let filter_params = FilterParams::new(2*sketch_size as usize);
+        sketch_and_request_dir(&request_dirpath, &filter_params, &seqdict, &sk_params, &hnsw, nbng as usize, ef_search);
 }  // end of main

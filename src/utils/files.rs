@@ -8,6 +8,31 @@ use kmerutils::base::{sequence::*};
 
 use super::idsketch::{IdSeq};
 
+/// a structure to filter files or sequences we treat
+pub struct FilterParams {
+    /// minimum sequence size
+    pub min_seq_size : usize,
+} // end of struct FilterParams
+
+
+impl FilterParams {
+    pub fn new(min_seq_size : usize) -> Self {
+        FilterParams{min_seq_size}
+    } // end of new
+
+    /// returns true if we filter (garbage the sequence)
+    pub fn filter(&self, seq : &[u8]) -> bool {
+        if seq.len() < self.min_seq_size {
+            true
+        }
+        else {
+            false
+        }
+    }
+}  // end of FilterParams
+
+
+
 
 // returns true if file is a fasta file (possibly gzipped)
 // filename are of type GCA[GCF]_000091165.1_genomic.fna.gz
@@ -46,7 +71,7 @@ pub fn filter_out_n(seq : &[u8]) -> Vec<u8> {
 /// opens parse fna files with needletail
 /// extracts records , filters out capsid and send sequences to function process_dir to execute file_task to produce sequence
 /// for any client
-pub fn process_file(file : &DirEntry)  -> Vec<IdSeq> {
+pub fn process_file(file : &DirEntry, filter_params : &FilterParams)  -> Vec<IdSeq> {
     let mut to_sketch = Vec::<IdSeq>::new();
     //
     let pathb = file.path();
@@ -61,17 +86,19 @@ pub fn process_file(file : &DirEntry)  -> Vec<IdSeq> {
         let seqrec = record.expect("invalid record");
         let id = seqrec.id();
         let strid = String::from_utf8(Vec::from(id)).unwrap();
-        if strid.find("capsid").is_none() {
+        // process sequence if not capsid and not filtered out
+        if strid.find("capsid").is_none() && !filter_params.filter(&seqrec.seq()) {
             // Our Kmers are 2bits encoded so we need to be able to encode sequence in 2 bits, so there is 
             // this hack,  causing reallocation. seqrec.seq is Cow so drain does not seem an option.
+            let old_len = seqrec.seq().len();
             let filtered = filter_out_n(&seqrec.seq());
-            let newseq = Sequence::new(&filtered, 2);
-            if log::log_enabled!(log::Level::Trace) && filtered.len() < seqrec.seq().len() {
-                let nb_n = seqrec.seq().len() - filtered.len();
-                log::trace!("filtered nb non ACTG {}, fraction  {:1.3e}", seqrec.seq().len() - filtered.len(), nb_n as f32/seqrec.seq().len() as f32);
+            drop(seqrec);
+            if log::log_enabled!(log::Level::Trace) && filtered.len() < old_len {
+                let nb_n = old_len - filtered.len();
+                log::trace!("filtered nb non ACTG {}, fraction  {:1.3e}", nb_n , nb_n as f32/old_len as f32);
             }
             // recall rank is set in process_dir beccause we should a have struct gatheing the 2 functions process_dir and process_file
-            let seqwithid = IdSeq::new(pathb.to_str().unwrap().to_string(), strid, newseq);
+            let seqwithid = IdSeq::new(pathb.to_str().unwrap().to_string(), strid, Sequence::new(&filtered,2));
             to_sketch.push(seqwithid);
             if log::log_enabled!(log::Level::Trace) {
                 log::trace!("process_file, nb_sketched {} ", to_sketch.len());
@@ -86,7 +113,7 @@ pub fn process_file(file : &DirEntry)  -> Vec<IdSeq> {
 
 /// scan directory recursively, executing function file_task on each file.
 /// adapted from from crate fd_find
-pub fn process_dir(dir: &Path, file_task: &dyn Fn(&DirEntry) -> Vec<IdSeq>, sender : &crossbeam_channel::Sender::<Vec<IdSeq>>) -> io::Result<usize> {
+pub fn process_dir(dir: &Path, filter_params : &FilterParams, file_task: &dyn Fn(&DirEntry, &FilterParams) -> Vec<IdSeq>, sender : &crossbeam_channel::Sender::<Vec<IdSeq>>) -> io::Result<usize> {
     let mut nb_seq_processed = 0;
     //
     // we checked that we have a directory
@@ -94,11 +121,11 @@ pub fn process_dir(dir: &Path, file_task: &dyn Fn(&DirEntry) -> Vec<IdSeq>, send
         let entry = entry?;
         let path = entry.path();
         if path.is_dir() {
-            nb_seq_processed += process_dir(&path, file_task, sender)?;
+            nb_seq_processed += process_dir(&path, filter_params, file_task, sender)?;
         } else {
             // check if entry is a fasta.gz file
             if is_fasta_file(&entry) {
-                let mut to_sketch = file_task(&entry);
+                let mut to_sketch = file_task(&entry, filter_params);
                 // put a rank id in sequences, now we have full information of where do the sequence come from
                 for i in 0..to_sketch.len() {
                     to_sketch[i].rank = nb_seq_processed + i;

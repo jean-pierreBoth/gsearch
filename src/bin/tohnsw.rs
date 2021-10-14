@@ -42,7 +42,7 @@ use kmerutils::sketching::seqsketchjaccard::SeqSketcher;
 
 use archaea::utils::idsketch::{SeqDict,Id, IdSeq};
 
-use archaea::utils::files::{process_dir,process_file};
+use archaea::utils::files::{process_dir,process_file, FilterParams};
 
 
 
@@ -64,7 +64,7 @@ pub fn init_log() -> u64 {
 }
 
 // this function does the sketching and hnsw store of a whole directory
-fn sketchandstore_dir(dirpath : &Path, sketcher_params : &SeqSketcher, hnsw_params : &HnswParams) {
+fn sketchandstore_dir(dirpath : &Path, filter_params: &FilterParams, sketcher_params : &SeqSketcher, hnsw_params : &HnswParams) {
     //
     log::trace!("sketchandstore_dir processing dir {}", dirpath.to_str().unwrap());
     log::info!("sketchandstore_dir {}", dirpath.to_str().unwrap());
@@ -92,7 +92,7 @@ fn sketchandstore_dir(dirpath : &Path, sketcher_params : &SeqSketcher, hnsw_para
         // sequence sending, productor thread
         let mut nb_sent = 0;
         let sender_handle = scope.spawn(move |_|   {
-            let res_nb_sent = process_dir(dirpath, &process_file, &send);
+            let res_nb_sent = process_dir(dirpath, filter_params, &process_file, &send);
             match res_nb_sent {
                 Ok(nb_really_sent) => {
                     nb_sent = nb_really_sent;
@@ -228,11 +228,11 @@ fn main() {
             .short("k")
             .takes_value(true)
             .help("expecting a kmer size"))
-        .arg(Arg::with_name("sketch size")
+        .arg(Arg::with_name("sketch_size")
             .long("sketch")
             .short("s")
-            .default_value("8")
-            .help("size of probinhash sketch, default to 8"))
+            .default_value("256")
+            .help("size of probinhash sketch, default to 256"))
         .arg(Arg::with_name("neighbours")
             .long("nbng")
             .short("n")
@@ -264,12 +264,13 @@ fn main() {
             std::process::exit(1);
         }
         // get sketching params
-        let mut sketch_size = 256;
-        if matches.is_present("size") {
-            sketch_size = matches.value_of("size").ok_or("").unwrap().parse::<u16>().unwrap();
-            println!("sketching size {}", sketch_size);
+        let sketch_size;
+        if matches.is_present("sketch_size") {
+            sketch_size = matches.value_of("sketch_size").ok_or("").unwrap().parse::<u16>().unwrap();
+            println!("sketching size arg {}", sketch_size);
         }
         else {
+            sketch_size = 256;
             println!("using default sketch size {}", sketch_size);
         }
         //
@@ -306,7 +307,8 @@ fn main() {
         let hnswparams = HnswParams{nbng : nbng as usize, capacity : 700_000, ef : ef_construction, max_nb_conn};
         //
         //
-        sketchandstore_dir(&dirpath, &sketch_params, &hnswparams);
+        let filter_params = FilterParams::new(2*sketch_size as usize);
+        sketchandstore_dir(&dirpath, &filter_params, &sketch_params, &hnswparams);
 
 
         //
