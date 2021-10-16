@@ -24,6 +24,7 @@ use env_logger::{Builder};
 //
 use std::time::{SystemTime};
 use cpu_time::ProcessTime;
+use serde::{Serialize, de::DeserializeOwned};
 
 
 use std::path::{Path, PathBuf};
@@ -32,7 +33,7 @@ use std::io::{Write,BufWriter, BufReader};
 
 use hnsw_rs::prelude::*;
 use hnsw_rs::hnswio::{load_description, load_hnsw};
-use kmerutils::base::{sequence::*, Kmer32bit, KmerT};
+use kmerutils::base::{sequence::*, Kmer32bit, Kmer64bit, KmerT};
 use kmerutils::sketching::*;
 use kmerutils::sketching::seqsketchjaccard::*;
 
@@ -89,7 +90,7 @@ impl <'a> ReqAnswer<'a> {
 /// dumpdir_path is the path to directory containing dump of Hnsw, database sequence dictionary and sketchparams.
 /// request_dirpath is the directory containing the fasta files which are the requests.
 /// 
-fn sketch_and_request_dir(request_dirpath : &Path, filter_params: &FilterParams, seqdict : &SeqDict, 
+fn sketch_and_request_dir_kmer32bit(request_dirpath : &Path, filter_params: &FilterParams, seqdict : &SeqDict, 
                 sketcher_params : &SeqSketcher, hnsw : &Hnsw<u32,DistHamming>,  
                 knbn : usize, ef_search : usize) {
     //
@@ -216,9 +217,141 @@ fn sketch_and_request_dir(request_dirpath : &Path, filter_params: &FilterParams,
 
 
 
+
+
+fn sketch_and_request_dir_kmer64bit(request_dirpath : &Path, filter_params: &FilterParams, seqdict : &SeqDict, 
+                sketcher_params : &SeqSketcher, hnsw : &Hnsw<u64,DistHamming>,  
+                knbn : usize, ef_search : usize) {
+    //
+    log::trace!("sketch_and_request_dir processing dir {}", request_dirpath.to_str().unwrap());
+    log::info!("sketch_and_request_dir {}", request_dirpath.to_str().unwrap());
+    log::info!("sketch_and_request kmer size  {}  sketch size {} ", 
+            sketcher_params.get_kmer_size(), sketcher_params.get_sketch_size());
+    // creating an output file in the 
+    let outname = "archea.answers";
+    let outpath = PathBuf::from(outname.clone());
+    let outfile = OpenOptions::new().write(true).create(true).truncate(true).open(&outpath);
+    if outfile.is_err() {
+        log::error!("SeqDict dump : dump could not open file {:?}", outpath.as_os_str());
+        println!("SeqDict dump: could not open file {:?}", outpath.as_os_str());
+        return Err("SeqDict Deserializer dump failed").unwrap();
+    }    
+    let mut outfile = BufWriter::new(outfile.unwrap());
+    log::info!("dumping request answers in : {}", outname);
+    //
+    let start_t = SystemTime::now();
+    let cpu_start = ProcessTime::now();
+    // a queue of signature request , size must be sufficient to benefit from threaded probminhash and search
+    let request_block_size = 500;
+    let mut request_queue : Vec<IdSeq>= Vec::with_capacity(request_block_size);
+    //
+    // Sketcher allocation, we do not need reverse complement hashing as we sketch assembled genomes. (Jianshu Zhao)
+    //
+    let kmer_hash_fn = | kmer : &Kmer64bit | -> u64 {
+        let value_mask :u64 = (0b1 << (2*kmer.get_nb_base())) - 1;
+        let hashval = kmer.0 & value_mask;
+        hashval
+    };
+    let sketcher = seqsketchjaccard::SeqSketcher::new(sketcher_params.get_kmer_size(), sketcher_params.get_sketch_size());
+    // to send IdSeq to sketch from reading thread to sketcher thread
+    let (send, receive) = crossbeam_channel::bounded::<Vec<IdSeq>>(10_000);
+    // launch process_dir in a thread or async
+    crossbeam_utils::thread::scope(|scope| {
+        // sequence sending, productor thread
+        let mut nb_sent = 0;
+        let sender_handle = scope.spawn(move |_|   {
+            let res_nb_sent = process_dir(request_dirpath, &filter_params, &process_file, &send);
+            match res_nb_sent {
+                Ok(nb_really_sent) => {
+                    nb_sent = nb_really_sent;
+                    println!("process_dir processed nb sequences : {}", nb_sent);
+                }
+                Err(_) => {
+                    println!("some error occured in process_dir");
+                }
+            };
+            drop(send);
+            Box::new(nb_sent)
+        });
+        // sequence reception, consumer thread
+        let receptor_handle = scope.spawn(move |_| {
+            let mut nb_request = 0;
+            // we must read messages, sketch and insert into hnsw
+            let mut read_more = true;
+            while read_more {
+                // try read, if error is Disconnected we stop read and both threads are finished.
+                let res_receive = receive.recv();
+                match res_receive {
+                    Err(_) => { read_more = false;
+                        // sketch the content of  insertion_queue if not empty
+                        if request_queue.len() > 0 {
+                            let sequencegroup_ref : Vec<&Sequence> = request_queue.iter().map(|s| s.get_sequence()).collect();
+                            let seq_id :  Vec<Id> = request_queue.iter().map(|s| Id::new(s.get_path(), s.get_fasta_id())).collect();
+                            let signatures = sketcher.sketch_probminhash3a_kmer64bit(&sequencegroup_ref, kmer_hash_fn);                            
+                            // we have Vec<u64> signatures we must go back to a vector of IdSketch for hnsw insertion
+                            let knn_neighbours  = hnsw.parallel_search(&signatures, knbn, ef_search);
+                            for i in 0..knn_neighbours.len() {
+                                let answer = ReqAnswer::new(nb_request+i, seq_id[i].clone(), &knn_neighbours[i]);
+                                if answer.dump(&seqdict, &mut outfile).is_err() {
+                                    log::info!("could not dump answer for request id {}", answer.req_id.get_fasta_id());
+                                }
+                            }
+                            //  dump results
+                            nb_request += signatures.len();
+                        }
+                    }
+                    Ok(mut idsequences) => {
+                        // concat the new idsketch in insertion queue.
+                        request_queue.append(&mut idsequences);
+                        // if request_queue is beyond threshold size we can go to threaded sketching and threading insertion
+                        if request_queue.len() > request_block_size {
+                            let sequencegroup_ref : Vec<&Sequence> = request_queue.iter().map(|s| s.get_sequence()).collect();
+                            // collect Id
+                            let seq_id :  Vec<Id> = request_queue.iter().map(|s| Id::new(s.get_path(), s.get_fasta_id())).collect();
+                            // computes hash signature
+                            let signatures = sketcher.sketch_probminhash3a_kmer64bit(&sequencegroup_ref, kmer_hash_fn);
+                            // we have Vec<u64> signatures we must go back to a vector of IdSketch, inserting unique id, for hnsw insertion
+                            // parallel search
+                            let knn_neighbours  = hnsw.parallel_search(&signatures, knbn, ef_search);
+                            // construct and dump answers
+                            for i in 0..knn_neighbours.len() {
+                                let answer = ReqAnswer::new(nb_request+i, seq_id[i].clone(), &knn_neighbours[i]);
+                                if answer.dump(&seqdict, &mut outfile).is_err() {
+                                    log::info!("could not dump answer for request id {}", answer.req_id.get_fasta_id());
+                                }
+                            }
+                            nb_request += signatures.len();
+                            request_queue.clear();
+                        }
+                    }
+                }
+            } // end while 
+            //
+            Box::new(nb_request)
+        }); // end of receptor thread
+        // now we must join handles
+        let nb_sent = sender_handle.join().unwrap();
+        let nb_received = receptor_handle.join().unwrap();
+        log::debug!("sketch_and_request_dir, nb_sent = {}, nb_received = {}", nb_sent, nb_received);
+        if nb_sent != nb_received {
+            log::error!("an error occurred  nb msg sent : {}, nb msg received : {}", nb_sent, nb_received);
+        }
+    }).unwrap();  // end of scope
+    //
+    let cpu_time = cpu_start.elapsed().as_secs();
+    log::info!("process_dir : cpu time(s) {}", cpu_time);
+    let elapsed_t = start_t.elapsed().unwrap().as_secs() as f32;
+    log::info!("process_dir : elapsed time(s) {}", elapsed_t);
+} // end of sketch_and_request_dir_kmer64bit
+
+
+
+
 /// reload hnsw from dump directory
 /// We know filename : hnswdump.hnsw.data and hnswdump.hnsw.graph
-fn reload_hnsw(dump_dirpath : &Path) -> Option<Hnsw<u32, DistHamming>> {
+fn reload_hnsw<T>(dump_dirpath : &Path) -> Option<Hnsw<T, DistHamming>>  
+            where T : 'static + Clone + Send + Sync + Serialize + DeserializeOwned ,
+                DistHamming : Distance<T>  {
     // just concat dirpath to filenames and get pathbuf
     let graph_path = dump_dirpath.join("hnswdump.hnsw.graph");
     log::info!("reload_hnsw, loading graph from {}",graph_path.to_str().unwrap());
@@ -242,7 +375,7 @@ fn reload_hnsw(dump_dirpath : &Path) -> Option<Hnsw<u32, DistHamming>> {
     //
     let start_t = SystemTime::now();
     let hnsw_description = load_description(&mut graphfile).unwrap();
-    let hnsw : Hnsw<u32, DistHamming>= load_hnsw(&mut graphfile, &hnsw_description, &mut datafile).unwrap();
+    let hnsw : Hnsw<T, DistHamming>= load_hnsw(&mut graphfile, &hnsw_description, &mut datafile).unwrap();
     let elapsed_t = start_t.elapsed().unwrap().as_secs() as f32;
     if log::log_enabled!(log::Level::Info) {
         log::info!("reload_hnsw : elapsed system time(s) {}", elapsed_t);
@@ -363,6 +496,8 @@ fn main() {
             println!("-n nbng is mandatory");
             std::process::exit(1);
         }
+        let ef_search = 800;
+        let filter_params = FilterParams::new(2*sketch_size as usize);
         //
         // Do all dump reload, first sketch params. We reload smaller files first 
         // so that path errors are found early 
@@ -389,16 +524,26 @@ fn main() {
         log::info!("reloading sequence dictionary from {} done", &seqname);
         // reload hnsw
         log::info!("\n reloading hnsw from {}", database_dirpath.to_str().unwrap());
-        let hnsw = reload_hnsw(database_dirpath);
-        let hnsw = match hnsw {
-            Some(hnsw) => hnsw,
-            _ => {
-                panic!("hnsw reload from dump dir {} failed", database_dirpath.to_str().unwrap());
-            }
-        };
-
+        if kmer_size < 14 {
+            let hnsw = reload_hnsw(database_dirpath);
+            let hnsw = match hnsw {
+                Some(hnsw) => hnsw,
+                _ => {
+                    panic!("hnsw reload from dump dir {} failed", database_dirpath.to_str().unwrap());
+                }
+            };
+            sketch_and_request_dir_kmer32bit(&request_dirpath, &filter_params, &seqdict, &sk_params, &hnsw, nbng as usize, ef_search);
+        }
+        else if kmer_size > 16 {
+            let hnsw = reload_hnsw(database_dirpath);
+            let hnsw = match hnsw {
+                Some(hnsw) => hnsw,
+                _ => {
+                    panic!("hnsw reload from dump dir {} failed", database_dirpath.to_str().unwrap());
+                }
+            };
+            sketch_and_request_dir_kmer64bit(&request_dirpath, &filter_params, &seqdict, &sk_params, &hnsw, nbng as usize, ef_search);
+        }
         // 
-        let ef_search = 800;
-        let filter_params = FilterParams::new(2*sketch_size as usize);
-        sketch_and_request_dir(&request_dirpath, &filter_params, &seqdict, &sk_params, &hnsw, nbng as usize, ef_search);
+
 }  // end of main
