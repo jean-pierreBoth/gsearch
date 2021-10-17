@@ -35,6 +35,7 @@ path = "src/lib.rs"
 serde= {version = "1.0", features = ["derive"] }
 serde_json= {version = "1.0"}
 
+num = {version = "0.4"}
 
 
 
@@ -52,14 +53,14 @@ clap = {version = "2.33"}
 
 ##
 
-probminhash = {version = "0.1.4"}
-#probminhash = {path = "../probminhash"}
-hnsw_rs =  {version = "0.1.14"}
-#hnsw_rs = {path = "../hnswlib-rs"}
+#probminhash = {version = "0.1.4"}
+probminhash = {path = "../probminhash"}
+#hnsw_rs =  {version = "0.1.14"}
+hnsw_rs = {path = "../hnswlib-rs"}
 
-kmerutils = {git = "https://github.com/jean-pierreBoth/kmerutils"}
+#kmerutils = {git = "https://github.com/jean-pierreBoth/kmerutils"}
 #kmerutils = {git = "https://gitlab.com/jpboth/kmerutils"}
-#kmerutils = {path = "../kmerutils"}
+kmerutils = {path = "../kmerutils"}
 
 lazy_static = { version = "1.4"}
 

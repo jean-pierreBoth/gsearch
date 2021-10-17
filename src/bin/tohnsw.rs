@@ -32,13 +32,15 @@ use cpu_time::ProcessTime;
 
 // for multithreading
 use crossbeam_channel::*;
+use serde::{de::DeserializeOwned, Serialize};
+
+use std::fmt::{Debug};
 
 // our crate
 use hnsw_rs::prelude::*;
-use kmerutils::base::{sequence::*, Kmer32bit, Kmer64bit, KmerT};
+use kmerutils::base::{kmergenerator::*, Kmer32bit, Kmer64bit, KmerT, CompressedKmerT};
 use kmerutils::sketching::*;
 use kmerutils::sketching::seqsketchjaccard::SeqSketcher;
-
 
 use archaea::utils::idsketch::{SeqDict,Id, IdSeq};
 
@@ -63,7 +65,9 @@ pub fn init_log() -> u64 {
     return 1;
 }
 
-// this function does the sketching in small kmers (less than 14 bases) and hnsw store of a whole directory
+// this function does the sketching in small kmers (less than 14 bases) and hnsw store of a whole directory, version before generic one
+
+#[allow(dead_code)]
 fn sketchandstore_dir_kmer32bit(dirpath : &Path, filter_params: &FilterParams, sketcher_params : &SeqSketcher, hnsw_params : &HnswParams) {
     //
     log::trace!("sketchandstore_dir processing dir {}", dirpath.to_str().unwrap());
@@ -212,9 +216,12 @@ fn sketchandstore_dir_kmer32bit(dirpath : &Path, filter_params: &FilterParams, s
 } // end of sketchandstore
 
 
-// TODO use a generic on Kmer type function
-// this function does the sketching in kmers of size > 16. and hnsw store of a whole directory
-fn sketchandstore_dir_kmer64bit(dirpath : &Path, filter_params: &FilterParams, sketcher_params : &SeqSketcher, hnsw_params : &HnswParams) {
+
+fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT>(dirpath : &Path, filter_params: &FilterParams, 
+        sketcher_params : &SeqSketcher, hnsw_params : &HnswParams) 
+        where Kmer::Val : num::PrimInt + Clone + Copy + Send + Sync + Serialize + DeserializeOwned + Debug,
+                KmerGenerator<Kmer> :  KmerGenerationPattern<Kmer>, 
+                DistHamming : Distance<Kmer::Val> {
     //
     log::trace!("sketchandstore_dir processing dir {}", dirpath.to_str().unwrap());
     log::info!("sketchandstore_dir {}", dirpath.to_str().unwrap());
@@ -225,13 +232,13 @@ fn sketchandstore_dir_kmer64bit(dirpath : &Path, filter_params: &FilterParams, s
     let insertion_block_size = 5000;
     let mut insertion_queue : Vec<IdSeq>= Vec::with_capacity(insertion_block_size);
     // TODO must get ef_search from clap via hnswparams
-    let hnsw = Hnsw::<u64, DistHamming>::new(hnsw_params.max_nb_conn as usize , hnsw_params.capacity , 16, hnsw_params.ef, DistHamming{});
+    let hnsw = Hnsw::<Kmer::Val, DistHamming>::new(hnsw_params.max_nb_conn as usize , hnsw_params.capacity , 16, hnsw_params.ef, DistHamming{});
     //
     // Sketcher allocation, we do not need reverse complement hashing as we sketch assembled genomes. (Jianshu Zhao)
     //
-    let kmer_hash_fn = | kmer : &Kmer64bit | -> u64 {
-        let mask : u64 = (0b1 << 2*kmer.get_nb_base()) - 1;
-        let hashval = kmer.0 & mask;
+    let kmer_hash_fn = | kmer : &Kmer | -> Kmer::Val {
+        let mask : Kmer::Val = num::NumCast::from::<u64>((0b1 << 2*kmer.get_nb_base()) - 1).unwrap();
+        let hashval = kmer.get_compressed_value() & mask;
         hashval
     };
     let sketcher = seqsketchjaccard::SeqSketcher::new(sketcher_params.get_kmer_size(), sketcher_params.get_sketch_size());
@@ -273,9 +280,9 @@ fn sketchandstore_dir_kmer64bit(dirpath : &Path, filter_params: &FilterParams, s
                             // collect Id
                             let mut seq_id :  Vec<Id> = insertion_queue.iter().map(|s| Id::new(s.get_path(), s.get_fasta_id())).collect();
                             seqdict.0.append(&mut seq_id);
-                            let signatures = sketcher.sketch_probminhash3a_kmer64bit(&sequencegroup_ref, kmer_hash_fn);                            
+                            let signatures = sketcher.sketch_probminhash3a_compressedkmer(&sequencegroup_ref, kmer_hash_fn);                            
                             // we have Vec<u64> signatures we must go back to a vector of IdSketch for hnsw insertion
-                            let mut data_for_hnsw = Vec::<(&Vec<u64>, usize)>::with_capacity(signatures.len());
+                            let mut data_for_hnsw = Vec::<(&Vec<Kmer::Val>, usize)>::with_capacity(signatures.len());
                             for i in 0..signatures.len() {
                                 data_for_hnsw.push((&signatures[i], seq_rank[i]));
                             }
@@ -294,9 +301,9 @@ fn sketchandstore_dir_kmer64bit(dirpath : &Path, filter_params: &FilterParams, s
                             let mut seq_id :  Vec<Id> = insertion_queue.iter().map(|s| Id::new(s.get_path(), s.get_fasta_id())).collect();
                             seqdict.0.append(&mut seq_id);
                             // computes hash signature
-                            let signatures = sketcher.sketch_probminhash3a_kmer64bit(&sequencegroup_ref, kmer_hash_fn);
+                            let signatures = sketcher.sketch_probminhash3a_compressedkmer(&sequencegroup_ref, kmer_hash_fn);
                             // we have Vec<u32> signatures we must go back to a vector of IdSketch, inserting unique id, for hnsw insertion
-                            let mut data_for_hnsw = Vec::<(&Vec<u64>, usize)>::with_capacity(signatures.len());
+                            let mut data_for_hnsw = Vec::<(&Vec<Kmer::Val>, usize)>::with_capacity(signatures.len());
                             for i in 0..signatures.len() {
                                 data_for_hnsw.push((&signatures[i], seq_rank[i]));
                             }
@@ -458,10 +465,12 @@ fn main() {
         //
         let filter_params = FilterParams::new(2*sketch_size as usize);
         if kmer_size <= 14 {
-            sketchandstore_dir_kmer32bit(&dirpath, &filter_params, &sketch_params, &hnswparams);
+            sketchandstore_dir_compressedkmer::<Kmer32bit>(&dirpath, &filter_params, &sketch_params, &hnswparams);
         }
-        else {
-            sketchandstore_dir_kmer64bit(&dirpath, &filter_params, &sketch_params, &hnswparams);
+        else if kmer_size > 16 {
+            sketchandstore_dir_compressedkmer::<Kmer64bit>(&dirpath, &filter_params, &sketch_params, &hnswparams);
+        } else if kmer_size == 16 {
+            sketchandstore_dir_compressedkmer::<Kmer16b32bit>(&dirpath, &filter_params, &sketch_params, &hnswparams);
         }
 
 
