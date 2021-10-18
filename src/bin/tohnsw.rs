@@ -44,7 +44,7 @@ use kmerutils::sketching::seqsketchjaccard::SeqSketcher;
 
 use archaea::utils::idsketch::{SeqDict,Id, IdSeq};
 
-use archaea::utils::files::{process_dir,process_file, FilterParams};
+use archaea::utils::files::{process_dir,process_file_in_one_block, process_file_by_sequence, FilterParams};
 
 
 
@@ -66,155 +66,6 @@ pub fn init_log() -> u64 {
 }
 
 // this function does the sketching in small kmers (less than 14 bases) and hnsw store of a whole directory, version before generic one
-
-#[allow(dead_code)]
-fn sketchandstore_dir_kmer32bit(dirpath : &Path, filter_params: &FilterParams, sketcher_params : &SeqSketcher, hnsw_params : &HnswParams) {
-    //
-    log::trace!("sketchandstore_dir processing dir {}", dirpath.to_str().unwrap());
-    log::info!("sketchandstore_dir {}", dirpath.to_str().unwrap());
-    let start_t = SystemTime::now();
-    let cpu_start = ProcessTime::now();
-    //
-    // a queue of signature waiting to be inserted , size must be sufficient to benefit from threaded probminhash and insert
-    let insertion_block_size = 5000;
-    let mut insertion_queue : Vec<IdSeq>= Vec::with_capacity(insertion_block_size);
-    // TODO must get ef_search from clap via hnswparams
-    let hnsw = Hnsw::<u32, DistHamming>::new(hnsw_params.max_nb_conn as usize , hnsw_params.capacity , 16, hnsw_params.ef, DistHamming{});
-    //
-    // Sketcher allocation, we do not need reverse complement hashing as we sketch assembled genomes. (Jianshu Zhao)
-    //
-    let kmer_hash_fn = | kmer : &Kmer32bit | -> u32 {
-        let value_mask :u32 = (0b1 << (2*kmer.get_nb_base())) - 1;
-        let hashval = kmer.0 & value_mask;
-        hashval
-    };
-    let sketcher = seqsketchjaccard::SeqSketcher::new(sketcher_params.get_kmer_size(), sketcher_params.get_sketch_size());
-    // to send IdSeq to sketch from reading thread to sketcher thread
-    let (send, receive) = crossbeam_channel::bounded::<Vec<IdSeq>>(10_000);
-    // launch process_dir in a thread or async
-    crossbeam_utils::thread::scope(|scope| {
-        // sequence sending, productor thread
-        let mut nb_sent = 0;
-        let sender_handle = scope.spawn(move |_|   {
-            let res_nb_sent = process_dir(dirpath, filter_params, &process_file, &send);
-            match res_nb_sent {
-                Ok(nb_really_sent) => {
-                    nb_sent = nb_really_sent;
-                    println!("process_dir processed nb sequences : {}", nb_sent);
-                }
-                Err(_) => {
-                    println!("some error occured in process_dir");
-                }
-            };
-            drop(send);
-            Box::new(nb_sent)
-        });
-        // sequence reception, consumer thread
-        let receptor_handle = scope.spawn(move |_| {
-            let mut seqdict = SeqDict::new(100000);
-            // we must read messages, sketch and insert into hnsw
-            let mut read_more = true;
-            while read_more {
-                // try read, if error is Disconnected we stop read and both threads are finished.
-                let res_receive = receive.recv();
-                match res_receive {
-                    Err(RecvError) => { read_more = false;
-                        // sketch the content of  insertion_queue if not empty
-                        if insertion_queue.len() > 0 {
-                            let sequencegroup_ref : Vec<&Sequence> = insertion_queue.iter().map(|s| s.get_sequence()).collect();
-                            // collect rank
-                            let seq_rank :  Vec<usize> = insertion_queue.iter().map(|s| s.get_rank()).collect();
-                            // collect Id
-                            let mut seq_id :  Vec<Id> = insertion_queue.iter().map(|s| Id::new(s.get_path(), s.get_fasta_id())).collect();
-                            seqdict.0.append(&mut seq_id);
-                            let signatures = sketcher.sketch_probminhash3a_kmer32bit(&sequencegroup_ref, kmer_hash_fn);                            
-                            // we have Vec<u32> signatures we must go back to a vector of IdSketch for hnsw insertion
-                            let mut data_for_hnsw = Vec::<(&Vec<u32>, usize)>::with_capacity(signatures.len());
-                            for i in 0..signatures.len() {
-                                data_for_hnsw.push((&signatures[i], seq_rank[i]));
-                            }
-                            // parallel insertion
-                            hnsw.parallel_insert(&data_for_hnsw);
-                        }
-                    }
-                    Ok(mut idsequences) => {
-                        // concat the new idsketch in insertion queue.
-                        insertion_queue.append(&mut idsequences);
-                        // if insertion_queue is beyond threshold size we can go to threaded sketching and threading insertion
-                        if insertion_queue.len() > insertion_block_size {
-                            let sequencegroup_ref : Vec<&Sequence> = insertion_queue.iter().map(|s| s.get_sequence()).collect();
-                            let seq_rank :  Vec<usize> = insertion_queue.iter().map(|s| s.get_rank()).collect();
-                            // collect Id
-                            let mut seq_id :  Vec<Id> = insertion_queue.iter().map(|s| Id::new(s.get_path(), s.get_fasta_id())).collect();
-                            seqdict.0.append(&mut seq_id);
-                            // computes hash signature
-                            let signatures = sketcher.sketch_probminhash3a_kmer32bit(&sequencegroup_ref, kmer_hash_fn);
-                            // we have Vec<u32> signatures we must go back to a vector of IdSketch, inserting unique id, for hnsw insertion
-                            let mut data_for_hnsw = Vec::<(&Vec<u32>, usize)>::with_capacity(signatures.len());
-                            for i in 0..signatures.len() {
-                                data_for_hnsw.push((&signatures[i], seq_rank[i]));
-                            }
-                            // parallel insertion
-                            hnsw.parallel_insert(&data_for_hnsw);
-                            // we reset insertion_queue
-                            insertion_queue.clear();
-                        }
-                    }
-                }
-            }
-            //
-            // We must dump hnsw to save "database" if not empty
-            //
-            if  hnsw.get_nb_point() > 0 {
-                let hnswdumpname = String::from("hnswdump");
-                log::info!("going to dump hnsw");
-                let resdump = hnsw.file_dump(&hnswdumpname);
-                match resdump {
-                    Err(msg) => {
-                        println!("dump failed error msg : {}", msg);
-                    },
-                    _ =>  { println!("dump of hnsw ended");}
-                };
-                // dump some info on layer structure
-                hnsw.dump_layer_info();
-                // dumping dictionary
-                let resdump = seqdict.dump(String::from("seqdict.json"));
-                match resdump {
-                    Err(msg) => {
-                        println!("seqdict dump failed error msg : {}", msg);
-                    },
-                    _ =>  { println!("dump of seqdict ended OK");}
-                };                
-            }
-            else {
-                log::info!("no dumping hnsw, no data points");
-            }
-            // and finally dump sketchparams
-            let _ = sketcher_params.dump_json(&"sketchparams_dump.json".to_string());
-            //
-            Box::new(seqdict.0.len())
-        }); // end of receptor thread
-        // now we must join handles
-        let nb_sent = sender_handle.join().unwrap();
-        let nb_received = receptor_handle.join().unwrap();
-        log::debug!("sketchandstore, nb_sent = {}, nb_received = {}", nb_sent, nb_received);
-        if nb_sent != nb_received {
-            log::error!("an error occurred  nb msg sent : {}, nb msg received : {}", nb_sent, nb_received);
-        }
-    }).unwrap();  // end of scope
-    //
-    let cpu_time = cpu_start.elapsed().as_secs();
-    let elapsed_t = start_t.elapsed().unwrap().as_secs() as f32;
-    if log::log_enabled!(log::Level::Info) {
-        log::info!("process_dir : cpu time(s) {}", cpu_time);
-        log::info!("process_dir : elapsed time(s) {}", elapsed_t);
-    }
-    else {
-        println!("process_dir : cpu time(s) {}", cpu_time);
-        println!("process_dir : elapsed time(s) {}", elapsed_t);
-    }
-} // end of sketchandstore
-
 
 
 fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT>(dirpath : &Path, filter_params: &FilterParams, 
@@ -243,13 +94,13 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT>(dirpath : &Path, filt
     };
     let sketcher = seqsketchjaccard::SeqSketcher::new(sketcher_params.get_kmer_size(), sketcher_params.get_sketch_size());
     // to send IdSeq to sketch from reading thread to sketcher thread
-    let (send, receive) = crossbeam_channel::bounded::<Vec<IdSeq>>(10_000);
+    let (send, receive) = crossbeam_channel::bounded::<Vec<IdSeq>>(5_000);
     // launch process_dir in a thread or async
     crossbeam_utils::thread::scope(|scope| {
         // sequence sending, productor thread
         let mut nb_sent = 0;
         let sender_handle = scope.spawn(move |_|   {
-            let res_nb_sent = process_dir(dirpath, filter_params, &process_file, &send);
+            let res_nb_sent = process_dir(dirpath, filter_params, &process_file_in_one_block, &send);
             match res_nb_sent {
                 Ok(nb_really_sent) => {
                     nb_sent = nb_really_sent;

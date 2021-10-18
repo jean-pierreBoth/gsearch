@@ -56,6 +56,10 @@ pub fn filter_out_n(seq : &[u8]) -> Vec<u8> {
             filtered.push(*c);
         }
     }
+    if log::log_enabled!(log::Level::Trace) && filtered.len() < seq.len() {
+        let nb_n = seq.len() - filtered.len();
+        log::trace!("filtered nb non ACTG {}, fraction  {:1.3e}", nb_n , nb_n as f32/seq.len() as f32);
+    }
     return filtered;
 }  // end of keep_atcg
 
@@ -71,7 +75,7 @@ pub fn filter_out_n(seq : &[u8]) -> Vec<u8> {
 /// opens parse fna files with needletail
 /// extracts records , filters out capsid and send sequences to function process_dir to execute file_task to produce sequence
 /// for any client
-pub fn process_file(file : &DirEntry, filter_params : &FilterParams)  -> Vec<IdSeq> {
+pub fn process_file_by_sequence(file : &DirEntry, filter_params : &FilterParams)  -> Vec<IdSeq> {
     let mut to_sketch = Vec::<IdSeq>::new();
     //
     let pathb = file.path();
@@ -93,10 +97,6 @@ pub fn process_file(file : &DirEntry, filter_params : &FilterParams)  -> Vec<IdS
             let old_len = seqrec.seq().len();
             let filtered = filter_out_n(&seqrec.seq());
             drop(seqrec);
-            if log::log_enabled!(log::Level::Trace) && filtered.len() < old_len {
-                let nb_n = old_len - filtered.len();
-                log::trace!("filtered nb non ACTG {}, fraction  {:1.3e}", nb_n , nb_n as f32/old_len as f32);
-            }
             // recall rank is set in process_dir beccause we should a have struct gatheing the 2 functions process_dir and process_file
             let seqwithid = IdSeq::new(pathb.to_str().unwrap().to_string(), strid, Sequence::new(&filtered,2));
             to_sketch.push(seqwithid);
@@ -110,11 +110,65 @@ pub fn process_file(file : &DirEntry, filter_params : &FilterParams)  -> Vec<IdS
 } // end of process_file
 
 
+/// opens parse fna files with needletail
+/// extracts records , filters out capsid and send sequences to function process_dir to execute file_task to produce sequence
+/// for any client
+pub fn process_file_in_one_block(file : &DirEntry, filter_params : &FilterParams)  -> Vec<IdSeq> {
+    let mut to_sketch = Vec::<IdSeq>::new();
+    //
+    let pathb = file.path();
+    log::trace!("processing file {}", pathb.to_str().unwrap());
+    let metadata = fs::metadata(pathb.clone());
+    let f_len : usize;
+    match(metadata) {
+        Ok(metadata) => { f_len = metadata.len() as usize;
+                          log::debug!("file length : {}", f_len);
+                        }
+        Err(_)       => {
+            println!("process_file_in_one_block could not get length of file {} ", pathb.to_str().unwrap());
+            f_len = 1_000_000_000;
+        }
+    }
+    log::trace!("processing file {}", pathb.to_str().unwrap());
+    let mut reader = needletail::parse_fastx_file(&pathb).expect("expecting valid filename");
+    // We allocate one large block tht will contain the whole filtered genome. 
+    // TODO We should get the file length to optimize the length
+    let mut one_block_seq = Vec::<u8>::with_capacity(f_len as usize);
+    //
+    while let Some(record) = reader.next() {
+        if record.is_err() {
+            println!("got bd record in file {:?}", file.file_name());
+            std::process::exit(1);
+        }
+        // do we keep record ? we must get its id
+        let seqrec = record.expect("invalid record");
+        let id = seqrec.id();
+        let strid = String::from_utf8(Vec::from(id)).unwrap();
+        // process sequence if not capsid and not filtered out
+        if strid.find("capsid").is_none() {
+            // Our Kmers are 2bits encoded so we need to be able to encode sequence in 2 bits, so there is 
+            // this hack,  causing reallocation. seqrec.seq is Cow so drain does not seem an option.
+            one_block_seq.append(&mut filter_out_n(&seqrec.seq()));
+            // recall rank is set in process_dir beccause we should a have struct gatheing the 2 functions process_dir and process_file
+            if log::log_enabled!(log::Level::Trace) {
+                log::trace!("process_file, nb_sketched {} ", to_sketch.len());
+            }
+        }
+    }
+    // we are at end of file, we have one large sequence for the whole file
+    let seqwithid = IdSeq::new(pathb.to_str().unwrap().to_string(), String::from("total sequence"), Sequence::new(&one_block_seq,2));
+    to_sketch.push(seqwithid);
+    // we must send to_sketch to some sketcher
+    return to_sketch;
+} // end of process_file
+
+
 
 /// scan directory recursively, executing function file_task on each file.
 /// adapted from from crate fd_find
 pub fn process_dir(dir: &Path, filter_params : &FilterParams, file_task: &dyn Fn(&DirEntry, &FilterParams) -> Vec<IdSeq>, sender : &crossbeam_channel::Sender::<Vec<IdSeq>>) -> io::Result<usize> {
     let mut nb_seq_processed = 0;
+    let mut nb_file_processed = 0;
     //
     // we checked that we have a directory
     for entry in fs::read_dir(dir)? {
@@ -131,15 +185,12 @@ pub fn process_dir(dir: &Path, filter_params : &FilterParams, file_task: &dyn Fn
                     to_sketch[i].rank = nb_seq_processed + i;
                 }
                 nb_seq_processed += to_sketch.len();
+                nb_file_processed += 1;
                 // we must send to_sketch into channel to upper thread
                 sender.send(to_sketch).unwrap();
             }
         }
     }
-    if nb_seq_processed > 0 && nb_seq_processed % 50000 == 0 {
-        log::info!("processed nb sequences : {}", nb_seq_processed);
-    }
-    log::trace!("processed nb sequences : {}", nb_seq_processed);
     //
     drop(sender);
     //
