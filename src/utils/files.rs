@@ -8,6 +8,27 @@ use kmerutils::base::{sequence::*};
 
 use super::idsketch::{IdSeq};
 
+/// To keep track of processed file and sequence processed
+pub struct ProcessingState {
+    /// nb sequences processed
+    nb_seq : usize,
+    /// nb file processed
+    nb_file : usize,
+} 
+
+
+impl ProcessingState {
+    pub fn new() -> Self {
+        ProcessingState{nb_seq : 0, nb_file : 0}
+    } // end of new
+     
+
+} // end of ProcessingState
+
+
+
+
+
 /// a structure to filter files or sequences we treat
 pub struct FilterParams {
     /// minimum sequence size
@@ -125,7 +146,7 @@ pub fn process_file_in_one_block(file : &DirEntry, filter_params : &FilterParams
                           log::debug!("file length : {}", f_len);
                         }
         Err(_)       => {
-            println!("process_file_in_one_block could not get length of file {} ", pathb.to_str().unwrap());
+            println!("process_file_in_one_blprocess_dirock could not get length of file {} ", pathb.to_str().unwrap());
             f_len = 1_000_000_000;
         }
     }
@@ -166,7 +187,7 @@ pub fn process_file_in_one_block(file : &DirEntry, filter_params : &FilterParams
 
 /// scan directory recursively, executing function file_task on each file.
 /// adapted from from crate fd_find
-pub fn process_dir(dir: &Path, filter_params : &FilterParams, file_task: &dyn Fn(&DirEntry, &FilterParams) -> Vec<IdSeq>, sender : &crossbeam_channel::Sender::<Vec<IdSeq>>) -> io::Result<usize> {
+pub fn process_dir(state : &mut ProcessingState, dir: &Path, filter_params : &FilterParams, file_task: &dyn Fn(&DirEntry, &FilterParams) -> Vec<IdSeq>, sender : &crossbeam_channel::Sender::<Vec<IdSeq>>) -> io::Result<usize> {
     let mut nb_seq_processed = 0;
     let mut nb_file_processed = 0;
     //
@@ -175,17 +196,23 @@ pub fn process_dir(dir: &Path, filter_params : &FilterParams, file_task: &dyn Fn
         let entry = entry?;
         let path = entry.path();
         if path.is_dir() {
-            nb_seq_processed += process_dir(&path, filter_params, file_task, sender)?;
+            nb_seq_processed += process_dir(state, &path, filter_params, file_task, sender)?;
         } else {
             // check if entry is a fasta.gz file
             if is_fasta_file(&entry) {
                 let mut to_sketch = file_task(&entry, filter_params);
                 // put a rank id in sequences, now we have full information of where do the sequence come from
                 for i in 0..to_sketch.len() {
-                    to_sketch[i].rank = nb_seq_processed + i;
+                    state.nb_seq += 1;
+                    to_sketch[i].rank = state.nb_seq;
                 }
-                nb_seq_processed += to_sketch.len();
-                nb_file_processed += 1;
+                state.nb_file += 1;
+                if log::log_enabled!(log::Level::Info) && state.nb_file % 500 == 0 {
+                    log::info!("nb file processed : {}, nb sequences processed : {}", state.nb_file, state.nb_seq);
+                }
+                if state.nb_file % 500 == 0 {
+                    println!("nb file processed : {}, nb sequences processed : {}", state.nb_file, state.nb_seq);
+                }
                 // we must send to_sketch into channel to upper thread
                 sender.send(to_sketch).unwrap();
             }

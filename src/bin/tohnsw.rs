@@ -38,13 +38,13 @@ use std::fmt::{Debug};
 
 // our crate
 use hnsw_rs::prelude::*;
-use kmerutils::base::{kmergenerator::*, Kmer32bit, Kmer64bit, KmerT, CompressedKmerT};
+use kmerutils::base::{kmergenerator::*, Kmer32bit, Kmer64bit, CompressedKmerT};
 use kmerutils::sketching::*;
 use kmerutils::sketching::seqsketchjaccard::SeqSketcher;
 
 use archaea::utils::idsketch::{SeqDict,Id, IdSeq};
 
-use archaea::utils::files::{process_dir,process_file_in_one_block, process_file_by_sequence, FilterParams};
+use archaea::utils::files::{process_dir,process_file_in_one_block, ProcessingState, FilterParams};
 
 
 
@@ -79,6 +79,7 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT>(dirpath : &Path, filt
     let start_t = SystemTime::now();
     let cpu_start = ProcessTime::now();
     //
+    let mut state = ProcessingState::new();
     // a queue of signature waiting to be inserted , size must be sufficient to benefit from threaded probminhash and insert
     let insertion_block_size = 5000;
     let mut insertion_queue : Vec<IdSeq>= Vec::with_capacity(insertion_block_size);
@@ -100,7 +101,7 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT>(dirpath : &Path, filt
         // sequence sending, productor thread
         let mut nb_sent = 0;
         let sender_handle = scope.spawn(move |_|   {
-            let res_nb_sent = process_dir(dirpath, filter_params, &process_file_in_one_block, &send);
+            let res_nb_sent = process_dir(&mut state, dirpath, filter_params, &process_file_in_one_block, &send);
             match res_nb_sent {
                 Ok(nb_really_sent) => {
                     nb_sent = nb_really_sent;

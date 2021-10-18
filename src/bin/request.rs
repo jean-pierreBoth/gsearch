@@ -40,7 +40,7 @@ use kmerutils::sketching::seqsketchjaccard::*;
 
 use archaea::utils::idsketch::{SeqDict, Id, IdSeq};
 //mod files;
-use archaea::utils::files::{process_dir,process_file_by_sequence, process_file_in_one_block, FilterParams};
+use archaea::utils::files::{process_dir,process_file_by_sequence, process_file_in_one_block, ProcessingState, FilterParams};
 
 
 // install a logger facility
@@ -122,6 +122,7 @@ fn sketch_and_request_dir_compressedkmer<Kmer:CompressedKmerT>(request_dirpath :
     // a queue of signature request , size must be sufficient to benefit from threaded probminhash and search
     let request_block_size = 500;
     let mut request_queue : Vec<IdSeq>= Vec::with_capacity(request_block_size);
+    let mut state = ProcessingState::new();
     //
     // Sketcher allocation, we do not need reverse complement hashing as we sketch assembled genomes. (Jianshu Zhao)
     //
@@ -138,7 +139,7 @@ fn sketch_and_request_dir_compressedkmer<Kmer:CompressedKmerT>(request_dirpath :
         // sequence sending, productor thread
         let mut nb_sent = 0;
         let sender_handle = scope.spawn(move |_|   {
-            let res_nb_sent = process_dir(request_dirpath, &filter_params, &process_file_in_one_block, &send);
+            let res_nb_sent = process_dir(&mut state, request_dirpath, &filter_params, &process_file_in_one_block, &send);
             match res_nb_sent {
                 Ok(nb_really_sent) => {
                     nb_sent = nb_really_sent;
