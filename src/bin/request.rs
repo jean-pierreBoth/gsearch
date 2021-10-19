@@ -393,6 +393,7 @@ fn main() {
                 panic!("SketchParams reload from dump dir {} failed", database_dirpath.to_str().unwrap());
             }
         };
+        kmer_size = sk_params.get_kmer_size() as u16;
         log::info!("sketch params reloaded kmer size : {}, sketch size {}", sk_params.get_kmer_size(), sk_params.get_sketch_size());
         // reload SeqDict
         let mut seqname = database_dir.clone();
