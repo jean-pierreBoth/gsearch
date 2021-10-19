@@ -6,6 +6,8 @@
 //! - database is the name of directory containing hnsw dump files and seqdict dump
 //! - requestdir is a file containing list of fasta file containing sequence to search for
 //! 
+//! In fact as in basedirname there must be a file (sketchparams.json) specifying sketch size and kmer size, these
+//! 2 options are useless in standard mode.
 
 // We can use the same structure as the tohnsw module
 // We parse a directory and send to a thread that do sketching and query
@@ -393,7 +395,6 @@ fn main() {
                 panic!("SketchParams reload from dump dir {} failed", database_dirpath.to_str().unwrap());
             }
         };
-        kmer_size = sk_params.get_kmer_size() as u16;
         log::info!("sketch params reloaded kmer size : {}, sketch size {}", sk_params.get_kmer_size(), sk_params.get_sketch_size());
         // reload SeqDict
         let mut seqname = database_dir.clone();
@@ -409,7 +410,7 @@ fn main() {
         log::info!("reloading sequence dictionary from {} done", &seqname);
         // reload hnsw
         log::info!("\n reloading hnsw from {}", database_dirpath.to_str().unwrap());
-        if kmer_size < 14 {
+        if sk_params.get_kmer_size() < 14 {
             let hnsw = reload_hnsw(database_dirpath);
             let hnsw = match hnsw {
                 Some(hnsw) => hnsw,
@@ -419,7 +420,7 @@ fn main() {
             };
             sketch_and_request_dir_compressedkmer::<Kmer32bit>(&request_dirpath, &filter_params, &seqdict, &sk_params, &hnsw, nbng as usize, ef_search);
         }
-        else if kmer_size > 16 {
+        else if sk_params.get_kmer_size() > 16 {
             let hnsw = reload_hnsw(database_dirpath);
             let hnsw = match hnsw {
                 Some(hnsw) => hnsw,
@@ -429,7 +430,7 @@ fn main() {
             };
             sketch_and_request_dir_compressedkmer::<Kmer64bit>(&request_dirpath, &filter_params, &seqdict, &sk_params, &hnsw, nbng as usize, ef_search);
         }
-        else if kmer_size == 16 {
+        else if sk_params.get_kmer_size() == 16 {
             let hnsw = reload_hnsw(database_dirpath);
             let hnsw = match hnsw {
                 Some(hnsw) => hnsw,
