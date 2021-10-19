@@ -315,8 +315,8 @@ fn main() {
         let max_nb_conn : u8 = 128.min(nbng as u8);
         let hnswparams = HnswParams{nbng : nbng as usize, capacity : 700_000, ef : ef_construction, max_nb_conn};
         //
-        //
-        let filter_params = FilterParams::new(2*sketch_size as usize);
+        // do not filter small seqs when running file in a whole block
+        let filter_params = FilterParams::new(0);
         if kmer_size <= 14 {
             sketchandstore_dir_compressedkmer::<Kmer32bit>(&dirpath, &filter_params, &sketch_params, &hnswparams);
         }
