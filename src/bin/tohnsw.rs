@@ -84,7 +84,8 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT>(dirpath : &Path, filt
     let insertion_block_size = 5000;
     let mut insertion_queue : Vec<IdSeq>= Vec::with_capacity(insertion_block_size);
     // TODO must get ef_search from clap via hnswparams
-    let hnsw = Hnsw::<Kmer::Val, DistHamming>::new(hnsw_params.max_nb_conn as usize , hnsw_params.capacity , 16, hnsw_params.ef, DistHamming{});
+    let mut hnsw = Hnsw::<Kmer::Val, DistHamming>::new(hnsw_params.max_nb_conn as usize , hnsw_params.capacity , 16, hnsw_params.ef, DistHamming{});
+    hnsw.set_extend_candidates(true);
     //
     // Sketcher allocation, we do not need reverse complement hashing as we sketch assembled genomes. (Jianshu Zhao)
     //

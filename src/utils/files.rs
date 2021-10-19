@@ -128,7 +128,7 @@ pub fn process_file_by_sequence(file : &DirEntry, filter_params : &FilterParams)
     }
     // we must send to_sketch to some sketcher
     return to_sketch;
-} // end of process_file
+} // end of process_file_by_sequence
 
 
 /// opens parse fna files with needletail
@@ -181,7 +181,7 @@ pub fn process_file_in_one_block(file : &DirEntry, filter_params : &FilterParams
     to_sketch.push(seqwithid);
     // we must send to_sketch to some sketcher
     return to_sketch;
-} // end of process_file
+} // end of process_file_in_one_block
 
 
 
@@ -221,6 +221,6 @@ pub fn process_dir(state : &mut ProcessingState, dir: &Path, filter_params : &Fi
     //
     drop(sender);
     //
-    Ok(nb_seq_processed)
+    Ok(state.nb_seq)
 }  // end of visit_dirs
 
