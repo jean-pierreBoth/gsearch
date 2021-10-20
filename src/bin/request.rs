@@ -392,7 +392,7 @@ fn main() {
             println!("-n nbng is mandatory");
             std::process::exit(1);
         }
-        // do we use block processing, recall that default is yes
+        // do we use block processing, recall that default is yes. We will try to reload from file but can pass as option for old runs
         if matches.is_present("seq") {
             println!("seq option , will process every sequence independantly ");
             block_processing = false;
@@ -413,10 +413,23 @@ fn main() {
             }
         };
         log::info!("sketch params reloaded kmer size : {}, sketch size {}", sk_params.get_kmer_size(), sk_params.get_sketch_size());
+        // reload processing state
+        let mut state_name = database_dir.clone();
+        state_name.push_str("/processing_state.json");
+        let proc_state_res = ProcessingState::reload_json(database_dirpath);
+        let proc_state;
+        if let Ok(_) = proc_state_res {
+                proc_state = proc_state_res.unwrap();
+                block_processing = proc_state.one_block();
+                println!("reloaded processing state , will use block sequecence {}", block_processing);
+        }
+        else {
+                println!("could not reload processing state , will use block sequence {}", block_processing);
+        }
         // reload SeqDict
         let mut seqname = database_dir.clone();
         seqname.push_str("/seqdict.json");
-        log::info!("\n reloaded sequence dictionary from {}", &seqname);
+        log::info!("\n reloading sequence dictionary from {}", &seqname);
         let seqdict = SeqDict::reload(&seqname);
         let seqdict = match seqdict {
             Ok(seqdict ) => seqdict ,

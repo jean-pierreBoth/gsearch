@@ -5,7 +5,7 @@ use std::io::{BufReader, BufWriter };
 use std::fs::{self, DirEntry};
 
 use std::fs::OpenOptions;
-use std::path::{Path, PathBuf};
+use std::path::{Path};
 
 use serde::{Deserialize, Serialize};
 use serde_json::{to_writer};
@@ -42,11 +42,11 @@ impl ProcessingState {
         self.elapsed_t
     }
     /// serialized dump
-    pub fn dump_json(&self, filename : &String) -> Result<(), String> {
+    pub fn dump_json(&self, dirpath : &Path) -> Result<(), String> {
         //
-        let filepath = PathBuf::from(filename.clone());
+        let filepath = dirpath.join("processing_state.json");
         //
-        log::info!("dumping ProcessingState in json file : {}", filename);
+        log::info!("dumping ProcessingState in json file : {:?}", filepath);
         //
         let fileres = OpenOptions::new().write(true).create(true).truncate(true).open(&filepath);
         if fileres.is_err() {
@@ -67,7 +67,7 @@ impl ProcessingState {
     pub fn reload_json(dirpath : &Path) -> Result<Self, String> {
         log::info!("in reload_json");
         //
-        let filepath = dirpath.join("processingstate_dump.json");
+        let filepath = dirpath.join("processing_state.json");
         let fileres = OpenOptions::new().read(true).open(&filepath);
         if fileres.is_err() {
             log::error!("ProcessingState reload_json : reload could not open file {:?}", filepath.as_os_str());

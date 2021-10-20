@@ -1,5 +1,3 @@
-//#![allow(dead_code)]
-//#![allow(unused_variables)]
 
 //! tohnsw --dir [-d] dir --sketch [-s] size --nbng [-n] nb --ef m [--seq]
 //! 
@@ -205,6 +203,8 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT>(dirpath : &Path, filt
             }
             // and finally dump sketchparams
             let _ = sketcher_params.dump_json(&"sketchparams_dump.json".to_string());
+            // dump processing state
+            let _ = state.dump_json(&dirpath);
             //
             Box::new(seqdict.0.len())
         }); // end of receptor thread
