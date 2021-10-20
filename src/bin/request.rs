@@ -98,7 +98,8 @@ impl <'a> ReqAnswer<'a> {
 
 
 fn sketch_and_request_dir_compressedkmer<Kmer:CompressedKmerT>(request_dirpath : &Path, filter_params: &FilterParams, 
-            seqdict : &SeqDict, sketcher_params : &SeqSketcher, hnsw : &Hnsw<Kmer::Val,DistHamming>, knbn : usize, ef_search : usize)
+                    seqdict : &SeqDict, sketcher_params : &SeqSketcher, block_processing : bool, 
+                    hnsw : &Hnsw<Kmer::Val,DistHamming>, knbn : usize, ef_search : usize)
             where Kmer::Val : num::PrimInt + Clone + Copy + Send + Sync + Serialize + DeserializeOwned + Debug,
                   KmerGenerator<Kmer> :  KmerGenerationPattern<Kmer>, 
                   DistHamming : Distance<Kmer::Val> {
@@ -124,7 +125,7 @@ fn sketch_and_request_dir_compressedkmer<Kmer:CompressedKmerT>(request_dirpath :
     // a queue of signature request , size must be sufficient to benefit from threaded probminhash and search
     let request_block_size = 500;
     let mut request_queue : Vec<IdSeq>= Vec::with_capacity(request_block_size);
-    let mut state = ProcessingState::new();
+    let mut state = ProcessingState::new(block_processing);
     //
     // Sketcher allocation, we do not need reverse complement hashing as we sketch assembled genomes. (Jianshu Zhao)
     //
@@ -141,7 +142,13 @@ fn sketch_and_request_dir_compressedkmer<Kmer:CompressedKmerT>(request_dirpath :
         // sequence sending, productor thread
         let mut nb_sent = 0;
         let sender_handle = scope.spawn(move |_|   {
-            let res_nb_sent = process_dir(&mut state, request_dirpath, &filter_params, &process_file_in_one_block, &send);
+            let res_nb_sent;
+            if block_processing {
+                res_nb_sent = process_dir(&mut state, request_dirpath, &filter_params, &process_file_in_one_block, &send);
+            }
+            else {
+                res_nb_sent = process_dir(&mut state, request_dirpath, &filter_params, &process_file_by_sequence, &send);
+            }
             match res_nb_sent {
                 Ok(nb_really_sent) => {
                     nb_sent = nb_really_sent;
@@ -306,8 +313,14 @@ fn main() {
             .short("n")
             .takes_value(true)
             .help("must specify number of neighbours in hnsw"))
+        .arg(Arg::with_name("seq")
+            .long("seq")
+            .takes_value(false)
+            .help("--seq to get a processing by sequence"))
         .get_matches();
 
+    // by default we process files in one large sequence block
+        let mut block_processing = true;
         // decode matches, check for request_dir
         let request_dir;
         if matches.is_present("request_dir") {
@@ -348,8 +361,6 @@ fn main() {
             std::process::exit(1);
         }
 
-
-
         // get sketching params
         let mut sketch_size = 96;
         if matches.is_present("size") {
@@ -381,9 +392,15 @@ fn main() {
             println!("-n nbng is mandatory");
             std::process::exit(1);
         }
+        // do we use block processing, recall that default is yes
+        if matches.is_present("seq") {
+            println!("seq option , will process every sequence independantly ");
+            block_processing = false;
+        }
+        //     
         let ef_search = 5000;
         log::info!("ef_search : {:?}", ef_search);
-        let filter_params = FilterParams::new(2*sketch_size as usize);
+        let filter_params = FilterParams::new(0);
         //
         // Do all dump reload, first sketch params. We reload smaller files first 
         // so that path errors are found early 
@@ -418,7 +435,8 @@ fn main() {
                     panic!("hnsw reload from dump dir {} failed", database_dirpath.to_str().unwrap());
                 }
             };
-            sketch_and_request_dir_compressedkmer::<Kmer32bit>(&request_dirpath, &filter_params, &seqdict, &sk_params, &hnsw, nbng as usize, ef_search);
+            sketch_and_request_dir_compressedkmer::<Kmer32bit>(&request_dirpath, &filter_params, &seqdict, &sk_params, block_processing, 
+                        &hnsw, nbng as usize, ef_search);
         }
         else if sk_params.get_kmer_size() > 16 {
             let hnsw = reload_hnsw(database_dirpath);
@@ -428,7 +446,8 @@ fn main() {
                     panic!("hnsw reload from dump dir {} failed", database_dirpath.to_str().unwrap());
                 }
             };
-            sketch_and_request_dir_compressedkmer::<Kmer64bit>(&request_dirpath, &filter_params, &seqdict, &sk_params, &hnsw, nbng as usize, ef_search);
+            sketch_and_request_dir_compressedkmer::<Kmer64bit>(&request_dirpath, &filter_params, &seqdict, &sk_params, block_processing, 
+                        &hnsw, nbng as usize, ef_search);
         }
         else if sk_params.get_kmer_size() == 16 {
             let hnsw = reload_hnsw(database_dirpath);
@@ -438,7 +457,8 @@ fn main() {
                     panic!("hnsw reload from dump dir {} failed", database_dirpath.to_str().unwrap());
                 }
             };
-            sketch_and_request_dir_compressedkmer::<Kmer16b32bit>(&request_dirpath, &filter_params, &seqdict, &sk_params, &hnsw, nbng as usize, ef_search);  
+            sketch_and_request_dir_compressedkmer::<Kmer16b32bit>(&request_dirpath, &filter_params, &seqdict, &sk_params, block_processing, 
+                        &hnsw, nbng as usize, ef_search);  
         }
         // 
 

@@ -1,7 +1,7 @@
 //#![allow(dead_code)]
 //#![allow(unused_variables)]
 
-//! tohnsw --dir [-d] dir --sketch [-s] size --nbng [-n] nb --ef m
+//! tohnsw --dir [-d] dir --sketch [-s] size --nbng [-n] nb --ef m [--seq]
 //! 
 //! --dir : the name of directory containing tree of GCF and GCA files 
 //! --sketch gives the size of probminhash sketch ()integer value)
@@ -9,6 +9,8 @@
 //! --nbng [-n] gives the number of neihbours required in hnsw construction at each layer, in the range 24-64 is usual
 //!             it doest not means you cannot ask for more neighbours in request.
 //! -- ef optional integer value to optimize hnsw structure creation (default to 400)
+//!  --seq if we want a processing by sequences. Default is to concatenate all sequneces in a file
+//!             in a large sequence.
 
 // must loop on sub directories , open gzipped files
 // extracts complete genomes possiby many in one file (get rid of capsid records if any)
@@ -44,7 +46,7 @@ use kmerutils::sketching::seqsketchjaccard::SeqSketcher;
 
 use archaea::utils::idsketch::{SeqDict,Id, IdSeq};
 
-use archaea::utils::files::{process_dir,process_file_in_one_block, ProcessingState, FilterParams};
+use archaea::utils::files::{process_dir,process_file_in_one_block, process_file_by_sequence, ProcessingState, FilterParams};
 
 
 
@@ -69,7 +71,7 @@ pub fn init_log() -> u64 {
 
 
 fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT>(dirpath : &Path, filter_params: &FilterParams, 
-        sketcher_params : &SeqSketcher, hnsw_params : &HnswParams) 
+        sketcher_params : &SeqSketcher, block_processing : bool, hnsw_params : &HnswParams) 
         where Kmer::Val : num::PrimInt + Clone + Copy + Send + Sync + Serialize + DeserializeOwned + Debug,
                 KmerGenerator<Kmer> :  KmerGenerationPattern<Kmer>, 
                 DistHamming : Distance<Kmer::Val> {
@@ -79,7 +81,7 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT>(dirpath : &Path, filt
     let start_t = SystemTime::now();
     let cpu_start = ProcessTime::now();
     //
-    let mut state = ProcessingState::new();
+    let mut state = ProcessingState::new(block_processing);
     // a queue of signature waiting to be inserted , size must be sufficient to benefit from threaded probminhash and insert
     let insertion_block_size = 5000;
     let mut insertion_queue : Vec<IdSeq>= Vec::with_capacity(insertion_block_size);
@@ -102,7 +104,13 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT>(dirpath : &Path, filt
         // sequence sending, productor thread
         let mut nb_sent = 0;
         let sender_handle = scope.spawn(move |_|   {
-            let res_nb_sent = process_dir(&mut state, dirpath, filter_params, &process_file_in_one_block, &send);
+            let res_nb_sent;
+            if block_processing {
+                res_nb_sent = process_dir(&mut state, dirpath, filter_params, &process_file_in_one_block, &send);
+            }
+            else {
+                res_nb_sent = process_dir(&mut state, dirpath, filter_params, &process_file_by_sequence, &send);
+            }
             match res_nb_sent {
                 Ok(nb_really_sent) => {
                     nb_sent = nb_really_sent;
@@ -211,6 +219,7 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT>(dirpath : &Path, filt
     //
     let cpu_time = cpu_start.elapsed().as_secs();
     let elapsed_t = start_t.elapsed().unwrap().as_secs() as f32;
+    state.elapsed_t = elapsed_t;
     if log::log_enabled!(log::Level::Info) {
         log::info!("process_dir : cpu time(s) {}", cpu_time);
         log::info!("process_dir : elapsed time(s) {}", elapsed_t);
@@ -219,7 +228,7 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT>(dirpath : &Path, filt
         println!("process_dir : cpu time(s) {}", cpu_time);
         println!("process_dir : elapsed time(s) {}", elapsed_t);
     }
-} // end of sketchandstore
+} // end of sketchandstore_dir_compressedkmer 
 
 
 
@@ -251,8 +260,14 @@ fn main() {
             .long("ef")
             .default_value("400")
             .help("parameters neighbour search at creation"))
+        .arg(Arg::with_name("seq")
+            .long("seq")
+            .takes_value(false)
+            .help("--seq to get a processing by sequence"))
         .get_matches();
-
+    //
+    // by default we process files in one large sequence block
+    let mut block_processing = true;
     // decode matches, check for dir
         let datadir;
         if matches.is_present("dir") {
@@ -310,7 +325,13 @@ fn main() {
         }
         else {
             println!("ef default used in construction {}", ef_construction);
-        }           
+        }
+        // do we use block processing, recall that default is yes
+        if matches.is_present("seq") {
+            println!("seq option , will process every sequence independantly ");
+            block_processing = false;
+        }     
+        // We have everything   
         // max_nb_conn must be adapted to the number of neighbours we will want in searches.
         let max_nb_conn : u8 = 128.min(nbng as u8);
         let hnswparams = HnswParams{nbng : nbng as usize, capacity : 700_000, ef : ef_construction, max_nb_conn};
@@ -318,12 +339,12 @@ fn main() {
         // do not filter small seqs when running file in a whole block
         let filter_params = FilterParams::new(0);
         if kmer_size <= 14 {
-            sketchandstore_dir_compressedkmer::<Kmer32bit>(&dirpath, &filter_params, &sketch_params, &hnswparams);
+            sketchandstore_dir_compressedkmer::<Kmer32bit>(&dirpath, &filter_params, &sketch_params, block_processing, &hnswparams);
         }
         else if kmer_size > 16 {
-            sketchandstore_dir_compressedkmer::<Kmer64bit>(&dirpath, &filter_params, &sketch_params, &hnswparams);
+            sketchandstore_dir_compressedkmer::<Kmer64bit>(&dirpath, &filter_params, &sketch_params, block_processing, &hnswparams);
         } else if kmer_size == 16 {
-            sketchandstore_dir_compressedkmer::<Kmer16b32bit>(&dirpath, &filter_params, &sketch_params, &hnswparams);
+            sketchandstore_dir_compressedkmer::<Kmer16b32bit>(&dirpath, &filter_params, &sketch_params, block_processing, &hnswparams);
         }
 
 

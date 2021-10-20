@@ -1,28 +1,88 @@
 //! This file contains directory exploration and fasta file selection
-#![allow(unused)]
 
 use std::io;
+use std::io::{BufReader, BufWriter };
 use std::fs::{self, DirEntry};
-use std::path::Path;
+
+use std::fs::OpenOptions;
+use std::path::{Path, PathBuf};
+
+use serde::{Deserialize, Serialize};
+use serde_json::{to_writer};
+
+
 use kmerutils::base::{sequence::*};
 
 use super::idsketch::{IdSeq};
 
 /// To keep track of processed file and sequence processed
+#[derive(Serialize,Deserialize, Clone, Copy)]
 pub struct ProcessingState {
     /// nb sequences processed
     nb_seq : usize,
     /// nb file processed
     nb_file : usize,
+    /// block or not processing , shold not be here...but in something with Sketching Params.
+    block : bool,
+    /// elapsed time in sec
+    pub elapsed_t : f32,
 } 
 
 
 impl ProcessingState {
-    pub fn new() -> Self {
-        ProcessingState{nb_seq : 0, nb_file : 0}
+    pub fn new(block : bool) -> Self {
+        ProcessingState{nb_seq : 0, nb_file : 0, block, elapsed_t : 0.}
     } // end of new
      
+    pub fn one_block(&self) -> bool {
+        self.block
+    }
+    /// get elapsed time
+    pub fn get_elapsed_t(&self) -> f32 {
+        self.elapsed_t
+    }
+    /// serialized dump
+    pub fn dump_json(&self, filename : &String) -> Result<(), String> {
+        //
+        let filepath = PathBuf::from(filename.clone());
+        //
+        log::info!("dumping ProcessingState in json file : {}", filename);
+        //
+        let fileres = OpenOptions::new().write(true).create(true).truncate(true).open(&filepath);
+        if fileres.is_err() {
+            log::error!("ProcessingState dump : dump could not open file {:?}", filepath.as_os_str());
+            println!("ProcessingState dump: could not open file {:?}", filepath.as_os_str());
+            return Err("ProcessingState dump failed".to_string());
+        }
+        // 
+        let mut writer = BufWriter::new(fileres.unwrap());
+        let _ = to_writer(&mut writer, &self).unwrap();
+        //
+        Ok(())
+    } // end of dump
 
+
+
+    /// reload from a json dump
+    pub fn reload_json(dirpath : &Path) -> Result<Self, String> {
+        log::info!("in reload_json");
+        //
+        let filepath = dirpath.join("processingstate_dump.json");
+        let fileres = OpenOptions::new().read(true).open(&filepath);
+        if fileres.is_err() {
+            log::error!("ProcessingState reload_json : reload could not open file {:?}", filepath.as_os_str());
+            println!("ProcessingState reload_json: could not open file {:?}", filepath.as_os_str());
+            return Err("ProcessingState reload_json could not open file".to_string());            
+        }
+        //
+        let loadfile = fileres.unwrap();
+        let reader = BufReader::new(loadfile);
+        let processing_state:Self = serde_json::from_reader(reader).unwrap();
+        //
+        log::info!("ProcessingState reload, blocked : {}, nb sequences : {}", processing_state.one_block(), processing_state.nb_seq);     
+        //
+        Ok(processing_state)
+    } // end of reload_json
 } // end of ProcessingState
 
 
@@ -115,7 +175,6 @@ pub fn process_file_by_sequence(file : &DirEntry, filter_params : &FilterParams)
         if strid.find("capsid").is_none() && !filter_params.filter(&seqrec.seq()) {
             // Our Kmers are 2bits encoded so we need to be able to encode sequence in 2 bits, so there is 
             // this hack,  causing reallocation. seqrec.seq is Cow so drain does not seem an option.
-            let old_len = seqrec.seq().len();
             let filtered = filter_out_n(&seqrec.seq());
             drop(seqrec);
             // recall rank is set in process_dir beccause we should a have struct gatheing the 2 functions process_dir and process_file
@@ -141,7 +200,7 @@ pub fn process_file_in_one_block(file : &DirEntry, filter_params : &FilterParams
     log::trace!("processing file {}", pathb.to_str().unwrap());
     let metadata = fs::metadata(pathb.clone());
     let f_len : usize;
-    match(metadata) {
+    match metadata {
         Ok(metadata) => { f_len = metadata.len() as usize;
                           log::debug!("file length : {}", f_len);
                         }
@@ -165,7 +224,8 @@ pub fn process_file_in_one_block(file : &DirEntry, filter_params : &FilterParams
         let seqrec = record.expect("invalid record");
         let id = seqrec.id();
         let strid = String::from_utf8(Vec::from(id)).unwrap();
-        // process sequence if not capsid and not filtered out
+        // process sequence if not capsid and not filtered out, in block mode we do not filter any at the moment
+        let _filter = filter_params.filter(&seqrec.seq());
         if strid.find("capsid").is_none() {
             // Our Kmers are 2bits encoded so we need to be able to encode sequence in 2 bits, so there is 
             // this hack,  causing reallocation. seqrec.seq is Cow so drain does not seem an option.
@@ -188,15 +248,13 @@ pub fn process_file_in_one_block(file : &DirEntry, filter_params : &FilterParams
 /// scan directory recursively, executing function file_task on each file.
 /// adapted from from crate fd_find
 pub fn process_dir(state : &mut ProcessingState, dir: &Path, filter_params : &FilterParams, file_task: &dyn Fn(&DirEntry, &FilterParams) -> Vec<IdSeq>, sender : &crossbeam_channel::Sender::<Vec<IdSeq>>) -> io::Result<usize> {
-    let mut nb_seq_processed = 0;
-    let mut nb_file_processed = 0;
     //
     // we checked that we have a directory
     for entry in fs::read_dir(dir)? {
         let entry = entry?;
         let path = entry.path();
         if path.is_dir() {
-            nb_seq_processed += process_dir(state, &path, filter_params, file_task, sender)?;
+            state.nb_seq += process_dir(state, &path, filter_params, file_task, sender)?;
         } else {
             // check if entry is a fasta.gz file
             if is_fasta_file(&entry) {
