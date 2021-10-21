@@ -254,7 +254,7 @@ pub fn process_dir(state : &mut ProcessingState, dir: &Path, filter_params : &Fi
         let entry = entry?;
         let path = entry.path();
         if path.is_dir() {
-            state.nb_seq += process_dir(state, &path, filter_params, file_task, sender)?;
+            let _ =  process_dir(state, &path, filter_params, file_task, sender)?;
         } else {
             // check if entry is a fasta.gz file
             if is_fasta_file(&entry) {

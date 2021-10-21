@@ -203,8 +203,6 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT>(dirpath : &Path, filt
             }
             // and finally dump sketchparams
             let _ = sketcher_params.dump_json(&"sketchparams_dump.json".to_string());
-            // dump processing state
-            let _ = state.dump_json(&dirpath);
             //
             Box::new(seqdict.0.len())
         }); // end of receptor thread
@@ -220,6 +218,8 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT>(dirpath : &Path, filt
     let cpu_time = cpu_start.elapsed().as_secs();
     let elapsed_t = start_t.elapsed().unwrap().as_secs() as f32;
     state.elapsed_t = elapsed_t;
+    // dump processing state in the current directory
+    let _ = state.dump_json(&Path::new("./"));
     if log::log_enabled!(log::Level::Info) {
         log::info!("process_dir : cpu time(s) {}", cpu_time);
         log::info!("process_dir : elapsed time(s) {}", elapsed_t);
