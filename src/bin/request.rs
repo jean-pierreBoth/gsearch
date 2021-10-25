@@ -58,15 +58,15 @@ pub fn init_log() -> u64 {
 struct ReqAnswer<'a> {
     rank : usize,
     /// request id
-    req_id : Id,
+    req_item : ItemDict,
     ///
     neighbours : &'a Vec<Neighbour>,
 }
 
 
 impl <'a> ReqAnswer<'a> {
-    pub fn new(rank : usize, req_id : Id, neighbours : &'a Vec<Neighbour>) -> Self {
-        ReqAnswer { rank, req_id, neighbours}
+    pub fn new(rank : usize, req_item : ItemDict, neighbours : &'a Vec<Neighbour>) -> Self {
+        ReqAnswer { rank, req_item, neighbours}
     }
 
     /// dump answers to a File. 
@@ -74,16 +74,19 @@ impl <'a> ReqAnswer<'a> {
     /// Typically keep only distance less than 0.98 with kmer size=12 is sufficient to get rid of garbage.
     fn dump(&self, seqdict : &SeqDict, threshold : f32, out : &mut BufWriter<File>) -> std::io::Result<()> {
         // dump rank , fasta_id
-        write!(out, "\n\n {} path {}, fasta_id {}", self.rank, self.req_id.get_path(), self.req_id.get_fasta_id())?;
-        for n in self.neighbours {
-            // get database identification of neighbour
-            if n.distance  < threshold {
-                let database_id = seqdict.0[n.d_id].get_id().get_path();
-                write!(out, "\n\t distance : {:.3E}  answer fasta id {}", n.distance, database_id)?;
-                log::debug!(" \t data id : {}", n.d_id);
-                write!(out, "\n\t\t answer fasta id {}", seqdict.0[n.d_id].get_id().get_fasta_id() )?;
+        let has_match = self.neighbours.iter().any(|n| n.distance <= threshold);
+        if has_match {
+            write!(out, "\n\n {} path {}, fasta_id {}", self.rank, self.req_item.get_id().get_path(), self.req_item.get_id().get_fasta_id())?;
+            for n in self.neighbours {
+                // get database identification of neighbour
+                if n.distance  < threshold {
+                    let database_id = seqdict.0[n.d_id].get_id().get_path();
+                    write!(out, "\n\t distance : {:.3E}  answer fasta id {}", n.distance, database_id)?;
+                    log::debug!(" \t data id : {}", n.d_id);
+                    write!(out, "\n\t\t answer fasta id {}", seqdict.0[n.d_id].get_id().get_fasta_id() )?;
+                }
             }
-        }
+    }
         Ok(())
     } // end of dump
 
@@ -179,19 +182,19 @@ fn sketch_and_request_dir_compressedkmer<Kmer:CompressedKmerT>(request_dirpath :
                         // sketch the content of  insertion_queue if not empty
                         if request_queue.len() > 0 {
                             let sequencegroup_ref : Vec<&Sequence> = request_queue.iter().map(|s| s.get_sequence()).collect();                   
-                            let seq_id :  Vec<Id> = request_queue.iter().map(|s| Id::new(s.get_path(), s.get_fasta_id())).collect();
+                            let seq_item : Vec<ItemDict> = request_queue.iter().map(|s| ItemDict::new(Id::new(s.get_path(), s.get_fasta_id()), s.get_seq_len())).collect();
                             if log::log_enabled!(log::Level::Debug) {
-                                for s in &seq_id  {
-                                    log::debug!("treating request : {}", s.get_path());
+                                for s in &seq_item  {
+                                    log::debug!("treating request : {}", s.get_id().get_path());
                                 }
                             }   
                             let signatures = sketcher.sketch_probminhash3a_compressedkmer(&sequencegroup_ref, kmer_hash_fn);                            
                             // we have Vec<u64> signatures we must go back to a vector of IdSketch for hnsw insertion
                             let knn_neighbours  = hnsw.parallel_search(&signatures, knbn, ef_search);
                             for i in 0..knn_neighbours.len() {
-                                let answer = ReqAnswer::new(nb_request+i, seq_id[i].clone(), &knn_neighbours[i]);
+                                let answer = ReqAnswer::new(nb_request+i, seq_item[i].clone(), &knn_neighbours[i]);
                                 if answer.dump(&seqdict, out_threshold, &mut outfile).is_err() {
-                                    log::info!("could not dump answer for request id {}", answer.req_id.get_fasta_id());
+                                    log::info!("could not dump answer for request id {}", answer.req_item.get_id().get_fasta_id());
                                 }
                             }
                             //  dump results
@@ -205,7 +208,7 @@ fn sketch_and_request_dir_compressedkmer<Kmer:CompressedKmerT>(request_dirpath :
                         if request_queue.len() > request_block_size {
                             let sequencegroup_ref : Vec<&Sequence> = request_queue.iter().map(|s| s.get_sequence()).collect();
                             // collect Id
-                            let seq_id :  Vec<Id> = request_queue.iter().map(|s| Id::new(s.get_path(), s.get_fasta_id())).collect();
+                            let seq_item : Vec<ItemDict> = request_queue.iter().map(|s| ItemDict::new(Id::new(s.get_path(), s.get_fasta_id()), s.get_seq_len())).collect();
                             // computes hash signature
                             let signatures = sketcher.sketch_probminhash3a_compressedkmer(&sequencegroup_ref, kmer_hash_fn);
                             // we have Vec<u64> signatures we must go back to a vector of IdSketch, inserting unique id, for hnsw insertion
@@ -213,9 +216,9 @@ fn sketch_and_request_dir_compressedkmer<Kmer:CompressedKmerT>(request_dirpath :
                             let knn_neighbours  = hnsw.parallel_search(&signatures, knbn, ef_search);
                             // construct and dump answers
                             for i in 0..knn_neighbours.len() {
-                                let answer = ReqAnswer::new(nb_request+i, seq_id[i].clone(), &knn_neighbours[i]);
+                                let answer = ReqAnswer::new(nb_request+i, seq_item[i].clone(), &knn_neighbours[i]);
                                 if answer.dump(&seqdict, out_threshold, &mut outfile).is_err() {
-                                    log::info!("could not dump answer for request id {}", answer.req_id.get_fasta_id());
+                                    log::info!("could not dump answer for request id {}", answer.req_item.get_id().get_fasta_id());
                                 }
                             }
                             nb_request += signatures.len();
