@@ -42,21 +42,10 @@ use kmerutils::base::{kmergenerator::*, Kmer32bit, Kmer64bit, CompressedKmerT};
 use kmerutils::sketching::*;
 use kmerutils::sketching::seqsketchjaccard::SeqSketcher;
 
-use archaea::utils::idsketch::{SeqDict,Id, IdSeq};
 
-use archaea::utils::files::{process_dir,process_file_in_one_block, process_file_by_sequence, ProcessingState, FilterParams};
+use archaea::utils::*;
 
-
-
-
-struct HnswParams {
-    #[allow(dead_code)]
-    nbng : usize,
-    /// expected number of sequences to store
-    capacity : usize,
-    ef : usize,
-    max_nb_conn : u8,
-}
+//=========================================================================
 
 // install a logger facility
 pub fn init_log() -> u64 {
@@ -84,7 +73,7 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT>(dirpath : &Path, filt
     let insertion_block_size = 5000;
     let mut insertion_queue : Vec<IdSeq>= Vec::with_capacity(insertion_block_size);
     // TODO must get ef_search from clap via hnswparams
-    let mut hnsw = Hnsw::<Kmer::Val, DistHamming>::new(hnsw_params.max_nb_conn as usize , hnsw_params.capacity , 16, hnsw_params.ef, DistHamming{});
+    let mut hnsw = Hnsw::<Kmer::Val, DistHamming>::new(hnsw_params.get_max_nb_connection() as usize , hnsw_params.capacity , 16, hnsw_params.get_ef(), DistHamming{});
     hnsw.set_extend_candidates(true);
     //
     // Sketcher allocation, we do not need reverse complement hashing as we sketch assembled genomes. (Jianshu Zhao)
@@ -102,6 +91,7 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT>(dirpath : &Path, filt
         // sequence sending, productor thread
         let mut nb_sent = 0;
         let sender_handle = scope.spawn(move |_|   {
+            let start_t_prod = SystemTime::now();
             let res_nb_sent;
             if block_processing {
                 res_nb_sent = process_dir(&mut state, dirpath, filter_params, &process_file_in_one_block, &send);
@@ -119,6 +109,9 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT>(dirpath : &Path, filt
                 }
             };
             drop(send);
+            state.elapsed_t =  start_t_prod.elapsed().unwrap().as_secs() as f32;
+            // dump processing state in the current directory
+            let _ = state.dump_json(&Path::new("./"));
             Box::new(nb_sent)
         });
         // sequence reception, consumer thread
@@ -217,9 +210,7 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT>(dirpath : &Path, filt
     //
     let cpu_time = cpu_start.elapsed().as_secs();
     let elapsed_t = start_t.elapsed().unwrap().as_secs() as f32;
-    state.elapsed_t = elapsed_t;
-    // dump processing state in the current directory
-    let _ = state.dump_json(&Path::new("./"));
+
     if log::log_enabled!(log::Level::Info) {
         log::info!("process_dir : cpu time(s) {}", cpu_time);
         log::info!("process_dir : elapsed time(s) {}", elapsed_t);
@@ -334,7 +325,7 @@ fn main() {
         // We have everything   
         // max_nb_conn must be adapted to the number of neighbours we will want in searches.
         let max_nb_conn : u8 = 128.min(nbng as u8);
-        let hnswparams = HnswParams{nbng : nbng as usize, capacity : 700_000, ef : ef_construction, max_nb_conn};
+        let hnswparams = HnswParams::new(700_000, ef_construction, max_nb_conn);
         //
         // do not filter small seqs when running file in a whole block
         let filter_params = FilterParams::new(0);

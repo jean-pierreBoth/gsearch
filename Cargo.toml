@@ -4,7 +4,7 @@ version = "0.0.1"
 authors = ["jeanpierre.both@gmail.com"]
 #repository = "https://gitlab.com/jpboth/archaea"
 keywords = ["hnsw", "probminhash", "bacteria"]
-edition = "2018"
+edition = "2021"
 license = "MIT OR Apache-2.0"
 description = "probminhash hnsw archaea"
 

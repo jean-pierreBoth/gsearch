@@ -42,8 +42,7 @@ use kmerutils::sketching::seqsketchjaccard::*;
 
 use archaea::utils::idsketch::{SeqDict, Id, IdSeq};
 //mod files;
-use archaea::utils::files::{process_dir,process_file_by_sequence, process_file_in_one_block, ProcessingState, FilterParams};
-
+use archaea::utils::*;
 
 // install a logger facility
 pub fn init_log() -> u64 {
@@ -71,16 +70,20 @@ impl <'a> ReqAnswer<'a> {
         ReqAnswer { rank, req_id, neighbours}
     }
 
-    /// dump answers to a File.
-    fn dump(&self, seqdict : &SeqDict, out : &mut BufWriter<File>) -> std::io::Result<()> {
+    /// dump answers to a File. 
+    /// We dump only answers with distance less than threshold to help visual synthesis of reult.
+    /// Typically keep only distance less than 0.98 with kmer size=12 is sufficient to get rid of garbage.
+    fn dump(&self, seqdict : &SeqDict, threshold : f32, out : &mut BufWriter<File>) -> std::io::Result<()> {
         // dump rank , fasta_id
         write!(out, "\n\n {} path {}, fasta_id {}", self.rank, self.req_id.get_path(), self.req_id.get_fasta_id())?;
         for n in self.neighbours {
             // get database identification of neighbour
-            let database_id = seqdict.0[n.d_id].get_path();
-            write!(out, "\n\t distance : {:.3E}  answer fasta id {}", n.distance, database_id)?;
-            log::debug!(" \t data id : {}", n.d_id);
-            write!(out, "\n\t\t answer fasta id {}", seqdict.0[n.d_id].get_fasta_id() )?;
+            if n.distance  < threshold {
+                let database_id = seqdict.0[n.d_id].get_path();
+                write!(out, "\n\t distance : {:.3E}  answer fasta id {}", n.distance, database_id)?;
+                log::debug!(" \t data id : {}", n.d_id);
+                write!(out, "\n\t\t answer fasta id {}", seqdict.0[n.d_id].get_fasta_id() )?;
+            }
         }
         Ok(())
     } // end of dump
@@ -113,12 +116,13 @@ fn sketch_and_request_dir_compressedkmer<Kmer:CompressedKmerT>(request_dirpath :
     let outpath = PathBuf::from(outname.clone());
     let outfile = OpenOptions::new().write(true).create(true).truncate(true).open(&outpath);
     if outfile.is_err() {
-    log::error!("SeqDict dump : dump could not open file {:?}", outpath.as_os_str());
-    println!("SeqDict dump: could not open file {:?}", outpath.as_os_str());
-    return Err("SeqDict Deserializer dump failed").unwrap();
+        log::error!("SeqDict dump : dump could not open file {:?}", outpath.as_os_str());
+        println!("SeqDict dump: could not open file {:?}", outpath.as_os_str());
+        return Err("SeqDict Deserializer dump failed").unwrap();
     }    
+    let out_threshold = 0.98;  // TODO threshold needs a test to get initialized!
     let mut outfile = BufWriter::new(outfile.unwrap());
-    log::info!("dumping request answers in : {}", outname);
+    log::info!("dumping request answers in : {}, thresold dist : {} ", outname, out_threshold);
     //
     let start_t = SystemTime::now();
     let cpu_start = ProcessTime::now();
@@ -185,7 +189,7 @@ fn sketch_and_request_dir_compressedkmer<Kmer:CompressedKmerT>(request_dirpath :
                             let knn_neighbours  = hnsw.parallel_search(&signatures, knbn, ef_search);
                             for i in 0..knn_neighbours.len() {
                                 let answer = ReqAnswer::new(nb_request+i, seq_id[i].clone(), &knn_neighbours[i]);
-                                if answer.dump(&seqdict, &mut outfile).is_err() {
+                                if answer.dump(&seqdict, out_threshold, &mut outfile).is_err() {
                                     log::info!("could not dump answer for request id {}", answer.req_id.get_fasta_id());
                                 }
                             }
@@ -209,7 +213,7 @@ fn sketch_and_request_dir_compressedkmer<Kmer:CompressedKmerT>(request_dirpath :
                             // construct and dump answers
                             for i in 0..knn_neighbours.len() {
                                 let answer = ReqAnswer::new(nb_request+i, seq_id[i].clone(), &knn_neighbours[i]);
-                                if answer.dump(&seqdict, &mut outfile).is_err() {
+                                if answer.dump(&seqdict, out_threshold, &mut outfile).is_err() {
                                     log::info!("could not dump answer for request id {}", answer.req_id.get_fasta_id());
                                 }
                             }
