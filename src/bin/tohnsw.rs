@@ -57,8 +57,7 @@ pub fn init_log() -> u64 {
 // this function does the sketching in small kmers (less than 14 bases) and hnsw store of a whole directory, version before generic one
 
 
-fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT>(dirpath : &Path, filter_params: &FilterParams, 
-        sketcher_params : &SeqSketcher, block_processing : bool, hnsw_params : &HnswParams) 
+fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT>(dirpath : &Path, filter_params: &FilterParams, processing_params : &ProcessingParams) 
         where Kmer::Val : num::PrimInt + Clone + Copy + Send + Sync + Serialize + DeserializeOwned + Debug,
                 KmerGenerator<Kmer> :  KmerGenerationPattern<Kmer>, 
                 DistHamming : Distance<Kmer::Val> {
@@ -68,11 +67,13 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT>(dirpath : &Path, filt
     let start_t = SystemTime::now();
     let cpu_start = ProcessTime::now();
     //
-    let mut state = ProcessingState::new(block_processing);
+    let block_processing = processing_params.get_block_flag();
+    let mut state = ProcessingState::new();
     // a queue of signature waiting to be inserted , size must be sufficient to benefit from threaded probminhash and insert
     let insertion_block_size = 5000;
     let mut insertion_queue : Vec<IdSeq>= Vec::with_capacity(insertion_block_size);
     // TODO must get ef_search from clap via hnswparams
+    let hnsw_params = processing_params.get_hnsw_params();
     let mut hnsw = Hnsw::<Kmer::Val, DistHamming>::new(hnsw_params.get_max_nb_connection() as usize , hnsw_params.capacity , 16, hnsw_params.get_ef(), DistHamming{});
     hnsw.set_extend_candidates(true);
     //
@@ -83,6 +84,7 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT>(dirpath : &Path, filt
         let hashval = kmer.get_compressed_value() & mask;
         hashval
     };
+    let sketcher_params = processing_params.get_sketching_params();
     let sketcher = seqsketchjaccard::SeqSketcher::new(sketcher_params.get_kmer_size(), sketcher_params.get_sketch_size());
     // to send IdSeq to sketch from reading thread to sketcher thread
     let (send, receive) = crossbeam_channel::bounded::<Vec<IdSeq>>(5_000);
@@ -110,6 +112,7 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT>(dirpath : &Path, filt
             };
             drop(send);
             state.elapsed_t =  start_t_prod.elapsed().unwrap().as_secs() as f32;
+            log::info!("sender processed in  system time(s) : {}", state.elapsed_t);
             // dump processing state in the current directory
             let _ = state.dump_json(&Path::new("./"));
             Box::new(nb_sent)
@@ -194,8 +197,8 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT>(dirpath : &Path, filt
             else {
                 log::info!("no dumping hnsw, no data points");
             }
-            // and finally dump sketchparams
-            let _ = sketcher_params.dump_json(&"sketchparams_dump.json".to_string());
+            // and finally dump processing parameters in file name "parameters.json"
+            let _ = processing_params.dump_json(&Path::new("./"));
             //
             Box::new(seqdict.0.len())
         }); // end of receptor thread
@@ -329,13 +332,14 @@ fn main() {
         //
         // do not filter small seqs when running file in a whole block
         let filter_params = FilterParams::new(0);
+        let processing_parameters = ProcessingParams::new(hnswparams, sketch_params, block_processing);
         if kmer_size <= 14 {
-            sketchandstore_dir_compressedkmer::<Kmer32bit>(&dirpath, &filter_params, &sketch_params, block_processing, &hnswparams);
+            sketchandstore_dir_compressedkmer::<Kmer32bit>(&dirpath, &filter_params, &processing_parameters);
         }
         else if kmer_size > 16 {
-            sketchandstore_dir_compressedkmer::<Kmer64bit>(&dirpath, &filter_params, &sketch_params, block_processing, &hnswparams);
+            sketchandstore_dir_compressedkmer::<Kmer64bit>(&dirpath, &filter_params, &processing_parameters);
         } else if kmer_size == 16 {
-            sketchandstore_dir_compressedkmer::<Kmer16b32bit>(&dirpath, &filter_params, &sketch_params, block_processing, &hnswparams);
+            sketchandstore_dir_compressedkmer::<Kmer16b32bit>(&dirpath, &filter_params, &processing_parameters);
         }
 
 

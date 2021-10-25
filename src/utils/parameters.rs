@@ -68,7 +68,7 @@ impl HnswParams {
 pub struct ProcessingParams {
     /// hnsw parameters
     hnsw: HnswParams,
-    ///
+    /// sketching prameters
     sketch: SeqSketcher,
     /// do we process sequence by sequence? true if we process whole genome in one block, false if we process sequence by sequence 
     block_flag : bool,
@@ -81,6 +81,22 @@ impl ProcessingParams {
     pub fn new(hnsw : HnswParams, sketch :  SeqSketcher, block_flag : bool) -> Self {
         ProcessingParams{hnsw, sketch, block_flag}
     }
+
+    /// gzt parameters for hnsw construction
+    pub fn get_hnsw_params(&self) -> &HnswParams {
+        &self.hnsw
+    }
+
+    /// gzt parameters used for sketching sequences 
+    pub fn get_sketching_params(&self) -> &SeqSketcher {
+        &self.sketch
+    }
+
+    /// get block flag
+    pub fn get_block_flag(&self) -> bool {
+        self.block_flag
+    }
+
 
     pub fn dump_json(&self, dirpath: &Path) ->  Result<(), String> {
         //

@@ -20,24 +20,19 @@ use super::parameters::*;
 #[derive(Serialize,Deserialize, Clone, Copy)]
 pub struct ProcessingState {
     /// nb sequences processed
-    nb_seq : usize,
+    pub nb_seq : usize,
     /// nb file processed
-    nb_file : usize,
-    /// block or not processing , shold not be here...but in something with Sketching Params.
-    block : bool,
+    pub nb_file : usize,
     /// elapsed time in sec
     pub elapsed_t : f32,
 } 
 
 
 impl ProcessingState {
-    pub fn new(block : bool) -> Self {
-        ProcessingState{nb_seq : 0, nb_file : 0, block, elapsed_t : 0.}
+    pub fn new() -> Self {
+        ProcessingState{nb_seq : 0, nb_file : 0, elapsed_t : 0.}
     } // end of new
-     
-    pub fn one_block(&self) -> bool {
-        self.block
-    }
+    
     /// get elapsed time
     pub fn get_elapsed_t(&self) -> f32 {
         self.elapsed_t
@@ -80,7 +75,7 @@ impl ProcessingState {
         let reader = BufReader::new(loadfile);
         let processing_state:Self = serde_json::from_reader(reader).unwrap();
         //
-        log::info!("ProcessingState reload, blocked : {}, nb sequences : {}", processing_state.one_block(), processing_state.nb_seq);     
+        log::info!("ProcessingState reload, nb sequences : {}", processing_state.nb_seq);     
         //
         Ok(processing_state)
     } // end of reload_json

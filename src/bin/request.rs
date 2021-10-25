@@ -100,16 +100,18 @@ impl <'a> ReqAnswer<'a> {
 
 
 fn sketch_and_request_dir_compressedkmer<Kmer:CompressedKmerT>(request_dirpath : &Path, filter_params: &FilterParams, 
-                    seqdict : &SeqDict, sketcher_params : &SeqSketcher, block_processing : bool, 
+                    seqdict : &SeqDict, processing_parameters : &ProcessingParams, 
                     hnsw : &Hnsw<Kmer::Val,DistHamming>, knbn : usize, ef_search : usize)
             where Kmer::Val : num::PrimInt + Clone + Copy + Send + Sync + Serialize + DeserializeOwned + Debug,
                   KmerGenerator<Kmer> :  KmerGenerationPattern<Kmer>, 
                   DistHamming : Distance<Kmer::Val> {
-//
+    //
+    let sketcher_params = processing_parameters.get_sketching_params();
+    let block_processing = processing_parameters.get_block_flag();
+    //
     log::trace!("sketch_and_request_dir processing dir {}", request_dirpath.to_str().unwrap());
     log::info!("sketch_and_request_dir {}", request_dirpath.to_str().unwrap());
-    log::info!("sketch_and_request kmer size  {}  sketch size {} ", 
-    sketcher_params.get_kmer_size(), sketcher_params.get_sketch_size());
+    log::info!("sketch_and_request kmer size  {}  sketch size {} ", sketcher_params.get_kmer_size(), sketcher_params.get_sketch_size());
     // creating an output file in the 
     let outname = "archea.answers";
     let outpath = PathBuf::from(outname.clone());
@@ -128,7 +130,7 @@ fn sketch_and_request_dir_compressedkmer<Kmer:CompressedKmerT>(request_dirpath :
     // a queue of signature request , size must be sufficient to benefit from threaded probminhash and search
     let request_block_size = 500;
     let mut request_queue : Vec<IdSeq>= Vec::with_capacity(request_block_size);
-    let mut state = ProcessingState::new(block_processing);
+    let mut state = ProcessingState::new();
     //
     // Sketcher allocation, we do not need reverse complement hashing as we sketch assembled genomes. (Jianshu Zhao)
     //
@@ -323,7 +325,6 @@ fn main() {
         .get_matches();
 
     // by default we process files in one large sequence block
-        let mut block_processing = true;
         // decode matches, check for request_dir
         let request_dir;
         if matches.is_present("request_dir") {
@@ -395,11 +396,6 @@ fn main() {
             println!("-n nbng is mandatory");
             std::process::exit(1);
         }
-        // do we use block processing, recall that default is yes. We will try to reload from file but can pass as option for old runs
-        if matches.is_present("seq") {
-            println!("seq option , will process every sequence independantly ");
-            block_processing = false;
-        }
         //     
         let ef_search = 5000;
         log::info!("ef_search : {:?}", ef_search);
@@ -408,13 +404,14 @@ fn main() {
         // Do all dump reload, first sketch params. We reload smaller files first 
         // so that path errors are found early 
         //
-        let sk_params = SeqSketcher::reload_json(database_dirpath);
-        let sk_params = match sk_params {
-            Ok(sk_params) => sk_params,
+        let processing_params = ProcessingParams::reload_json(database_dirpath);
+        let processing_params = match processing_params {
+            Ok(processing_params) => processing_params,
             _ => {
-                panic!("SketchParams reload from dump dir {} failed", database_dirpath.to_str().unwrap());
+                panic!("ProcessingParams reload from dump dir {} failed", database_dirpath.to_str().unwrap());
             }
         };
+        let sk_params = processing_params.get_sketching_params();
         log::info!("sketch params reloaded kmer size : {}, sketch size {}", sk_params.get_kmer_size(), sk_params.get_sketch_size());
         // reload processing state
         let mut state_name = database_dir.clone();
@@ -423,11 +420,10 @@ fn main() {
         let proc_state;
         if let Ok(_) = proc_state_res {
                 proc_state = proc_state_res.unwrap();
-                block_processing = proc_state.one_block();
-                println!("reloaded processing state , will use block sequecence {}", block_processing);
+                println!("reloaded processing state , nb sequences : {}", proc_state.nb_seq);
         }
         else {
-                println!("could not reload processing state , will use block sequence {}", block_processing);
+                println!("could not reload processing state");
         }
         // reload SeqDict
         let mut seqname = database_dir.clone();
@@ -451,7 +447,7 @@ fn main() {
                     panic!("hnsw reload from dump dir {} failed", database_dirpath.to_str().unwrap());
                 }
             };
-            sketch_and_request_dir_compressedkmer::<Kmer32bit>(&request_dirpath, &filter_params, &seqdict, &sk_params, block_processing, 
+            sketch_and_request_dir_compressedkmer::<Kmer32bit>(&request_dirpath, &filter_params, &seqdict, &processing_params, 
                         &hnsw, nbng as usize, ef_search);
         }
         else if sk_params.get_kmer_size() > 16 {
@@ -462,7 +458,7 @@ fn main() {
                     panic!("hnsw reload from dump dir {} failed", database_dirpath.to_str().unwrap());
                 }
             };
-            sketch_and_request_dir_compressedkmer::<Kmer64bit>(&request_dirpath, &filter_params, &seqdict, &sk_params, block_processing, 
+            sketch_and_request_dir_compressedkmer::<Kmer64bit>(&request_dirpath, &filter_params, &seqdict, &processing_params,
                         &hnsw, nbng as usize, ef_search);
         }
         else if sk_params.get_kmer_size() == 16 {
@@ -473,7 +469,7 @@ fn main() {
                     panic!("hnsw reload from dump dir {} failed", database_dirpath.to_str().unwrap());
                 }
             };
-            sketch_and_request_dir_compressedkmer::<Kmer16b32bit>(&request_dirpath, &filter_params, &seqdict, &sk_params, block_processing, 
+            sketch_and_request_dir_compressedkmer::<Kmer16b32bit>(&request_dirpath, &filter_params, &seqdict, &processing_params, 
                         &hnsw, nbng as usize, ef_search);  
         }
         // 
