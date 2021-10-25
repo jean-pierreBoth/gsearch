@@ -43,7 +43,7 @@ impl Id {
 
 /// 
 /// This structure is used for returning info from function process_file
-/// It stores all info on sequence. 
+/// It stores all info on treated sequences 
 /// 
 pub struct IdSeq {
     /// as read is sequential we can identify uniquely sequence in hnsw
@@ -79,13 +79,43 @@ impl IdSeq {
     pub fn get_sequence(&self) -> &Sequence {
         &self.seq
     }
+
+    /// get sequence length
+    pub fn get_seq_len(&self) -> usize {
+        self.seq.size()
+    }
 } // end of impl IdSea
 
 
-/// to keep track of sequence id by their rank. 
-/// So we can retrieve Seq description from Hnsw and the dictionary 
-/// 
-pub struct SeqDict(pub Vec<Id>);
+/// We maintain an association of sequence Id and its length (useful to build a test?, anyway not a big cost )
+#[derive(Clone, Serialize, Deserialize)]
+pub struct ItemDict {
+    /// sequence id
+    id : Id, 
+    /// sequene length
+    len : usize,
+}
+
+impl ItemDict {
+    ///
+    pub fn new(id : Id, len : usize) -> Self {
+        ItemDict{id, len}
+    }
+    ///
+    pub fn get_id(&self) -> &Id { 
+            &self.id
+    }
+    ///
+    pub fn get_len(&self) -> usize {
+         self.len
+    }
+}  // end of impl seqdict.0[n.d_id].get_id()
+
+
+/// To keep track of sequence id by their rank.  
+/// The rank of a sequence is its dataId in the Hnsw structure. 
+/// So we can retrieve Seq description from Hnsw and the dictionary. 
+pub struct SeqDict(pub Vec<ItemDict>);
 
 
 
@@ -127,7 +157,7 @@ impl SeqDict {
         let start_t = SystemTime::now();
         //
         println!("reloading database ids from : {}", filename);
-        let mut sequences =  Vec::<Id>::with_capacity(100000);
+        let mut sequences =  Vec::<ItemDict>::with_capacity(100000);
         let filepath = PathBuf::from(filename);
         let fileres = OpenOptions::new().read(true).open(&filepath);
         if fileres.is_err() {
@@ -140,7 +170,7 @@ impl SeqDict {
         let loadfile = fileres.unwrap();
         let reader = BufReader::new(loadfile);
         // we must deserialize Id structs 
-        let stream = serde_json::Deserializer::from_reader(reader).into_iter::<Id>();
+        let stream = serde_json::Deserializer::from_reader(reader).into_iter::<ItemDict>();
         for value in stream {
             if value.is_err() {
                 println!("nb id loaded {}", nbloaded);
@@ -149,7 +179,8 @@ impl SeqDict {
             }
             sequences.push(value.unwrap());
             if log::log_enabled!(log::Level::Debug) && nbloaded <= 3 {
-                log::debug!(" nbloaded : {:?}, sesqid path : ({}, {})", nbloaded, sequences[nbloaded].path,sequences[nbloaded].fasta_id);
+                log::debug!(" nbloaded : {:?}, sesqid path : ({}, {}), len : {}", nbloaded, sequences[nbloaded].get_id().path,
+                        sequences[nbloaded].get_id().fasta_id, sequences[nbloaded].get_len());
             }
             nbloaded += 1;
         } 

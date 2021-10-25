@@ -40,7 +40,6 @@ use kmerutils::base::{kmergenerator::*, Kmer32bit, Kmer64bit, CompressedKmerT};
 use kmerutils::sketching::*;
 use kmerutils::sketching::seqsketchjaccard::*;
 
-use archaea::utils::idsketch::{SeqDict, Id, IdSeq};
 //mod files;
 use archaea::utils::*;
 
@@ -79,10 +78,10 @@ impl <'a> ReqAnswer<'a> {
         for n in self.neighbours {
             // get database identification of neighbour
             if n.distance  < threshold {
-                let database_id = seqdict.0[n.d_id].get_path();
+                let database_id = seqdict.0[n.d_id].get_id().get_path();
                 write!(out, "\n\t distance : {:.3E}  answer fasta id {}", n.distance, database_id)?;
                 log::debug!(" \t data id : {}", n.d_id);
-                write!(out, "\n\t\t answer fasta id {}", seqdict.0[n.d_id].get_fasta_id() )?;
+                write!(out, "\n\t\t answer fasta id {}", seqdict.0[n.d_id].get_id().get_fasta_id() )?;
             }
         }
         Ok(())
