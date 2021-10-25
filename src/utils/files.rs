@@ -10,10 +10,11 @@ use std::path::{Path};
 use serde::{Deserialize, Serialize};
 use serde_json::{to_writer};
 
-
 use kmerutils::base::{sequence::*};
 
 use super::idsketch::{IdSeq};
+use super::parameters::*;
+
 
 /// To keep track of processed file and sequence processed
 #[derive(Serialize,Deserialize, Clone, Copy)]
@@ -87,32 +88,7 @@ impl ProcessingState {
 
 
 
-
-
-/// a structure to filter files or sequences we treat
-pub struct FilterParams {
-    /// minimum sequence size
-    pub min_seq_size : usize,
-} // end of struct FilterParams
-
-
-impl FilterParams {
-    pub fn new(min_seq_size : usize) -> Self {
-        FilterParams{min_seq_size}
-    } // end of new
-
-    /// returns true if we filter (garbage the sequence)
-    pub fn filter(&self, seq : &[u8]) -> bool {
-        if seq.len() < self.min_seq_size {
-            true
-        }
-        else {
-            false
-        }
-    }
-}  // end of FilterParams
-
-
+//==================================================================================
 
 
 // returns true if file is a fasta file (possibly gzipped)
@@ -261,8 +237,8 @@ pub fn process_dir(state : &mut ProcessingState, dir: &Path, filter_params : &Fi
                 let mut to_sketch = file_task(&entry, filter_params);
                 // put a rank id in sequences, now we have full information of where do the sequence come from
                 for i in 0..to_sketch.len() {
-                    state.nb_seq += 1;
                     to_sketch[i].rank = state.nb_seq;
+                    state.nb_seq += 1;
                 }
                 state.nb_file += 1;
                 if log::log_enabled!(log::Level::Info) && state.nb_file % 500 == 0 {
