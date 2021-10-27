@@ -37,3 +37,25 @@ pub struct GenomeMatch {
 
 /// A type providing keyed access to matches between requests and database genomes.
 type Matches = HashMap<(String, String), GenomeMatch>
+
+
+/// This structure quantifies a match
+/// 
+pub struct Matcher {
+    kmer_size : usize,
+    /// Dictionary of Database
+    seqdict : &SeqDict,
+    /// total number of bases of database.
+    database_size : usize,
+}  // end of Matcher
+
+
+
+impl Matcher {
+    pub fn new(kmer_size : usize , seqdict : &SeqDict) -> Self {
+        database_size = seqdict.get_total_length();
+        Matcher{kmer_size, seqdict, database_size}
+    }
+
+
+} // e,d of impl block for Matcher

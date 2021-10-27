@@ -50,7 +50,7 @@ pub struct IdSeq {
     pub(crate) rank : usize,
     /// But we do not know in which order files are read, so we store filename
     path : String,
-    /// id of genome Sketched as read in head of fasta record.
+    /// fasta id of genome Sketched as read in head of fasta record.
     id : String,
     /// Sequence compressed to 2 bit / base
     seq : Sequence
@@ -191,6 +191,11 @@ impl SeqDict {
         //        
         return Ok(SeqDict{0:sequences});
     } // end of reload
+
+    /// computes totol number of bases of database.
+    pub fn get_total_length(&self) -> usize {
+       self.0.iter().map(|s| s.len).sum()
+    }
 
 }  // end of impl SeqDict
 
