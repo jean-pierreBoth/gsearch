@@ -97,6 +97,10 @@ impl ProcessingParams {
         self.block_flag
     }
 
+    pub fn get_kmer_size(&self) ->  usize {
+        self.sketch.get_kmer_size()
+    }
+
 
     pub fn dump_json(&self, dirpath: &Path) ->  Result<(), String> {
         //
