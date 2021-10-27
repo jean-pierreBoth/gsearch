@@ -42,6 +42,8 @@ use kmerutils::sketching::seqsketchjaccard::*;
 
 //mod files;
 use archaea::utils::*;
+use archaea::matcher::*;
+
 
 // install a logger facility
 pub fn init_log() -> u64 {
@@ -116,7 +118,8 @@ fn sketch_and_request_dir_compressedkmer<Kmer:CompressedKmerT>(request_dirpath :
     log::trace!("sketch_and_request_dir processing dir {}", request_dirpath.to_str().unwrap());
     log::info!("sketch_and_request_dir {}", request_dirpath.to_str().unwrap());
     log::info!("sketch_and_request kmer size  {}  sketch size {} ", sketcher_params.get_kmer_size(), sketcher_params.get_sketch_size());
-    // creating an output file in the 
+    let out_threshold = 0.98;  // TODO threshold needs a test to get initialized!
+    // creating an output file in the current directory
     let outname = "archea.answers";
     let outpath = PathBuf::from(outname.clone());
     let outfile = OpenOptions::new().write(true).create(true).truncate(true).open(&outpath);
@@ -124,8 +127,7 @@ fn sketch_and_request_dir_compressedkmer<Kmer:CompressedKmerT>(request_dirpath :
         log::error!("SeqDict dump : dump could not open file {:?}", outpath.as_os_str());
         println!("SeqDict dump: could not open file {:?}", outpath.as_os_str());
         return Err("SeqDict Deserializer dump failed").unwrap();
-    }    
-    let out_threshold = 0.98;  // TODO threshold needs a test to get initialized!
+    }
     let mut outfile = BufWriter::new(outfile.unwrap());
     log::info!("dumping request answers in : {}, thresold dist : {} ", outname, out_threshold);
     //
@@ -144,10 +146,14 @@ fn sketch_and_request_dir_compressedkmer<Kmer:CompressedKmerT>(request_dirpath :
         hashval
     };
     let sketcher = seqsketchjaccard::SeqSketcher::new(sketcher_params.get_kmer_size(), sketcher_params.get_sketch_size());
+
+    //
     // to send IdSeq to sketch from reading thread to sketcher thread
     let (send, receive) = crossbeam_channel::bounded::<Vec<IdSeq>>(1_000);
     // launch process_dir in a thread or async
     crossbeam_utils::thread::scope(|scope| {
+        // create something for likelyhood computation
+        let mut matcher = Matcher::new(processing_parameters.get_kmer_size(), seqdict);
         // sequence sending, productor thread
         let mut nb_sent = 0;
         let sender_handle = scope.spawn(move |_|   {
@@ -221,6 +227,9 @@ fn sketch_and_request_dir_compressedkmer<Kmer:CompressedKmerT>(request_dirpath :
                                 if answer.dump(&seqdict, out_threshold, &mut outfile).is_err() {
                                     log::info!("could not dump answer for request id {}", answer.req_item.get_id().get_fasta_id());
                                 }
+                                // store in matcher. remind that each i corresponds to a request
+                                let candidates = knn_neighbours[i].iter().map(|n| Candidate::new(seqdict.0[n.d_id].clone(), n.get_distance())).collect();
+                                matcher.insert_sequence_match(seq_item[i].clone(), candidates);
                             }
                             nb_request += signatures.len();
                             request_queue.clear();
@@ -238,8 +247,10 @@ fn sketch_and_request_dir_compressedkmer<Kmer:CompressedKmerT>(request_dirpath :
         if nb_sent != nb_received {
             log::error!("an error occurred  nb msg sent : {}, nb msg received : {}", nb_sent, nb_received);
         }
-    }).unwrap();  // end of scope
+    }  // end of closure in scope
+    ).unwrap();  // end of scope
     //
+//    log::info!("matcher collected {} answers", matcher.get_nb_sequence_match());
     let cpu_time = cpu_start.elapsed().as_secs();
     log::info!("process_dir : cpu time(s) {}", cpu_time);
     let elapsed_t = start_t.elapsed().unwrap().as_secs() as f32;
