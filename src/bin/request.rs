@@ -147,7 +147,7 @@ fn sketch_and_request_dir_compressedkmer<'a, Kmer:CompressedKmerT>(request_dirpa
     };
     let sketcher = seqsketchjaccard::SeqSketcher::new(sketcher_params.get_kmer_size(), sketcher_params.get_sketch_size());
     // create something for likelyhood computation
-    let mut matcher = Matcher::new(processing_parameters.get_kmer_size(), seqdict);
+    let mut matcher = Matcher::new(processing_parameters.get_kmer_size(), sketcher_params.get_sketch_size(), seqdict);
     //
     // to send IdSeq to sketch from reading thread to sketcher thread
     let (send, receive) = crossbeam_channel::bounded::<Vec<IdSeq>>(1_000);
@@ -306,7 +306,57 @@ fn reload_hnsw<T>(dump_dirpath : &Path) -> Option<Hnsw<T, DistHamming>>
 } // end of reload_hnsw
 
 
-
+// This function returns paired sequence by probminhash and hnsw 
+fn get_sequence_matcher<'a>(request_dirpath : &Path, database_dirpath : &Path, processing_params : &ProcessingParams,
+                     filter_params : &FilterParams, seqdict : &'a SeqDict, 
+                     nbng : u16, ef_search : usize) -> Result<Matcher<'a>, String> {
+    //
+    let sk_params = processing_params.get_sketching_params();
+    log::info!("sketch params reloaded kmer size : {}, sketch size {}", sk_params.get_kmer_size(), sk_params.get_sketch_size());
+    //
+    let matcher : Matcher;
+    // reload hnsw
+    log::info!("\n reloading hnsw from {}", database_dirpath.to_str().unwrap());
+    if sk_params.get_kmer_size() < 14 {
+        let hnsw = reload_hnsw(database_dirpath);
+        let hnsw = match hnsw {
+            Some(hnsw) => hnsw,
+            _ => {
+                panic!("hnsw reload from dump dir {} failed", database_dirpath.to_str().unwrap());
+            }
+        };
+        matcher = sketch_and_request_dir_compressedkmer::<Kmer32bit>(&request_dirpath, &filter_params, &seqdict, &processing_params, 
+                    &hnsw, nbng as usize, ef_search);
+        return Ok(matcher)  
+    }
+    else if sk_params.get_kmer_size() > 16 {
+        let hnsw = reload_hnsw(database_dirpath);
+        let hnsw = match hnsw {
+            Some(hnsw) => hnsw,
+            _ => {
+                panic!("hnsw reload from dump dir {} failed", database_dirpath.to_str().unwrap());
+            }
+        };
+        matcher = sketch_and_request_dir_compressedkmer::<Kmer64bit>(&request_dirpath, &filter_params, &seqdict, &processing_params,
+                    &hnsw, nbng as usize, ef_search);
+        return Ok(matcher)  
+    }
+    else if sk_params.get_kmer_size() == 16 {
+        let hnsw = reload_hnsw(database_dirpath);
+        let hnsw = match hnsw {
+            Some(hnsw) => hnsw,
+            _ => {
+                panic!("hnsw reload from dump dir {} failed", database_dirpath.to_str().unwrap());
+            }
+        };
+        matcher = sketch_and_request_dir_compressedkmer::<Kmer16b32bit>(&request_dirpath, &filter_params, &seqdict, &processing_params, 
+                    &hnsw, nbng as usize, ef_search);
+        return Ok(matcher)  
+    }
+    else {
+        Err(String::from("bad value fro kmer size"))
+    }
+}  // end of get_matcher
 
 
 fn main() {
@@ -403,7 +453,6 @@ fn main() {
         else {
             println!("will use dumped kmer size");
         }
-
         // in fact sketch_params must be initialized from the dump directory
         let _sketch_params =  SeqSketcher::new(kmer_size as usize, sketch_size as usize);  
         //
@@ -433,7 +482,9 @@ fn main() {
         };
         let sk_params = processing_params.get_sketching_params();
         log::info!("sketch params reloaded kmer size : {}, sketch size {}", sk_params.get_kmer_size(), sk_params.get_sketch_size());
+        //
         // reload processing state
+        //
         let mut state_name = database_dir.clone();
         state_name.push_str("/processing_state.json");
         let proc_state_res = ProcessingState::reload_json(database_dirpath);
@@ -456,43 +507,14 @@ fn main() {
                 panic!("SeqDict reload from dump file  {} failed", seqname);
             }            
         };
-        let matcher : Matcher<'a>;
+        // we have eveything we want...
+        if let Ok(_seq_matcher) = get_sequence_matcher(request_dirpath, database_dirpath, &processing_params, &filter_params, &seqdict, nbng, ef_search) {
+
+        }
+        else {
+            panic!("Error occurred in get_matcher");
+        }
         log::info!("reloading sequence dictionary from {} done", &seqname);
-        // reload hnsw
-        log::info!("\n reloading hnsw from {}", database_dirpath.to_str().unwrap());
-        if sk_params.get_kmer_size() < 14 {
-            let hnsw = reload_hnsw(database_dirpath);
-            let hnsw = match hnsw {
-                Some(hnsw) => hnsw,
-                _ => {
-                    panic!("hnsw reload from dump dir {} failed", database_dirpath.to_str().unwrap());
-                }
-            };
-            matcher = sketch_and_request_dir_compressedkmer::<Kmer32bit>(&request_dirpath, &filter_params, &seqdict, &processing_params, 
-                        &hnsw, nbng as usize, ef_search);
-        }
-        else if sk_params.get_kmer_size() > 16 {
-            let hnsw = reload_hnsw(database_dirpath);
-            let hnsw = match hnsw {
-                Some(hnsw) => hnsw,
-                _ => {
-                    panic!("hnsw reload from dump dir {} failed", database_dirpath.to_str().unwrap());
-                }
-            };
-            matcher = sketch_and_request_dir_compressedkmer::<Kmer64bit>(&request_dirpath, &filter_params, &seqdict, &processing_params,
-                        &hnsw, nbng as usize, ef_search);
-        }
-        else if sk_params.get_kmer_size() == 16 {
-            let hnsw = reload_hnsw(database_dirpath);
-            let hnsw = match hnsw {
-                Some(hnsw) => hnsw,
-                _ => {
-                    panic!("hnsw reload from dump dir {} failed", database_dirpath.to_str().unwrap());
-                }
-            };
-            matcher = sketch_and_request_dir_compressedkmer::<Kmer16b32bit>(&request_dirpath, &filter_params, &seqdict, &processing_params, 
-                        &hnsw, nbng as usize, ef_search);  
-        }
         // 
 
 }  // end of main
