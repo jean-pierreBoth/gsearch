@@ -105,9 +105,9 @@ impl <'a> ReqAnswer<'a> {
 
 
 
-fn sketch_and_request_dir_compressedkmer<Kmer:CompressedKmerT>(request_dirpath : &Path, filter_params: &FilterParams, 
-                    seqdict : &SeqDict, processing_parameters : &ProcessingParams, 
-                    hnsw : &Hnsw<Kmer::Val,DistHamming>, knbn : usize, ef_search : usize)
+fn sketch_and_request_dir_compressedkmer<'a, Kmer:CompressedKmerT>(request_dirpath : &Path, filter_params: &FilterParams, 
+                    seqdict : &'a SeqDict, processing_parameters : &ProcessingParams, 
+                    hnsw : &Hnsw<Kmer::Val,DistHamming>, knbn : usize, ef_search : usize) -> Matcher<'a>
             where Kmer::Val : num::PrimInt + Clone + Copy + Send + Sync + Serialize + DeserializeOwned + Debug,
                   KmerGenerator<Kmer> :  KmerGenerationPattern<Kmer>, 
                   DistHamming : Distance<Kmer::Val> {
@@ -146,14 +146,14 @@ fn sketch_and_request_dir_compressedkmer<Kmer:CompressedKmerT>(request_dirpath :
         hashval
     };
     let sketcher = seqsketchjaccard::SeqSketcher::new(sketcher_params.get_kmer_size(), sketcher_params.get_sketch_size());
-
+    // create something for likelyhood computation
+    let mut matcher = Matcher::new(processing_parameters.get_kmer_size(), seqdict);
     //
     // to send IdSeq to sketch from reading thread to sketcher thread
     let (send, receive) = crossbeam_channel::bounded::<Vec<IdSeq>>(1_000);
     // launch process_dir in a thread or async
     crossbeam_utils::thread::scope(|scope| {
-        // create something for likelyhood computation
-        let mut matcher = Matcher::new(processing_parameters.get_kmer_size(), seqdict);
+
         // sequence sending, productor thread
         let mut nb_sent = 0;
         let sender_handle = scope.spawn(move |_|   {
@@ -177,7 +177,7 @@ fn sketch_and_request_dir_compressedkmer<Kmer:CompressedKmerT>(request_dirpath :
             Box::new(nb_sent)
         });
         // sequence reception, consumer thread
-        let receptor_handle = scope.spawn(move |_| {
+        let receptor_handle = scope.spawn( |_| {
             let mut nb_request = 0;
             // we must read messages, sketch and insert into hnsw
             let mut read_more = true;
@@ -203,6 +203,9 @@ fn sketch_and_request_dir_compressedkmer<Kmer:CompressedKmerT>(request_dirpath :
                                 if answer.dump(&seqdict, out_threshold, &mut outfile).is_err() {
                                     log::info!("could not dump answer for request id {}", answer.req_item.get_id().get_fasta_id());
                                 }
+                                // store in matcher. remind that each i corresponds to a request
+                                let candidates = knn_neighbours[i].iter().map(|n| Candidate::new(seqdict.0[n.d_id].clone(), n.get_distance())).collect();
+                                matcher.insert_sequence_match(seq_item[i].clone(), candidates);
                             }
                             //  dump results
                             nb_request += signatures.len();
@@ -250,11 +253,13 @@ fn sketch_and_request_dir_compressedkmer<Kmer:CompressedKmerT>(request_dirpath :
     }  // end of closure in scope
     ).unwrap();  // end of scope
     //
-//    log::info!("matcher collected {} answers", matcher.get_nb_sequence_match());
+    log::info!("matcher collected {} answers", matcher.get_nb_sequence_match());
     let cpu_time = cpu_start.elapsed().as_secs();
     log::info!("process_dir : cpu time(s) {}", cpu_time);
     let elapsed_t = start_t.elapsed().unwrap().as_secs() as f32;
     log::info!("process_dir : elapsed time(s) {}", elapsed_t);
+    //
+    matcher
 } // end of sketch_and_request_dir_kmer64bit
 
 
@@ -451,6 +456,7 @@ fn main() {
                 panic!("SeqDict reload from dump file  {} failed", seqname);
             }            
         };
+        let matcher : Matcher<'a>;
         log::info!("reloading sequence dictionary from {} done", &seqname);
         // reload hnsw
         log::info!("\n reloading hnsw from {}", database_dirpath.to_str().unwrap());
@@ -462,7 +468,7 @@ fn main() {
                     panic!("hnsw reload from dump dir {} failed", database_dirpath.to_str().unwrap());
                 }
             };
-            sketch_and_request_dir_compressedkmer::<Kmer32bit>(&request_dirpath, &filter_params, &seqdict, &processing_params, 
+            matcher = sketch_and_request_dir_compressedkmer::<Kmer32bit>(&request_dirpath, &filter_params, &seqdict, &processing_params, 
                         &hnsw, nbng as usize, ef_search);
         }
         else if sk_params.get_kmer_size() > 16 {
@@ -473,7 +479,7 @@ fn main() {
                     panic!("hnsw reload from dump dir {} failed", database_dirpath.to_str().unwrap());
                 }
             };
-            sketch_and_request_dir_compressedkmer::<Kmer64bit>(&request_dirpath, &filter_params, &seqdict, &processing_params,
+            matcher = sketch_and_request_dir_compressedkmer::<Kmer64bit>(&request_dirpath, &filter_params, &seqdict, &processing_params,
                         &hnsw, nbng as usize, ef_search);
         }
         else if sk_params.get_kmer_size() == 16 {
@@ -484,7 +490,7 @@ fn main() {
                     panic!("hnsw reload from dump dir {} failed", database_dirpath.to_str().unwrap());
                 }
             };
-            sketch_and_request_dir_compressedkmer::<Kmer16b32bit>(&request_dirpath, &filter_params, &seqdict, &processing_params, 
+            matcher = sketch_and_request_dir_compressedkmer::<Kmer16b32bit>(&request_dirpath, &filter_params, &seqdict, &processing_params, 
                         &hnsw, nbng as usize, ef_search);  
         }
         // 
