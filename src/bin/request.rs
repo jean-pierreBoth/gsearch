@@ -168,11 +168,13 @@ fn sketch_and_request_dir_compressedkmer<'a, Kmer:CompressedKmerT>(request_dirpa
                 Ok(nb_really_sent) => {
                     nb_sent = nb_really_sent;
                     println!("process_dir processed nb sequences : {}", nb_sent);
+                    log::info!("sender processed nb sequences {}", nb_sent);
                 }
                 Err(_) => {
                     println!("some error occured in process_dir");
                 }
             };
+            log::info!("sender processed in  system time(s) : {}", state.elapsed_t);
             drop(send);
             Box::new(nb_sent)
         });
