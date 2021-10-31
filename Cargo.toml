@@ -9,8 +9,6 @@ license = "MIT OR Apache-2.0"
 description = "probminhash hnsw archaea"
 
 
-[features]
-
 
 [[bin]]
 
@@ -19,7 +17,7 @@ path= "src/bin/tohnsw.rs"
 
 [[bin]]
 name= "request"
-path= "src/bin/request.rs"
+path= "src/bin/request/main.rs"
 
 
 [lib]
@@ -53,9 +51,9 @@ clap = {version = "2.33"}
 
 ##
 
-#probminhash = {version = "0.1.4"}
+#probminhash = {version = "0.1.5"}
 probminhash = {path = "../probminhash"}
-#hnsw_rs =  {version = "0.1.14"}
+#hnsw_rs =  {version = "0.1.15"}
 hnsw_rs = {path = "../hnswlib-rs"}
 
 #kmerutils = {git = "https://github.com/jean-pierreBoth/kmerutils"}
@@ -69,3 +67,12 @@ lazy_static = { version = "1.4"}
 #log = { version = "0.4", features = ["max_level_trace", "release_max_level_trace"] }
 log = { version = "0.4"}
 env_logger = { version = "0.9"}
+
+# optional dependency to embed hnsw grap
+#annembed = {version = "0.0.1"}
+annembed = {path = "../annembed", optional = true}
+
+
+[features]
+
+annembed_f = [ "annembed"]

@@ -44,6 +44,8 @@ use kmerutils::sketching::seqsketchjaccard::*;
 use archaea::utils::*;
 use archaea::matcher::*;
 
+#[cfg(feature="annembed_f")]
+mod embed;
 
 // install a logger facility
 pub fn init_log() -> u64 {
@@ -206,7 +208,7 @@ fn sketch_and_request_dir_compressedkmer<'a, Kmer:CompressedKmerT>(request_dirpa
                                     log::info!("could not dump answer for request id {}", answer.req_item.get_id().get_fasta_id());
                                 }
                                 // store in matcher. remind that each i corresponds to a request
-                                let candidates = knn_neighbours[i].iter().map(|n| Candidate::new(seqdict.0[n.d_id].clone(), n.get_distance())).collect();
+                                let candidates = knn_neighbours[i].iter().map(|n| SequenceMatch::new(seqdict.0[n.d_id].clone(), n.get_distance())).collect();
                                 matcher.insert_sequence_match(seq_item[i].clone(), candidates);
                             }
                             //  dump results
@@ -233,7 +235,7 @@ fn sketch_and_request_dir_compressedkmer<'a, Kmer:CompressedKmerT>(request_dirpa
                                     log::info!("could not dump answer for request id {}", answer.req_item.get_id().get_fasta_id());
                                 }
                                 // store in matcher. remind that each i corresponds to a request
-                                let candidates = knn_neighbours[i].iter().map(|n| Candidate::new(seqdict.0[n.d_id].clone(), n.get_distance())).collect();
+                                let candidates = knn_neighbours[i].iter().map(|n| SequenceMatch::new(seqdict.0[n.d_id].clone(), n.get_distance())).collect();
                                 matcher.insert_sequence_match(seq_item[i].clone(), candidates);
                             }
                             nb_request += signatures.len();
@@ -302,6 +304,9 @@ fn reload_hnsw<T>(dump_dirpath : &Path) -> Option<Hnsw<T, DistHamming>>
     else {
         println!("reload_hnsw : elapsed system time(s) {}", elapsed_t);
     }
+    //
+    #[cfg(feature="annembed_f")]
+    let _ = embed::get_graph_stats_embed(&hnsw, true);
     //
     return Some(hnsw);
     //  
@@ -510,8 +515,8 @@ fn main() {
             }            
         };
         // we have eveything we want...
-        if let Ok(_seq_matcher) = get_sequence_matcher(request_dirpath, database_dirpath, &processing_params, &filter_params, &seqdict, nbng, ef_search) {
-
+        if let Ok(seq_matcher) = get_sequence_matcher(request_dirpath, database_dirpath, &processing_params, &filter_params, &seqdict, nbng, ef_search) {
+            seq_matcher.analyze();
         }
         else {
             panic!("Error occurred in get_matcher");

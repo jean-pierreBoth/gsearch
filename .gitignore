@@ -8,3 +8,4 @@ rls*
 *.bin
 hnswdump*
 *.json
+.vscode/**

@@ -17,8 +17,14 @@ use std::collections::HashMap;
 
 use crate::utils::*;
 
+
+type RequestGenome = String;
+type TargetGenome = String;
+
+
 #[derive(Clone)]
-pub struct Candidate {
+pub struct SequenceMatch {
+    /// sequence id in database.
     base_item : ItemDict,
     /// jaccard distance computed by hnsw
     distance : f32,
@@ -27,37 +33,62 @@ pub struct Candidate {
 }
 
 
-impl Candidate {
-    pub fn new(item: ItemDict, distance:f32) -> Self {
-        Candidate{ base_item : item, distance : distance, likelyhood : 0.}
+impl  SequenceMatch {
+    pub fn new(base_item : ItemDict, distance:f32) -> Self {
+        SequenceMatch{base_item : base_item, distance : distance, likelyhood : 0.}
+    }
+
+    /// return genome path of candidate
+    pub fn get_path(&self) -> &String {
+        self.base_item.get_id().get_path()
+    }
+
+    pub fn get_item(&self) -> &ItemDict {
+        &self.base_item
     }
 
 } // end of impl block Candidate
 
 //==================================
 
-/// A match between 2 sequences.
+/// A candidate genome stores sequence matches involving it 
+/// So all candidates in this structure belong to th same candidate genome.
 /// TODO devise an order
 #[derive(Clone)]
-pub struct SequenceMatch {
-    request_item : ItemDict,
+pub struct MatchList {
+    /// 
+    base_item : ItemDict,
     ///
-    candidates : Vec<Candidate>
+    candidates : Vec<SequenceMatch>
 }  // end of MatchSequence
 
 
 
-impl SequenceMatch {
-    pub fn new(request_item : ItemDict, candidates : Vec<Candidate>) -> Self {
-        SequenceMatch{ request_item, candidates}
+impl MatchList  {
+    pub fn new(base_item : ItemDict) -> Self {
+
+        MatchList { base_item, candidates : Vec::<SequenceMatch>::new()}
     }
 
-}  // end of SequenceMatch
+    pub fn get_item(&self) -> &ItemDict {
+        &self.base_item
+    }
+
+    pub fn get_path(&self) -> &String {
+        &self.base_item.get_id().get_path()
+    }
+
+    fn insert(&mut self, seq_match : &SequenceMatch) {
+        self.candidates.push(seq_match.clone());
+    }
+}  // end of MatchList
 
 
 //====================================================================
 
 
+
+type GenomeMatch =  HashMap<TargetGenome, MatchList>;
 
 /// This structure gther all sequence matches collected in function sketch_and_request_dir_compressedkmer.
 /// It must dispatch matches to GenomeMatch quantifies a match
@@ -71,8 +102,10 @@ pub struct Matcher<'a> {
     seqdict : &'a SeqDict,
     /// total number of bases of database.
     database_size : usize,
+    /// for each request genome, we maintain a 
+    seq_matches : HashMap<RequestGenome,  HashMap<TargetGenome, MatchList> >,
     ///
-    seq_matches : Vec<SequenceMatch>,
+    nb_sequence_match : usize,
 }  // end of Matcher
 
 
@@ -80,35 +113,56 @@ pub struct Matcher<'a> {
 impl <'a> Matcher<'a> {
     pub fn new(kmer_size : usize , sketch_size: usize, seqdict : &'a SeqDict) -> Self {
         let database_size = seqdict.get_total_length();
-        let seq_matches = Vec::with_capacity(1000);
-        Matcher{kmer_size, sketch_size, seqdict, database_size, seq_matches}
+        let seq_matches = HashMap::<RequestGenome, HashMap<TargetGenome, MatchList> >::new();
+        Matcher{kmer_size, sketch_size, seqdict, database_size, seq_matches, nb_sequence_match : 0}
     }
 
-    pub fn insert_sequence_match(&mut self, request_item: ItemDict, candidates : Vec<Candidate>) {
-        let new_match = SequenceMatch::new(request_item, candidates);
-        self.seq_matches.push(new_match);
+    pub fn insert_sequence_match(&mut self, req_item : ItemDict, new_matches : Vec<SequenceMatch>) {
+        //
+        // find request genome, if new we have to add an entry into seq_matches
+        //                      if not get the hashmap of its TargetGenome and add entry.
+        //
+        let req_genome_path = req_item.get_id().get_path();
+        let genome_match = self.seq_matches.get_mut(req_genome_path);
+        let mut genome_for_insertion;
+        if self.seq_matches.get_mut(req_genome_path).is_none() {
+            // if request is new, insert it in request hashmap
+            log::info!("insert_sequence_match , creating entry for request genome {}", req_genome_path);
+            self.seq_matches.insert(req_genome_path.clone(), HashMap::<TargetGenome, MatchList>::new());
+        }
+        genome_for_insertion = self.seq_matches.get_mut(req_genome_path).unwrap();
+        // now we can add new_matches in genome_for_insertion
+        for new_match in &new_matches {
+            let candidate_item = new_match.get_item();
+            let candidate_path = new_match.get_path();
+            if  genome_for_insertion.get(candidate_path).is_none() {
+             // do we have already candidate_genome in candidate list ?, if not insert it in target list
+             log::info!("insert_sequence_match , creating entry for target genome {}", req_genome_path);
+             genome_for_insertion.insert(candidate_path.to_string(), MatchList::new(candidate_item.clone()));
+            }
+            let match_list = genome_for_insertion.get_mut(candidate_path).unwrap();
+            // insert candidate
+            match_list.insert(new_match);
+        } // end of for on new matches
+        //
+        self.nb_sequence_match += new_matches.len();
     }  // end of insert_sequence_match
 
+    pub fn get_genome_match(&self, request : &RequestGenome) -> Option<&HashMap<TargetGenome, MatchList> > {
+        None
+    }
+
     pub fn get_nb_sequence_match(&self) -> usize {
-        self.seq_matches.len()
+        self.nb_sequence_match
     }
     
+    /// This function must order all target genome match according a likelyhood/merit function
+    /// The merit function is the sum on matched sequences for each target genome of (1-distance) * sequence length / total genome length. 
+    pub fn analyze(&self) {
+
+    }
 } // end of impl block for Matcher
 
 
 //===========================================================================
 
-/// Regroup sequecneMAtch from the same genome file.
-pub struct GenomeMatch {
-    /// filename containing request genome we want to identify
-    request_file : String,
-    /// target file in which some sequences were found 
-    target_file : String,
-    /// a sequence of matches between the request and a genome in the database.
-    seq_matches : Vec<SequenceMatch>
-}
-
-
-
-/// A type providing keyed access to matches between requests and database genomes.
-type Matches<'a> = HashMap<(String, String), GenomeMatch >;
