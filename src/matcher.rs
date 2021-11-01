@@ -15,6 +15,10 @@
 
 use std::collections::HashMap;
 
+use std::path::{Path, PathBuf};
+use std::fs::{OpenOptions, File};
+use std::io::{Write,BufWriter, BufReader};
+
 use crate::utils::*;
 
 
@@ -81,25 +85,73 @@ impl MatchList  {
     fn insert(&mut self, seq_match : &SequenceMatch) {
         self.candidates.push(seq_match.clone());
     }
+    // proximity * fraction of len matched. The larger the better.
+    fn compute_merit_wl(&self, threshold : f32, len : usize) -> f32 {
+        panic!("not yet impleented");
+        return 1.;
+    }
 }  // end of MatchList
 
 
 //====================================================================
 
+type GenomeMatch = HashMap<TargetGenome, MatchList>;
+
+struct GenomeMatchAnalyzer<'a> {
+    ///
+    hashed_genome_length : &'a HashMap<String, usize>,
+} // end of GenomeMatchAnalyzer
 
 
-type GenomeMatch =  HashMap<TargetGenome, MatchList>;
+impl <'a> GenomeMatchAnalyzer<'a> {
+
+    pub fn new(hashed_genome_length : &'a HashMap<String, usize>) -> Self {
+        GenomeMatchAnalyzer{hashed_genome_length}
+    }
+
+    /// 
+    /// returns vecors of (Id,similrity measure. The lesser the better).
+    fn analyze(&mut self, request : RequestGenome, targets : &GenomeMatch, threshold: f32) -> Vec<(String, f32)> {
+        //
+        let mut sorted = Vec::<(String,f32)>::new();
+        // iterate through MatchList and call compute_merit
+        for (g, m) in targets.iter() {
+            let g_len = self.hashed_genome_length.get(g).unwrap();
+            let merit = m.compute_merit_wl(threshold, *g_len);
+            sorted.push((g.to_string(), merit));
+        }
+        // sort in ascending order so first is better for us!
+        sorted.sort_unstable_by(|a,b| a.1.partial_cmp(&b.1).unwrap());
+        //
+        sorted
+    }
+
+} // end of impl GenomeMatchAnalyzer
+
+//===============================================================
+
+// compute each genome length. Useful only in sequence mode not in block genome 
+fn compute_genome_length(sequences : &SeqDict) -> HashMap<String, usize> {
+    let mut hashed_length = HashMap::<String, usize>::new();
+    //
+    for seq in &sequences.0 {
+        hashed_length.entry(seq.get_id().get_path().to_string()).or_insert(seq.get_len());
+    }
+    //
+    return hashed_length;
+}
+
 
 /// This structure gther all sequence matches collected in function sketch_and_request_dir_compressedkmer.
 /// It must dispatch matches to GenomeMatch quantifies a match
 #[derive(Clone)]
-pub struct Matcher<'a> {
+pub struct Matcher {
     /// kmer size in ketching
     kmer_size : usize,
     /// size of sketch
     sketch_size : usize,
-    /// Dictionary of Database
-    seqdict : &'a SeqDict,
+    /// genomes lenght
+    genome_length : HashMap<String, usize>,
     /// total number of bases of database.
     database_size : usize,
     /// for each request genome, we maintain a 
@@ -110,11 +162,12 @@ pub struct Matcher<'a> {
 
 
 
-impl <'a> Matcher<'a> {
-    pub fn new(kmer_size : usize , sketch_size: usize, seqdict : &'a SeqDict) -> Self {
+impl Matcher{
+    pub fn new(kmer_size : usize , sketch_size: usize, seqdict : &SeqDict) -> Self {
         let database_size = seqdict.get_total_length();
+        let genome_length = compute_genome_length(seqdict);
         let seq_matches = HashMap::<RequestGenome, HashMap<TargetGenome, MatchList> >::new();
-        Matcher{kmer_size, sketch_size, seqdict, database_size, seq_matches, nb_sequence_match : 0}
+        Matcher{kmer_size, sketch_size, genome_length, database_size, seq_matches, nb_sequence_match : 0}
     }
 
     pub fn insert_sequence_match(&mut self, req_item : ItemDict, new_matches : Vec<SequenceMatch>) {
@@ -148,19 +201,48 @@ impl <'a> Matcher<'a> {
         self.nb_sequence_match += new_matches.len();
     }  // end of insert_sequence_match
 
-    pub fn get_genome_match(&self, request : &RequestGenome) -> Option<&HashMap<TargetGenome, MatchList> > {
-        None
+
+
+    /// return mut reference to Target genome hashmap  matched for a given request genome, None if request is seen for the first time. 
+    pub fn get_genome_match_mut(&mut self, request_path : &RequestGenome) -> Option<&mut HashMap<TargetGenome, MatchList> > {
+        self.seq_matches.get_mut(request_path)
     }
 
+    /// return total number of sequence matched. (useful only in sequence matching mode, not in one block genome match)
     pub fn get_nb_sequence_match(&self) -> usize {
         self.nb_sequence_match
     }
     
     /// This function must order all target genome match according a likelyhood/merit function
-    /// The merit function is the sum on matched sequences for each target genome of (1-distance) * sequence length / total genome length. 
-    pub fn analyze(&self) {
+    /// The merit function is the sum on matched sequences for each target genome of (1-distance) * sequence length / total genome length.
+    /// So it the fraction of length matched. The larger the better.
+    pub fn analyze(&mut self) -> Result<(), String> {
+        //
+        let threshold = 0.98; // TODO ...
+        let outname = "archea.matches";
+        let outpath = PathBuf::from(outname.clone());
+        let outfile = OpenOptions::new().write(true).create(true).truncate(true).open(&outpath);
+        if outfile.is_err() {
+            log::error!("Matcher analyze : dump could not open file {:?}", outpath.as_os_str());
+            println!("Matcher analyze: could not open file {:?}", outpath.as_os_str());
+            return Err("Opening of Matcher output failed").unwrap();
+        }
+        let mut outfile = BufWriter::new(outfile.unwrap());
+        log::info!("dumping sorted match in : {}, threshold dist : {} ", outname, threshold);
+        let mut match_analyzer = GenomeMatchAnalyzer::new(&self.genome_length);
+        // iterate on request genome request
+        for (genome, candidates) in self.seq_matches.iter_mut() {
+            let sorted_match = match_analyzer.analyze(genome.to_string(), candidates, threshold);
+            // print
+            for m in sorted_match {
+                write!(outfile, "\n\t matched genome {}  distance : {:.3E}", m.0, m.1).unwrap();
+            }
+        }
+        Ok(())
+    } // end of analyze
 
-    }
+
+
 } // end of impl block for Matcher
 
 
