@@ -10,13 +10,15 @@ pub fn get_graph_stats_embed<T, D>(hnsw: &Hnsw<T,D>, embed : bool) -> Result<(),
     where T : Clone+Send+Sync,  
           D : Distance<T> + Send + Sync {
     let knbn = 8;
-    log::info!("calling kgraph_from_hnsw_all");
+    log::info!("calling kgraph_from_hnsw_all, embed = {}", embed);
 
     let kgraph_res = kgraph_from_hnsw_all::<T, D, f32>(hnsw, knbn);
     if let Ok(kgraph) = kgraph_res {
         // we are just interested in quantile statistics on first distance to neighbours.
+        log::info!(" computing graph statistics");
         let _kgraph_stats = kgraph.get_kraph_stats();
         if embed {
+            log::info!(" going to embedding");
             let mut embed_params = EmbedderParams::new();
             embed_params.nb_grad_batch = 15;
             embed_params.scale_rho = 0.5;
@@ -26,6 +28,7 @@ pub fn get_graph_stats_embed<T, D>(hnsw: &Hnsw<T,D>, embed : bool) -> Result<(),
             embed_params.dmap_init = true;
             let mut embedder = Embedder::new(&kgraph, embed_params);
             let _embed_res = embedder.embed();
+            log::info!(" embedding finished");
         } // end of embedding
 
     }

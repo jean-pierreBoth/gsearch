@@ -34,7 +34,7 @@ impl FilterParams {
     }
 }  // end of FilterParams
 
-
+//===========================================================
 
 #[derive(Copy,Clone,Serialize,Deserialize)]
 pub struct HnswParams {
@@ -57,9 +57,32 @@ impl HnswParams {
     pub fn get_max_nb_connection(&self) -> u8 {
         self.max_nb_conn
     }
-
-
 }  // end of impl block HnswParams
+
+
+//======================================================================================
+
+#[derive(Clone, Copy)]
+pub struct AnnArgs {
+    /// true to get statistics on neighbours
+    ask_stats : bool,
+} // end of 
+
+impl AnnArgs {
+    // default initiaization is false
+    pub fn new(ask_stats : bool) -> Self {
+        AnnArgs{ask_stats}
+    }
+
+    pub fn ask_stats(&self) -> bool {
+        self.ask_stats
+    }
+
+} // end of impl AnnArgs
+
+
+//=========================================================================================
+
 
 
 /// Gathers parameters used for hnsw, sketching and choice of sequence/blocked genome processing.

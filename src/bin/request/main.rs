@@ -1,12 +1,13 @@
 //! Module request
 //! try to match fasta sequence with repsect to database
 //! 
-//! request --database [-b] basedirname --query [-r]  requestdir --nbsearch [-n] nbanswers -s sketch_size
+//! request --database [-b] basedirname --query [-r]  requestdir --nbsearch [-n] nbanswers -s sketch_size [ann]
 //! 
 //! - database is the name of directory containing hnsw dump files and seqdict dump
-//! - requestdir is a file containing list of fasta file containing sequence to search for
+//! - requestdir is a directory containing list of fasta file containing sequence to search for
 //! 
-//! In fact as in basedirname there must be a file (sketchparams.json) specifying sketch size and kmer size, these
+//! [ann] is an optional subcommand asking ofr some statistics on distances between hnsw items
+//! In fact as in basedirname there must be a file (processingparams.json) specifying sketch size and kmer size, these
 //! 2 options are useless in standard mode.
 
 // We can use the same structure as the tohnsw module
@@ -18,7 +19,7 @@
 
 
 
-use clap::{App, Arg};
+use clap::{App, Arg, SubCommand};
 
 // for logging (debug mostly, switched at compile time in cargo.toml)
 use env_logger::{Builder};
@@ -91,7 +92,7 @@ impl <'a> ReqAnswer<'a> {
                     write!(out, "\n\t\t answer fasta id {}, seq len : {}", seqdict.0[n.d_id].get_id().get_fasta_id(), seqdict.0[n.d_id].get_len())?;
                 }
             }
-    }
+        } // end match
         Ok(())
     } // end of dump
 
@@ -107,9 +108,9 @@ impl <'a> ReqAnswer<'a> {
 
 
 
-fn sketch_and_request_dir_compressedkmer<'a, Kmer:CompressedKmerT>(request_dirpath : &Path, filter_params: &FilterParams, 
-                    seqdict : &'a SeqDict, processing_parameters : &ProcessingParams, 
-                    hnsw : &Hnsw<Kmer::Val,DistHamming>, knbn : usize, ef_search : usize) -> Matcher<'a>
+fn sketch_and_request_dir_compressedkmer<Kmer:CompressedKmerT>(request_dirpath : &Path, filter_params: &FilterParams, 
+                    seqdict : &SeqDict, processing_parameters : &ProcessingParams, 
+                    hnsw : &Hnsw<Kmer::Val,DistHamming>, knbn : usize, ef_search : usize) -> Matcher
             where Kmer::Val : num::PrimInt + Clone + Copy + Send + Sync + Serialize + DeserializeOwned + Debug,
                   KmerGenerator<Kmer> :  KmerGenerationPattern<Kmer>, 
                   DistHamming : Distance<Kmer::Val> {
@@ -126,7 +127,7 @@ fn sketch_and_request_dir_compressedkmer<'a, Kmer:CompressedKmerT>(request_dirpa
     let outpath = PathBuf::from(outname.clone());
     let outfile = OpenOptions::new().write(true).create(true).truncate(true).open(&outpath);
     if outfile.is_err() {
-        log::error!("SeqDict dump : dump could not open file {:?}", outpath.as_os_str());
+        log::error!("sketch_and_request_dir_compressedkmer could not open file {:?}", outpath.as_os_str());
         println!("SeqDict dump: could not open file {:?}", outpath.as_os_str());
         return Err("SeqDict Deserializer dump failed").unwrap();
     }
@@ -270,7 +271,7 @@ fn sketch_and_request_dir_compressedkmer<'a, Kmer:CompressedKmerT>(request_dirpa
 
 /// reload hnsw from dump directory
 /// We know filename : hnswdump.hnsw.data and hnswdump.hnsw.graph
-fn reload_hnsw<T>(dump_dirpath : &Path) -> Option<Hnsw<T, DistHamming>>  
+fn reload_hnsw<T>(dump_dirpath : &Path, ann_args: &AnnArgs) -> Option<Hnsw<T, DistHamming>>  
             where T : 'static + Clone + Send + Sync + Serialize + DeserializeOwned ,
                 DistHamming : Distance<T>  {
     // just concat dirpath to filenames and get pathbuf
@@ -306,7 +307,9 @@ fn reload_hnsw<T>(dump_dirpath : &Path) -> Option<Hnsw<T, DistHamming>>
     }
     //
     #[cfg(feature="annembed_f")]
-    let _ = embed::get_graph_stats_embed(&hnsw, true);
+    if ann_args.ask_stats() {
+        let _ = embed::get_graph_stats_embed(&hnsw, false);
+    }
     //
     return Some(hnsw);
     //  
@@ -314,9 +317,9 @@ fn reload_hnsw<T>(dump_dirpath : &Path) -> Option<Hnsw<T, DistHamming>>
 
 
 // This function returns paired sequence by probminhash and hnsw 
-fn get_sequence_matcher<'a>(request_dirpath : &Path, database_dirpath : &Path, processing_params : &ProcessingParams,
-                     filter_params : &FilterParams, seqdict : &'a SeqDict, 
-                     nbng : u16, ef_search : usize) -> Result<Matcher<'a>, String> {
+fn get_sequence_matcher(request_dirpath : &Path, database_dirpath : &Path, processing_params : &ProcessingParams,
+                     filter_params : &FilterParams, ann_args: &AnnArgs, seqdict : &SeqDict, 
+                     nbng : u16, ef_search : usize) -> Result<Matcher, String> {
     //
     let sk_params = processing_params.get_sketching_params();
     log::info!("sketch params reloaded kmer size : {}, sketch size {}", sk_params.get_kmer_size(), sk_params.get_sketch_size());
@@ -325,7 +328,7 @@ fn get_sequence_matcher<'a>(request_dirpath : &Path, database_dirpath : &Path, p
     // reload hnsw
     log::info!("\n reloading hnsw from {}", database_dirpath.to_str().unwrap());
     if sk_params.get_kmer_size() < 14 {
-        let hnsw = reload_hnsw(database_dirpath);
+        let hnsw = reload_hnsw(database_dirpath, ann_args);
         let hnsw = match hnsw {
             Some(hnsw) => hnsw,
             _ => {
@@ -337,7 +340,7 @@ fn get_sequence_matcher<'a>(request_dirpath : &Path, database_dirpath : &Path, p
         return Ok(matcher)  
     }
     else if sk_params.get_kmer_size() > 16 {
-        let hnsw = reload_hnsw(database_dirpath);
+        let hnsw = reload_hnsw(database_dirpath, ann_args);
         let hnsw = match hnsw {
             Some(hnsw) => hnsw,
             _ => {
@@ -349,7 +352,7 @@ fn get_sequence_matcher<'a>(request_dirpath : &Path, database_dirpath : &Path, p
         return Ok(matcher)  
     }
     else if sk_params.get_kmer_size() == 16 {
-        let hnsw = reload_hnsw(database_dirpath);
+        let hnsw = reload_hnsw(database_dirpath, ann_args);
         let hnsw = match hnsw {
             Some(hnsw) => hnsw,
             _ => {
@@ -399,7 +402,29 @@ fn main() {
             .long("seq")
             .takes_value(false)
             .help("--seq to get a processing by sequence"))
+        .subcommand(SubCommand::with_name("ann")
+            .about("annembed usage")
+            .arg(Arg::with_name("stats")
+                .takes_value(false)
+                .long("stats")
+                .short("s")
+                .help("to get stats on nb neighbours"))
+        )
         .get_matches();
+
+
+        let mut ann_params = AnnArgs::new(false);
+        match matches.subcommand() {
+            ("ann", Some(ann_match)) => {
+                log::info!("got ann subcommand");
+                if ann_match.is_present("stats") {
+                    println!(" got subcommand neighbour stats option");
+                    ann_params = AnnArgs::new(true);
+                }
+            },
+            ("", None)               => println!("no subcommand at all"),
+            _                        => unreachable!(),
+        }
 
     // by default we process files in one large sequence block
         // decode matches, check for request_dir
@@ -472,6 +497,10 @@ fn main() {
             println!("-n nbng is mandatory");
             std::process::exit(1);
         }
+        // match subcommands
+
+        //
+        // matching args is finished
         //     
         let ef_search = 5000;
         log::info!("ef_search : {:?}", ef_search);
@@ -514,14 +543,17 @@ fn main() {
                 panic!("SeqDict reload from dump file  {} failed", seqname);
             }            
         };
+        log::info!("reloading sequence dictionary from {} done", &seqname);
         // we have eveything we want...
-        if let Ok(seq_matcher) = get_sequence_matcher(request_dirpath, database_dirpath, &processing_params, &filter_params, &seqdict, nbng, ef_search) {
-            seq_matcher.analyze();
+        if let Ok(mut seq_matcher) = get_sequence_matcher(request_dirpath, database_dirpath, &processing_params, 
+                        &filter_params, &ann_params, &seqdict, nbng, ef_search) {
+            if processing_params.get_block_flag() == false {
+                log::info!("sequence mode, trying to analyze..");
+                    let _= seq_matcher.analyze(&ann_params);
+            }
         }
         else {
             panic!("Error occurred in get_matcher");
         }
-        log::info!("reloading sequence dictionary from {} done", &seqname);
         // 
-
 }  // end of main

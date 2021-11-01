@@ -86,9 +86,16 @@ impl MatchList  {
         self.candidates.push(seq_match.clone());
     }
     // proximity * fraction of len matched. The larger the better.
-    fn compute_merit_wl(&self, threshold : f32, len : usize) -> f32 {
-        panic!("not yet impleented");
-        return 1.;
+    // TODO risk here: be sure we send len of target genome! We could have it the hashmap_genome_length 
+    fn compute_merit_wl(&self, threshold : f32, len : usize) -> f64 {
+        let mut merit = 1f64;
+        for candidate in &self.candidates {
+            if candidate.distance < threshold {
+//                merit += (1. - candidate.distance as f64) * candidate.base_item.get_len() as f64 / len as f64;
+                merit *= candidate.distance as f64;
+            }
+        }
+        return merit;
     }
 }  // end of MatchList
 
@@ -117,10 +124,10 @@ impl <'a> GenomeMatchAnalyzer<'a> {
         // iterate through MatchList and call compute_merit
         for (g, m) in targets.iter() {
             let g_len = self.hashed_genome_length.get(g).unwrap();
-            let merit = m.compute_merit_wl(threshold, *g_len);
-            sorted.push((g.to_string(), merit));
+            let merit = m.compute_merit_wl(threshold, *g_len); // the lower the better
+            sorted.push((g.to_string(), merit as f32));
         }
-        // sort in ascending order so first is better for us!
+        // sort in increasing order so first is better for us!
         sorted.sort_unstable_by(|a,b| a.1.partial_cmp(&b.1).unwrap());
         //
         sorted
@@ -190,7 +197,7 @@ impl Matcher{
             let candidate_path = new_match.get_path();
             if  genome_for_insertion.get(candidate_path).is_none() {
              // do we have already candidate_genome in candidate list ?, if not insert it in target list
-             log::info!("insert_sequence_match , creating entry for target genome {}", req_genome_path);
+             log::trace!("insert_sequence_match , creating entry for target genome {}", candidate_path);
              genome_for_insertion.insert(candidate_path.to_string(), MatchList::new(candidate_item.clone()));
             }
             let match_list = genome_for_insertion.get_mut(candidate_path).unwrap();
@@ -216,9 +223,9 @@ impl Matcher{
     /// This function must order all target genome match according a likelyhood/merit function
     /// The merit function is the sum on matched sequences for each target genome of (1-distance) * sequence length / total genome length.
     /// So it the fraction of length matched. The larger the better.
-    pub fn analyze(&mut self) -> Result<(), String> {
+    pub fn analyze(&mut self, ann_args: &AnnArgs) -> Result<(), String> {
         //
-        let threshold = 0.98; // TODO ...
+        let threshold = 0.99; // TODO ...
         let outname = "archea.matches";
         let outpath = PathBuf::from(outname.clone());
         let outfile = OpenOptions::new().write(true).create(true).truncate(true).open(&outpath);
@@ -234,8 +241,10 @@ impl Matcher{
         for (genome, candidates) in self.seq_matches.iter_mut() {
             let sorted_match = match_analyzer.analyze(genome.to_string(), candidates, threshold);
             // print
-            for m in sorted_match {
-                write!(outfile, "\n\t matched genome {}  distance : {:.3E}", m.0, m.1).unwrap();
+            write!(outfile, "\n\n request genome : {}", genome);
+            let max_out = 5.min(sorted_match.len());
+            for i in 0..max_out  {
+                write!(outfile, "\n\t matched genome {}  merit : {:.3E}", sorted_match[i].0, sorted_match[i].1).unwrap();
             }
         }
         Ok(())
