@@ -69,7 +69,7 @@ log = { version = "0.4"}
 env_logger = { version = "0.9"}
 
 # optional dependency to embed hnsw grap
-#annembed = {version = "0.0.1"}
+#annembed = {version = "0.0.1", optional = true}
 annembed = {path = "../annembed", optional = true}
 
 

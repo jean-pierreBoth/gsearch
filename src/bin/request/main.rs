@@ -165,7 +165,8 @@ fn sketch_and_request_dir_compressedkmer<Kmer:CompressedKmerT>(request_dirpath :
                 res_nb_sent = process_dir(&mut state, request_dirpath, &filter_params, &process_file_in_one_block, &send);
             }
             else {
-                res_nb_sent = process_dir(&mut state, request_dirpath, &filter_params, &process_file_by_sequence, &send);
+                log::info!("processing by concat and split");
+                res_nb_sent = process_dir(&mut state, request_dirpath, &filter_params, &process_file_concat_split, &send);
             }
             match res_nb_sent {
                 Ok(nb_really_sent) => {
