@@ -221,6 +221,7 @@ pub fn process_file_in_one_block(file : &DirEntry, filter_params : &FilterParams
 
 /// opens parse fna files with needletail
 /// extracts records , concat in a whole block and split in equal parts.
+/// The split is done in 10 segments (hard coded at present time)
 /// filters out capsid and send sequences to function process_dir to execute file_task to produce sequences
 /// for any client
 pub fn process_file_concat_split(file : &DirEntry, filter_params : &FilterParams)  -> Vec<IdSeq> {
@@ -285,7 +286,9 @@ pub fn process_file_concat_split(file : &DirEntry, filter_params : &FilterParams
 
 /// scan directory recursively, executing function file_task on each file.
 /// adapted from from crate fd_find
-pub fn process_dir(state : &mut ProcessingState, dir: &Path, filter_params : &FilterParams, file_task: &dyn Fn(&DirEntry, &FilterParams) -> Vec<IdSeq>, sender : &crossbeam_channel::Sender::<Vec<IdSeq>>) -> io::Result<usize> {
+pub fn process_dir(state : &mut ProcessingState, dir: &Path, filter_params : &FilterParams, 
+                file_task: &dyn Fn(&DirEntry, &FilterParams) -> Vec<IdSeq>, 
+                sender : &crossbeam_channel::Sender::<Vec<IdSeq>>) -> io::Result<usize> {
     //
     // we checked that we have a directory
     for entry in fs::read_dir(dir)? {

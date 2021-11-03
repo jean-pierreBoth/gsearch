@@ -11,13 +11,12 @@
 //! a probability of match getting ideas from :
 //! *How independent are the appearances of n-mers in different genomes Fufanov and al. BioInformatics 2004*
 
-#![allow(unused)]
 
 use std::collections::HashMap;
 
-use std::path::{Path, PathBuf};
-use std::fs::{OpenOptions, File};
-use std::io::{Write,BufWriter, BufReader};
+use std::path::{PathBuf};
+use std::fs::{OpenOptions};
+use std::io::{Write,BufWriter};
 
 use crate::utils::*;
 
@@ -57,7 +56,6 @@ impl  SequenceMatch {
 
 /// A candidate genome stores sequence matches involving it 
 /// So all candidates in this structure belong to th same candidate genome.
-/// TODO devise an order
 #[derive(Clone)]
 pub struct MatchList {
     /// 
@@ -85,13 +83,11 @@ impl MatchList  {
     fn insert(&mut self, seq_match : &SequenceMatch) {
         self.candidates.push(seq_match.clone());
     }
-    // proximity * fraction of len matched. The larger the better.
-    // TODO risk here: be sure we send len of target genome! We could have it the hashmap_genome_length 
-    fn compute_merit_wl(&self, threshold : f32, len : usize) -> f64 {
+    // as far as we use split sequence coming from our split we do not need length as it is the same for all sequences
+    fn compute_merit_wl(&self, threshold : f32) -> f64 {
         let mut merit = 1f64;
         for candidate in &self.candidates {
             if candidate.distance < threshold {
-//                merit += (1. - candidate.distance as f64) * candidate.base_item.get_len() as f64 / len as f64;
                 merit *= candidate.distance as f64;
             }
         }
@@ -99,32 +95,28 @@ impl MatchList  {
     }
 }  // end of MatchList
 
-
 //====================================================================
 
 type GenomeMatch = HashMap<TargetGenome, MatchList>;
 
-struct GenomeMatchAnalyzer<'a> {
-    ///
-    hashed_genome_length : &'a HashMap<String, usize>,
+struct GenomeMatchAnalyzer {
 } // end of GenomeMatchAnalyzer
 
 
-impl <'a> GenomeMatchAnalyzer<'a> {
+impl <'a> GenomeMatchAnalyzer{
 
-    pub fn new(hashed_genome_length : &'a HashMap<String, usize>) -> Self {
-        GenomeMatchAnalyzer{hashed_genome_length}
+    pub fn new() -> Self {
+        GenomeMatchAnalyzer{}
     }
 
     /// 
     /// returns vecors of (Id,similrity measure. The lesser the better).
-    fn analyze(&mut self, request : RequestGenome, targets : &GenomeMatch, threshold: f32) -> Vec<(String, f32)> {
+    fn analyze(&mut self, targets : &GenomeMatch, threshold: f32) -> Vec<(String, f32)> {
         //
         let mut sorted = Vec::<(String,f32)>::new();
         // iterate through MatchList and call compute_merit
         for (g, m) in targets.iter() {
-            let g_len = self.hashed_genome_length.get(g).unwrap();
-            let merit = m.compute_merit_wl(threshold, *g_len); // the lower the better
+            let merit = m.compute_merit_wl(threshold); // the lower the better
             sorted.push((g.to_string(), merit as f32));
         }
         // sort in increasing order so first is better for us!
@@ -149,7 +141,7 @@ fn compute_genome_length(sequences : &SeqDict) -> HashMap<String, usize> {
 }
 
 
-/// This structure gther all sequence matches collected in function sketch_and_request_dir_compressedkmer.
+/// This structure gather all sequence matches collected in function sketch_and_request_dir_compressedkmer.
 /// It must dispatch matches to GenomeMatch quantifies a match
 #[derive(Clone)]
 pub struct Matcher {
@@ -183,11 +175,10 @@ impl Matcher{
         //                      if not get the hashmap of its TargetGenome and add entry.
         //
         let req_genome_path = req_item.get_id().get_path();
-        let genome_match = self.seq_matches.get_mut(req_genome_path);
-        let mut genome_for_insertion;
+        let genome_for_insertion;
         if self.seq_matches.get_mut(req_genome_path).is_none() {
             // if request is new, insert it in request hashmap
-            log::info!("insert_sequence_match , creating entry for request genome {}", req_genome_path);
+            log::trace!("insert_sequence_match , creating entry for request genome {}", req_genome_path);
             self.seq_matches.insert(req_genome_path.clone(), HashMap::<TargetGenome, MatchList>::new());
         }
         genome_for_insertion = self.seq_matches.get_mut(req_genome_path).unwrap();
@@ -223,7 +214,7 @@ impl Matcher{
     /// This function must order all target genome match according a likelyhood/merit function
     /// The merit function is the sum on matched sequences for each target genome of (1-distance) * sequence length / total genome length.
     /// So it the fraction of length matched. The larger the better.
-    pub fn analyze(&mut self, ann_args: &AnnArgs) -> Result<(), String> {
+    pub fn analyze(&mut self) -> Result<(), String> {
         //
         let threshold = 0.99; // TODO ...
         let outname = "archea.matches";
@@ -236,12 +227,12 @@ impl Matcher{
         }
         let mut outfile = BufWriter::new(outfile.unwrap());
         log::info!("dumping sorted match in : {}, threshold dist : {} ", outname, threshold);
-        let mut match_analyzer = GenomeMatchAnalyzer::new(&self.genome_length);
+        let mut match_analyzer = GenomeMatchAnalyzer::new();
         // iterate on request genome request
         for (genome, candidates) in self.seq_matches.iter_mut() {
-            let sorted_match = match_analyzer.analyze(genome.to_string(), candidates, threshold);
+            let sorted_match = match_analyzer.analyze(candidates, threshold);
             // print
-            write!(outfile, "\n\n request genome : {}", genome);
+            write!(outfile, "\n\n request genome : {}", genome).unwrap();
             let max_out = 5.min(sorted_match.len());
             for i in 0..max_out  {
                 write!(outfile, "\n\t matched genome {}  merit : {:.3E}", sorted_match[i].0, sorted_match[i].1).unwrap();

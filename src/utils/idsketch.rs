@@ -1,10 +1,9 @@
 //! The module gathers structures used to identify sequences stroed in Hnsw (with probminhash hash data) from a id
-#![allow(unused)]
 
 use serde::{Deserialize, Serialize};
 use serde_json::{to_writer};
 
-use std::path::{Path, PathBuf};
+use std::path::{PathBuf};
 use std::fs::OpenOptions;
 use std::io::{BufReader, BufWriter};
 use std::time::{SystemTime};
@@ -92,7 +91,7 @@ impl IdSeq {
 pub struct ItemDict {
     /// sequence id
     id : Id, 
-    /// sequene length
+    /// sequence length
     len : usize,
 }
 

@@ -6,7 +6,7 @@
 //! - database is the name of directory containing hnsw dump files and seqdict dump
 //! - requestdir is a directory containing list of fasta file containing sequence to search for
 //! 
-//! [ann] is an optional subcommand asking ofr some statistics on distances between hnsw items
+//! [ann] is an optional subcommand asking for some statistics on distances between hnsw items
 //! In fact as in basedirname there must be a file (processingparams.json) specifying sketch size and kmer size, these
 //! 2 options are useless in standard mode.
 
@@ -14,7 +14,6 @@
 // We parse a directory and send to a thread that do sketching and query
 // we must enforce that the sketching size is the same as used in the database, so SketcherParams
 // must have been dumped also in database directory.
-// TODO for now we pass it
 // 
 
 
@@ -266,13 +265,17 @@ fn sketch_and_request_dir_compressedkmer<Kmer:CompressedKmerT>(request_dirpath :
     log::info!("process_dir : elapsed time(s) {}", elapsed_t);
     //
     matcher
-} // end of sketch_and_request_dir_kmer64bit
+} // end of sketch_and_request_dir_compressedkmer 
 
 
 
-/// reload hnsw from dump directory
-/// We know filename : hnswdump.hnsw.data and hnswdump.hnsw.graph
-fn reload_hnsw<T>(dump_dirpath : &Path, ann_args: &AnnArgs) -> Option<Hnsw<T, DistHamming>>  
+/* 
+    reload hnsw from dump directory
+    We know filename : hnswdump.hnsw.data and hnswdump.hnsw.graph
+    The allow(unused_variables) is here to avoid a warning on ann_params when compiling without feature f_annembed
+ */
+#[allow(unused_variables)]
+fn reload_hnsw<T>(dump_dirpath : &Path, ann_params: &AnnParameters) -> Option<Hnsw<T, DistHamming>>  
             where T : 'static + Clone + Send + Sync + Serialize + DeserializeOwned ,
                 DistHamming : Distance<T>  {
     // just concat dirpath to filenames and get pathbuf
@@ -306,9 +309,9 @@ fn reload_hnsw<T>(dump_dirpath : &Path, ann_args: &AnnArgs) -> Option<Hnsw<T, Di
     else {
         println!("reload_hnsw : elapsed system time(s) {}", elapsed_t);
     }
-    //
+    // feature enabled (or not) in Cargo.toml, requires the crate annembed
     #[cfg(feature="annembed_f")]
-    if ann_args.ask_stats() {
+    if ann_params.ask_stats() {
         let _ = embed::get_graph_stats_embed(&hnsw, false);
     }
     //
@@ -319,7 +322,7 @@ fn reload_hnsw<T>(dump_dirpath : &Path, ann_args: &AnnArgs) -> Option<Hnsw<T, Di
 
 // This function returns paired sequence by probminhash and hnsw 
 fn get_sequence_matcher(request_dirpath : &Path, database_dirpath : &Path, processing_params : &ProcessingParams,
-                     filter_params : &FilterParams, ann_args: &AnnArgs, seqdict : &SeqDict, 
+                     filter_params : &FilterParams, ann_params: &AnnParameters, seqdict : &SeqDict, 
                      nbng : u16, ef_search : usize) -> Result<Matcher, String> {
     //
     let sk_params = processing_params.get_sketching_params();
@@ -329,7 +332,7 @@ fn get_sequence_matcher(request_dirpath : &Path, database_dirpath : &Path, proce
     // reload hnsw
     log::info!("\n reloading hnsw from {}", database_dirpath.to_str().unwrap());
     if sk_params.get_kmer_size() < 14 {
-        let hnsw = reload_hnsw(database_dirpath, ann_args);
+        let hnsw = reload_hnsw(database_dirpath, ann_params);
         let hnsw = match hnsw {
             Some(hnsw) => hnsw,
             _ => {
@@ -341,7 +344,7 @@ fn get_sequence_matcher(request_dirpath : &Path, database_dirpath : &Path, proce
         return Ok(matcher)  
     }
     else if sk_params.get_kmer_size() > 16 {
-        let hnsw = reload_hnsw(database_dirpath, ann_args);
+        let hnsw = reload_hnsw(database_dirpath, ann_params);
         let hnsw = match hnsw {
             Some(hnsw) => hnsw,
             _ => {
@@ -353,7 +356,7 @@ fn get_sequence_matcher(request_dirpath : &Path, database_dirpath : &Path, proce
         return Ok(matcher)  
     }
     else if sk_params.get_kmer_size() == 16 {
-        let hnsw = reload_hnsw(database_dirpath, ann_args);
+        let hnsw = reload_hnsw(database_dirpath, ann_params);
         let hnsw = match hnsw {
             Some(hnsw) => hnsw,
             _ => {
@@ -414,20 +417,20 @@ fn main() {
         .get_matches();
 
 
-        let mut ann_params = AnnArgs::new(false);
+        let mut ann_params = AnnParameters::new(false);
         match matches.subcommand() {
             ("ann", Some(ann_match)) => {
                 log::info!("got ann subcommand");
                 if ann_match.is_present("stats") {
                     println!(" got subcommand neighbour stats option");
-                    ann_params = AnnArgs::new(true);
+                    ann_params = AnnParameters::new(true);
                 }
             },
             ("", None)               => println!("no subcommand at all"),
             _                        => unreachable!(),
         }
 
-    // by default we process files in one large sequence block
+        // by default we process files in one large sequence block
         // decode matches, check for request_dir
         let request_dir;
         if matches.is_present("request_dir") {
@@ -478,7 +481,7 @@ fn main() {
             println!("will use dumped sketch size");
         }
         //
-        let mut kmer_size = 8;
+        let mut kmer_size = 28;
         if matches.is_present("kmer_size") {
             kmer_size = matches.value_of("kmer_size").ok_or("").unwrap().parse::<u16>().unwrap();
             println!("kmer size {}", kmer_size);
@@ -545,12 +548,12 @@ fn main() {
             }            
         };
         log::info!("reloading sequence dictionary from {} done", &seqname);
-        // we have eveything we want...
+        // we have everything we want...
         if let Ok(mut seq_matcher) = get_sequence_matcher(request_dirpath, database_dirpath, &processing_params, 
                         &filter_params, &ann_params, &seqdict, nbng, ef_search) {
             if processing_params.get_block_flag() == false {
                 log::info!("sequence mode, trying to analyze..");
-                    let _= seq_matcher.analyze(&ann_params);
+                let _= seq_matcher.analyze();
             }
         }
         else {

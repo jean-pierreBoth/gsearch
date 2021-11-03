@@ -62,23 +62,25 @@ impl HnswParams {
 
 //======================================================================================
 
-#[derive(Clone, Copy)]
-pub struct AnnArgs {
+#[derive(Clone, Copy, Serialize,Deserialize)]
+pub struct AnnParameters {
     /// true to get statistics on neighbours
     ask_stats : bool,
 } // end of 
 
-impl AnnArgs {
+impl AnnParameters {
     // default initiaization is false
     pub fn new(ask_stats : bool) -> Self {
-        AnnArgs{ask_stats}
+        AnnParameters{ask_stats}
     }
 
+    /// returns if stats on distance on nearest neighbours resulting from hnsw information were asked for
+    /// In this case some quantiles on nearest neighbours are dumped.
     pub fn ask_stats(&self) -> bool {
         self.ask_stats
     }
 
-} // end of impl AnnArgs
+} // end of impl AnnParameters
 
 
 //=========================================================================================
@@ -105,12 +107,12 @@ impl ProcessingParams {
         ProcessingParams{hnsw, sketch, block_flag}
     }
 
-    /// gzt parameters for hnsw construction
+    /// get parameters for hnsw construction
     pub fn get_hnsw_params(&self) -> &HnswParams {
         &self.hnsw
     }
 
-    /// gzt parameters used for sketching sequences 
+    /// get parameters used for sketching sequences 
     pub fn get_sketching_params(&self) -> &SeqSketcher {
         &self.sketch
     }
@@ -120,6 +122,7 @@ impl ProcessingParams {
         self.block_flag
     }
 
+    /// return kmer size used in sketching.
     pub fn get_kmer_size(&self) ->  usize {
         self.sketch.get_kmer_size()
     }
@@ -146,7 +149,7 @@ impl ProcessingParams {
 
 
 
-    /// reload from a json dump
+    /// reload from a json dump. Used in request module to ensure coherence with database constitution
     pub fn reload_json(dirpath : &Path) -> Result<Self, String> {
         log::info!("in reload_json");
         //
