@@ -1,13 +1,13 @@
 # A rust classifier based on HNSW for prokaryotic genomes
 
-archaea stands for: <u>a<u> <u>r<u>ust <u>c<u>lassifier <u>H<u>i<u>e<u>rarchical N<u>a<u>vigable SW graphs
+archaea stands for: **A Rust Classifier Hierarchical Navigable SW graphs**
 
 This package (**currently in development**) compute probminhash signature of  bacteria and archaea genomes and stores the id of bacteria and probminhash signature in a Hnsw structure for searching of new request genomes
 
 This package is developped in collaboration with Jianshu Zhao
 
 # Dependencies and Installation
-Two libraries, zeromq, libsodium are required to successfully compile. 
+* Two libraries, zeromq, libsodium are required to successfully compile. 
 
 ```
 ### if you are using Linux (ubuntu for example), install them first
@@ -21,19 +21,24 @@ brew install libsodium
 conda install -c anaconda zeromq libsodium
 export PKG_CONFIG_PATH="~/miniconda3/lib/pkgconfig:$PKG_CONFIG_PATH"
 export LD_CONFIG_PATH="~/miniconda3/lib:$LD_CONFIG_PATH"
-  
-## Clone hnsw-rs and probminhash
-git clone https://github.com/jean-pierreBoth/hnswlib-rs.git
-git clone https://github.com/jean-pierreBoth/probminhash
-git clone https://github.com/jean-pierreBoth/archaea
-cd archaea
-cargo build --release
 ```
+  
+*  Clone hnsw-rs and probminhash or get them from crate.io
+    - git clone https://github.com/jean-pierreBoth/hnswlib-rs
+
+    - git clone https://github.com/jean-pierreBoth/probminhash
+
+    - get archaea directly from gitbub: (git clone https://github.com/jean-pierreBoth/archaea) as long as it is not in crate.io and run cargo build --release
+
+* A dependency is provided as a feature. It uses the crate **annembed** that gives some statistics on the hnsw graph constructed (and will provide some visualization of data).
+It is activated by running:
+    -   *cargo build --release --features annembed_f*
+
 ## Sketching of genomes
 
 The sketching and database is done by the module ***tohnsw***.
 
-The sketching of reference genomes can take some time so when done it is stored in 2 structures:
+The sketching of reference genomes can take some time (one or 2 hours for 50000 bacterial genomes of NCBI for parameters giving a correct quality of sketching). Result is stored in 2 structures:
 - A Hnsw structure storing rank of data processed and corresponding sketches.
 - A Dictionary associating each rank to a fasta id and fasta filename.
 
