@@ -12,6 +12,8 @@ use serde_json::{to_writer};
 
 use kmerutils::base::{sequence::*};
 
+use kmerutils::rnautils::kmeraa;
+
 use super::idsketch::{IdSeq};
 use super::parameters::*;
 
@@ -99,6 +101,20 @@ pub fn is_fasta_file(file : &DirEntry) -> bool {
 }  // end of is_fasta_file
 
 
+// returns true if file is a fasta file (possibly gzipped)
+// filename are of type GCA[GCF]_000091165.1_genomic.fna.gz
+pub fn is_fasta_aa_file(file : &DirEntry) -> bool {
+    let filename = file.file_name().into_string().unwrap();
+    if filename.ends_with("faa.gz")|| filename.ends_with("faa") {
+        return true;
+    }
+    else { 
+        return false;
+    }
+}  // end of is_fasta_aa_file
+
+
+
 #[inline]
 /// clones the sequence filtering out non ATCG
 pub fn filter_out_n(seq : &[u8]) -> Vec<u8> {
@@ -113,7 +129,24 @@ pub fn filter_out_n(seq : &[u8]) -> Vec<u8> {
         log::trace!("filtered nb non ACTG {}, fraction  {:1.3e}", nb_n , nb_n as f32/seq.len() as f32);
     }
     return filtered;
-}  // end of keep_atcg
+}  // end of filter_out_n
+
+
+/// filters out poential non AA letters. In fact it is the * that is really searched.
+pub fn filter_out_non_aa(seq : &[u8]) -> Vec<u8> {
+    let mut filtered = Vec::<u8>::with_capacity(seq.len());
+    let alphabet = kmeraa::Alphabet::new();
+    for c in seq {
+        if alphabet.is_valid_base(*c) {
+            filtered.push(*c);
+        }
+    }
+    if log::log_enabled!(log::Level::Trace) && filtered.len() < seq.len() {
+        let nb_n = seq.len() - filtered.len();
+        log::trace!("filtered nb non AA letters {}, fraction  {:1.3e}", nb_n , nb_n as f32/seq.len() as f32);
+    }
+    return filtered;
+}  // end of filter_out_non_aa
 
 
 
