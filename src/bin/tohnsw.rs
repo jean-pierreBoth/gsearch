@@ -31,7 +31,7 @@ use env_logger::{Builder};
 
 // our crate
 
-use archaea::dna::dnasketch::dna_process;
+use archaea::dna::dnasketch::dna_process_tohnsw;
 use archaea::utils::*;
 
 //=========================================================================
@@ -153,7 +153,7 @@ fn main() {
         let filter_params = FilterParams::new(0);
         let processing_parameters = ProcessingParams::new(hnswparams, sketch_params, block_processing);
         //
-        dna_process(&dirpath, &filter_params, &processing_parameters);
+        dna_process_tohnsw(&dirpath, &filter_params, &processing_parameters);
  
 
 

@@ -195,7 +195,7 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT>(dirpath : &Path, filt
 } // end of sketchandstore_dir_compressedkmer 
 
 
-pub fn dna_process(dirpath : &Path, filter_params : &FilterParams, processing_parameters : &ProcessingParams) {
+pub fn dna_process_tohnsw(dirpath : &Path, filter_params : &FilterParams, processing_parameters : &ProcessingParams) {
     // dispatch according to kmer_size
     let kmer_size = processing_parameters.get_sketching_params().get_kmer_size();
     //
