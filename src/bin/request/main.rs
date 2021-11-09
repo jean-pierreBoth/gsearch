@@ -42,7 +42,7 @@ use kmerutils::sketching::seqsketchjaccard::*;
 //mod files;
 use archaea::utils::*;
 use archaea::matcher::*;
-
+use archaea::dna::dnafiles::{process_file_in_one_block,process_file_concat_split};
 
 
 // install a logger facility
