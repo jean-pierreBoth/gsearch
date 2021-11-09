@@ -83,6 +83,13 @@ impl ProcessingState {
 
 
 
+///
+/// enum to store if we are doing DNA or RNA processing mode
+pub enum DataType {
+    DNA,
+    RNA,
+}
+
 //==================================================================================
 
 

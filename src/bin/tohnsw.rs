@@ -1,14 +1,16 @@
 
 //! tohnsw --dir [-d] dir --sketch [-s] size --nbng [-n] nb --ef m [--seq]
 //! 
-//! --dir : the name of directory containing tree of GCF and GCA files 
-//! --sketch gives the size of probminhash sketch ()integer value)
-//! --kmer [-k] gives the size of kmer to use for generating probminhash (integer value)
+//! --dir : the name of directory containing tree of DNA files or RNA files. 
+//! --sketch gives the size of probminhash sketch (integer value). Mandatory value
+//! --kmer [-k] gives the size of kmer to use for generating probminhash (integer value). Mandatory argument
 //! --nbng [-n] gives the number of neihbours required in hnsw construction at each layer, in the range 24-64 is usual
 //!             it doest not means you cannot ask for more neighbours in request.
-//! -- ef optional integer value to optimize hnsw structure creation (default to 400)
+//!  -- ef optional integer value to optimize hnsw structure creation (default to 400)
 //!  --seq if we want a processing by sequences. Default is to concatenate all sequneces in a file
 //!             in a large sequence.
+//! 
+//!  --rna : set if data to process are RNA sequences. Default is DNA
 
 // must loop on sub directories , open gzipped files
 // extracts complete genomes possiby many in one file (get rid of capsid records if any)
@@ -32,6 +34,7 @@ use env_logger::{Builder};
 // our crate
 
 use archaea::dna::dnasketch::dna_process_tohnsw;
+use archaea::rna::rnasketch::rna_process_tohnsw;
 use archaea::utils::*;
 
 //=========================================================================
@@ -48,38 +51,44 @@ pub fn init_log() -> u64 {
 fn main() {
     let _ = init_log();
     //
+    //
     let matches = App::new("tohnsw")
         .arg(Arg::with_name("dir")
             .long("dir")
             .short("d")
             .takes_value(true)
+            .required(true)
             .help("name of directory containing genomes to index"))
         .arg(Arg::with_name("kmer_size")
             .long("kmer")
             .short("k")
+            .required(true)
             .takes_value(true)
             .help("expecting a kmer size"))
         .arg(Arg::with_name("sketch_size")
             .long("sketch")
             .short("s")
-            .default_value("256")
+            .required(true)
             .help("size of probinhash sketch, default to 256"))
         .arg(Arg::with_name("neighbours")
             .long("nbng")
             .short("n")
+            .required(true)
             .takes_value(true)
             .help("must specify number of neighbours in hnsw"))
         .arg(Arg::with_name("ef")
             .long("ef")
             .default_value("400")
             .help("parameters neighbour search at creation"))
+        .arg(Arg::with_name("rna"))
+            .help("to specify rna processing")
         .arg(Arg::with_name("seq")
             .long("seq")
             .takes_value(false)
             .help("--seq to get a processing by sequence"))
         .get_matches();
     //
-    // by default we process files in one large sequence block
+    // by default we process DNA files in one large sequence block
     let mut block_processing = true;
     // decode matches, check for dir
         let datadir;
@@ -107,17 +116,16 @@ fn main() {
             println!("sketching size arg {}", sketch_size);
         }
         else {
-            sketch_size = 256;
-            println!("using default sketch size {}", sketch_size);
+            panic!("sketch_size is mandatory");
         }
         //
-        let mut kmer_size = 6;
+        let kmer_size;
         if matches.is_present("kmer_size") {
             kmer_size = matches.value_of("kmer_size").ok_or("").unwrap().parse::<u16>().unwrap();
             println!("kmer size {}", kmer_size);
         }
         else {
-            println!("using default kmer size {}", kmer_size);
+            panic!(" kmer size is mandatory");
         }
         let sketch_params =  SeqSketcherParams::new(kmer_size as usize, sketch_size as usize);  
         //
@@ -143,7 +151,17 @@ fn main() {
         if matches.is_present("seq") {
             println!("seq option , will process every sequence independantly ");
             block_processing = false;
-        }     
+        }
+        //
+        let data_type;
+        if matches.is_present("rna") {
+            println!("data to processs are RNA data ");
+            data_type = DataType::RNA;
+        }
+        else {
+            println!("data to processs are DNA data ");
+            data_type = DataType::DNA;            
+        }
         // We have everything   
         // max_nb_conn must be adapted to the number of neighbours we will want in searches.
         let max_nb_conn : u8 = 128.min(nbng as u8);
@@ -153,9 +171,9 @@ fn main() {
         let filter_params = FilterParams::new(0);
         let processing_parameters = ProcessingParams::new(hnswparams, sketch_params, block_processing);
         //
-        dna_process_tohnsw(&dirpath, &filter_params, &processing_parameters);
- 
-
-
+        match data_type {
+            DataType::DNA => dna_process_tohnsw(&dirpath, &filter_params, &processing_parameters),
+            DataType::RNA => rna_process_tohnsw(&dirpath, &filter_params, &processing_parameters),
+        }
         //
  } // end of main
