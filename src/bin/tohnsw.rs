@@ -40,7 +40,6 @@ use std::fmt::{Debug};
 use hnsw_rs::prelude::*;
 use kmerutils::base::{kmergenerator::*, Kmer32bit, Kmer64bit, CompressedKmerT};
 use kmerutils::sketching::*;
-use kmerutils::sketching::seqsketchjaccard::SeqSketcher;
 
 
 use archaea::utils::*;
@@ -130,7 +129,7 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT>(dirpath : &Path, filt
                     Err(RecvError) => { read_more = false;
                         // sketch the content of  insertion_queue if not empty
                         if insertion_queue.len() > 0 {
-                            let sequencegroup_ref : Vec<&Sequence> = insertion_queue.iter().map(|s| s.get_sequence()).collect();
+                            let sequencegroup_ref : Vec<&Sequence> = insertion_queue.iter().map(|s| s.get_sequence_dna().unwrap()).collect();
                             // collect rank
                             let seq_rank :  Vec<usize> = insertion_queue.iter().map(|s| s.get_rank()).collect();
                             // collect Id
@@ -151,7 +150,7 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT>(dirpath : &Path, filt
                         insertion_queue.append(&mut idsequences);
                         // if insertion_queue is beyond threshold size we can go to threaded sketching and threading insertion
                         if insertion_queue.len() > insertion_block_size {
-                            let sequencegroup_ref : Vec<&Sequence> = insertion_queue.iter().map(|s| s.get_sequence()).collect();
+                            let sequencegroup_ref : Vec<&Sequence> = insertion_queue.iter().map(|s| s.get_sequence_dna().unwrap()).collect();
                             let seq_rank :  Vec<usize> = insertion_queue.iter().map(|s| s.get_rank()).collect();
                             // collect Id
                             let mut seq_id :  Vec<ItemDict> = insertion_queue.iter().map(|s| ItemDict::new(Id::new(s.get_path(), s.get_fasta_id()), s.get_seq_len())).collect();
@@ -301,7 +300,7 @@ fn main() {
         else {
             println!("using default kmer size {}", kmer_size);
         }
-        let sketch_params =  SeqSketcher::new(kmer_size as usize, sketch_size as usize);  
+        let sketch_params =  SeqSketcherParams::new(kmer_size as usize, sketch_size as usize);  
         //
         let nbng;
         if matches.is_present("neighbours") {

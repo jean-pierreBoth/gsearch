@@ -32,10 +32,9 @@ use std::fmt::{Debug};
 
 use std::path::{Path, PathBuf};
 use std::fs::{OpenOptions, File};
-use std::io::{Write,BufWriter, BufReader};
+use std::io::{Write,BufWriter};
 
 use hnsw_rs::prelude::*;
-use hnsw_rs::hnswio::{load_description, load_hnsw};
 use kmerutils::base::{kmergenerator::*, Kmer32bit, Kmer64bit, CompressedKmerT};
 use kmerutils::sketching::*;
 use kmerutils::sketching::seqsketchjaccard::*;
@@ -44,8 +43,7 @@ use kmerutils::sketching::seqsketchjaccard::*;
 use archaea::utils::*;
 use archaea::matcher::*;
 
-#[cfg(feature="annembed_f")]
-mod embed;
+
 
 // install a logger facility
 pub fn init_log() -> u64 {
@@ -193,7 +191,7 @@ fn sketch_and_request_dir_compressedkmer<Kmer:CompressedKmerT>(request_dirpath :
                     Err(_) => { read_more = false;
                         // sketch the content of  insertion_queue if not empty
                         if request_queue.len() > 0 {
-                            let sequencegroup_ref : Vec<&Sequence> = request_queue.iter().map(|s| s.get_sequence()).collect();                   
+                            let sequencegroup_ref : Vec<&Sequence> = request_queue.iter().map(|s| s.get_sequence_dna().unwrap()).collect();                   
                             let seq_item : Vec<ItemDict> = request_queue.iter().map(|s| ItemDict::new(Id::new(s.get_path(), s.get_fasta_id()), s.get_seq_len())).collect();
                             if log::log_enabled!(log::Level::Debug) {
                                 for s in &seq_item  {
@@ -221,7 +219,7 @@ fn sketch_and_request_dir_compressedkmer<Kmer:CompressedKmerT>(request_dirpath :
                         request_queue.append(&mut idsequences);
                         // if request_queue is beyond threshold size we can go to threaded sketching and threading insertion
                         if request_queue.len() > request_block_size {
-                            let sequencegroup_ref : Vec<&Sequence> = request_queue.iter().map(|s| s.get_sequence()).collect();
+                            let sequencegroup_ref : Vec<&Sequence> = request_queue.iter().map(|s| s.get_sequence_dna().unwrap()).collect();
                             // collect Id
                             let seq_item : Vec<ItemDict> = request_queue.iter().map(|s| ItemDict::new(Id::new(s.get_path(), s.get_fasta_id()), s.get_seq_len())).collect();
                             // computes hash signature
@@ -269,56 +267,6 @@ fn sketch_and_request_dir_compressedkmer<Kmer:CompressedKmerT>(request_dirpath :
 
 
 
-/* 
-    reload hnsw from dump directory
-    We know filename : hnswdump.hnsw.data and hnswdump.hnsw.graph
-    The allow(unused_variables) is here to avoid a warning on ann_params when compiling without feature f_annembed
- */
-#[allow(unused_variables)]
-fn reload_hnsw<T>(dump_dirpath : &Path, ann_params: &AnnParameters) -> Option<Hnsw<T, DistHamming>>  
-            where T : 'static + Clone + Send + Sync + Serialize + DeserializeOwned ,
-                DistHamming : Distance<T>  {
-    // just concat dirpath to filenames and get pathbuf
-    let graph_path = dump_dirpath.join("hnswdump.hnsw.graph");
-    log::info!("reload_hnsw, loading graph from {}",graph_path.to_str().unwrap());
-    let graphfile = OpenOptions::new().read(true).open(&graph_path);
-    if graphfile.is_err() {
-        println!("test_dump_reload: could not open file {:?}", graph_path.as_os_str());
-        return None;
-    }
-    let graphfile = graphfile.unwrap();
-    let mut graphfile = BufReader::with_capacity(50_000_000, graphfile);
-    //
-    let data_path = dump_dirpath.join("hnswdump.hnsw.data");
-    log::info!("reload_hnsw, loading data from {}",data_path.to_str().unwrap());
-    let datafile = OpenOptions::new().read(true).open(&data_path);
-    if datafile.is_err() {
-        println!("test_dump_reload: could not open file {:?}", data_path.as_os_str());
-        return None;
-    }
-    let datafile = datafile.unwrap();
-    let mut datafile = BufReader::with_capacity(50_000_000,datafile);
-    //
-    let start_t = SystemTime::now();
-    let hnsw_description = load_description(&mut graphfile).unwrap();
-    let hnsw : Hnsw<T, DistHamming>= load_hnsw(&mut graphfile, &hnsw_description, &mut datafile).unwrap();
-    let elapsed_t = start_t.elapsed().unwrap().as_secs() as f32;
-    if log::log_enabled!(log::Level::Info) {
-        log::info!("reload_hnsw : elapsed system time(s) {}", elapsed_t);
-    }
-    else {
-        println!("reload_hnsw : elapsed system time(s) {}", elapsed_t);
-    }
-    // feature enabled (or not) in Cargo.toml, requires the crate annembed
-    #[cfg(feature="annembed_f")]
-    if ann_params.ask_stats() {
-        let _ = embed::get_graph_stats_embed(&hnsw, false);
-    }
-    //
-    return Some(hnsw);
-    //  
-} // end of reload_hnsw
-
 
 // This function returns paired sequence by probminhash and hnsw 
 fn get_sequence_matcher(request_dirpath : &Path, database_dirpath : &Path, processing_params : &ProcessingParams,
@@ -332,7 +280,7 @@ fn get_sequence_matcher(request_dirpath : &Path, database_dirpath : &Path, proce
     // reload hnsw
     log::info!("\n reloading hnsw from {}", database_dirpath.to_str().unwrap());
     if sk_params.get_kmer_size() < 14 {
-        let hnsw = reload_hnsw(database_dirpath, ann_params);
+        let hnsw = reloadhnsw::reload_hnsw(database_dirpath, ann_params);
         let hnsw = match hnsw {
             Some(hnsw) => hnsw,
             _ => {
@@ -344,7 +292,7 @@ fn get_sequence_matcher(request_dirpath : &Path, database_dirpath : &Path, proce
         return Ok(matcher)  
     }
     else if sk_params.get_kmer_size() > 16 {
-        let hnsw = reload_hnsw(database_dirpath, ann_params);
+        let hnsw = reloadhnsw::reload_hnsw(database_dirpath, ann_params);
         let hnsw = match hnsw {
             Some(hnsw) => hnsw,
             _ => {
@@ -356,7 +304,7 @@ fn get_sequence_matcher(request_dirpath : &Path, database_dirpath : &Path, proce
         return Ok(matcher)  
     }
     else if sk_params.get_kmer_size() == 16 {
-        let hnsw = reload_hnsw(database_dirpath, ann_params);
+        let hnsw = reloadhnsw::reload_hnsw(database_dirpath, ann_params);
         let hnsw = match hnsw {
             Some(hnsw) => hnsw,
             _ => {

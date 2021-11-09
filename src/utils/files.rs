@@ -14,7 +14,7 @@ use kmerutils::base::{sequence::*};
 
 use kmerutils::rnautils::kmeraa;
 
-use super::idsketch::{IdSeq};
+use super::idsketch::{IdSeq, SequenceType};
 use super::parameters::*;
 
 
@@ -177,12 +177,12 @@ pub fn process_file_by_sequence(file : &DirEntry, filter_params : &FilterParams)
         let strid = String::from_utf8(Vec::from(id)).unwrap();
         // process sequence if not capsid and not filtered out
         if strid.find("capsid").is_none() && !filter_params.filter(&seqrec.seq()) {
-            // Our Kmers are 2bits encoded so we need to be able to encode sequence in 2 bits, so there is 
-            // this hack,  causing reallocation. seqrec.seq is Cow so drain does not seem an option.
+            // filtering cause reallocation. As we encode in 2 bits we cannot get something that does not fit. seqrec.seq is Cow so drain does not seem an option.
             let filtered = filter_out_n(&seqrec.seq());
             drop(seqrec);
-            // recall rank is set in process_dir beccause we should a have struct gatheing the 2 functions process_dir and process_file
-            let seqwithid = IdSeq::new(pathb.to_str().unwrap().to_string(), strid, Sequence::new(&filtered,2));
+            // we have DNA seq for now
+            let new_seq = Sequence::new(&filtered,2);
+            let seqwithid = IdSeq::new(pathb.to_str().unwrap().to_string(), strid,SequenceType::SequenceDNA(new_seq));
             to_sketch.push(seqwithid);
             if log::log_enabled!(log::Level::Trace) {
                 log::trace!("process_file, nb_sketched {} ", to_sketch.len());
@@ -243,7 +243,9 @@ pub fn process_file_in_one_block(file : &DirEntry, filter_params : &FilterParams
         }
     }
     // we are at end of file, we have one large sequence for the whole file
-    let seqwithid = IdSeq::new(pathb.to_str().unwrap().to_string(), String::from("total sequence"), Sequence::new(&one_block_seq,2));
+    // we have DNA seq for now
+    let new_seq = Sequence::new(&one_block_seq,2);
+    let seqwithid = IdSeq::new(pathb.to_str().unwrap().to_string(), String::from("total sequence"), SequenceType::SequenceDNA(new_seq));
     to_sketch.push(seqwithid);
     // we must send to_sketch to some sketcher
     return to_sketch;
@@ -307,8 +309,8 @@ pub fn process_file_concat_split(file : &DirEntry, filter_params : &FilterParams
         let block_end = one_block_seq.len().min((i+1) * block_size) - 1;
         // generate an id
         let id = format!("total seq split {}", i);
-        let seqwithid = IdSeq::new(pathb.to_str().unwrap().to_string(), id, 
-                                Sequence::new(&one_block_seq[block_begin..block_end],2));
+        let new_seq = Sequence::new(&one_block_seq[block_begin..block_end],2);
+        let seqwithid = IdSeq::new(pathb.to_str().unwrap().to_string(), id, SequenceType::SequenceDNA(new_seq));
         to_sketch.push(seqwithid);
     }
     // we must send to_sketch to some sketcher

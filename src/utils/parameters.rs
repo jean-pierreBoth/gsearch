@@ -9,7 +9,6 @@ use serde::{Deserialize, Serialize};
 use serde_json::{to_writer};
 
 
-use kmerutils::sketching::seqsketchjaccard::SeqSketcher;
 
 /// a structure to filter files or sequences we treat
 pub struct FilterParams {
@@ -85,7 +84,35 @@ impl AnnParameters {
 
 //=========================================================================================
 
+// This is redundant with struct Sketcher for DNA case and RNA case, but it makes
+// possible the factorization of all parameters
 
+#[derive(Copy,Clone,Serialize,Deserialize)]
+pub struct SeqSketcherParams {
+    kmer_size : usize,
+    sketch_size : usize  
+}
+
+
+impl SeqSketcherParams {
+    /// 
+    pub fn new(kmer_size: usize, sketch_size : usize) -> Self {
+        SeqSketcherParams{kmer_size, sketch_size}
+    }
+
+    /// returns kmer size
+    pub fn get_kmer_size(&self) -> usize {
+        self.kmer_size
+    }
+
+    /// return sketch size
+    pub fn get_sketch_size(&self) -> usize {
+        self.sketch_size
+    }  
+
+}  // end of SeqSketcherParams
+
+//==========================================================================================
 
 /// Gathers parameters used for hnsw, sketching and choice of sequence/blocked genome processing.
 /// To be dumped to ease request processing.
@@ -94,7 +121,7 @@ pub struct ProcessingParams {
     /// hnsw parameters
     hnsw: HnswParams,
     /// sketching prameters
-    sketch: SeqSketcher,
+    sketch: SeqSketcherParams,
     /// do we process sequence by sequence? true if we process whole genome in one block, false if we process sequence by sequence 
     block_flag : bool,
 }  // end of WholeParams
@@ -103,7 +130,7 @@ pub struct ProcessingParams {
 
 impl ProcessingParams {
 
-    pub fn new(hnsw : HnswParams, sketch :  SeqSketcher, block_flag : bool) -> Self {
+    pub fn new(hnsw : HnswParams, sketch :  SeqSketcherParams, block_flag : bool) -> Self {
         ProcessingParams{hnsw, sketch, block_flag}
     }
 
@@ -113,7 +140,7 @@ impl ProcessingParams {
     }
 
     /// get parameters used for sketching sequences 
-    pub fn get_sketching_params(&self) -> &SeqSketcher {
+    pub fn get_sketching_params(&self) -> &SeqSketcherParams {
         &self.sketch
     }
 

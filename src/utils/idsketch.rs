@@ -9,7 +9,7 @@ use std::io::{BufReader, BufWriter};
 use std::time::{SystemTime};
 
 use kmerutils::base::{sequence::*};
-
+use kmerutils::rnautils;
 
 /// This structure is a summary of struct IdSeq
 /// It is sent to sketcher thread, serialized and dump in a file so that its rank in dump file
@@ -39,6 +39,11 @@ impl Id {
 } // end of impl Id
 
 
+/// We have 2 types of sequences Sequence (i.e DNA sequence and RNA-Sequence stored in SequenceAA)
+pub enum SequenceType {
+    SequenceDNA(Sequence),
+    SequenceAA(rnautils::kmeraa::SequenceAA),
+}
 
 /// 
 /// This structure is used for returning info from function process_file
@@ -52,13 +57,13 @@ pub struct IdSeq {
     /// fasta id of genome Sketched as read in head of fasta record.
     id : String,
     /// Sequence compressed to 2 bit / base
-    seq : Sequence
+    seq : SequenceType
 }  // end of IdSeq
 
 
 impl IdSeq {
     ///
-    pub fn new(path : String, id: String, seq : Sequence) -> Self {
+    pub fn new(path : String, id: String, seq : SequenceType) -> Self {
         IdSeq{rank : 0, path, id, seq}
     }
     /// get file path 
@@ -75,14 +80,37 @@ impl IdSeq {
         self.rank
     }
 
-    pub fn get_sequence(&self) -> &Sequence {
+    pub fn get_sequence(&self) -> &SequenceType {
         &self.seq
     }
 
+    /// returns sequence if internal sequence is a DNA sequence, None else
+    pub fn get_sequence_dna(&self) -> Option<&Sequence> {
+        match &self.seq {
+            SequenceType::SequenceDNA(seq) => Some(seq),
+            _ => None,
+        }
+    }  // end get_sequence_dna
+
+
+    /// returns sequence if internal sequence is a AA sequence, None else
+    pub fn get_sequence_aa(&self) -> Option<&rnautils::kmeraa::SequenceAA> {
+        match &self.seq {
+            SequenceType::SequenceAA(seq) => Some(seq),
+            _ => None,
+        }
+    }  // end get_sequence_aa
+
+
+
     /// get sequence length
     pub fn get_seq_len(&self) -> usize {
-        self.seq.size()
-    }
+        match &self.seq {
+            SequenceType::SequenceDNA(seq) => seq.size(),
+            SequenceType::SequenceAA(seq)  => seq.len(),
+        }
+    } // end of get_seq_len
+
 } // end of impl IdSea
 
 
