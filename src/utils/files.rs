@@ -11,7 +11,6 @@ use serde::{Deserialize, Serialize};
 use serde_json::{to_writer};
 
 
-use kmerutils::rnautils::kmeraa;
 
 use super::idsketch::{IdSeq};
 use super::parameters::*;
@@ -114,22 +113,6 @@ pub fn is_fasta_aa_file(file : &DirEntry) -> bool {
 
 
 
-
-/// filters out poential non AA letters. In fact it is the * that is really searched.
-pub fn filter_out_non_aa(seq : &[u8]) -> Vec<u8> {
-    let mut filtered = Vec::<u8>::with_capacity(seq.len());
-    let alphabet = kmeraa::Alphabet::new();
-    for c in seq {
-        if alphabet.is_valid_base(*c) {
-            filtered.push(*c);
-        }
-    }
-    if log::log_enabled!(log::Level::Trace) && filtered.len() < seq.len() {
-        let nb_n = seq.len() - filtered.len();
-        log::trace!("filtered nb non AA letters {}, fraction  {:1.3e}", nb_n , nb_n as f32/seq.len() as f32);
-    }
-    return filtered;
-}  // end of filter_out_non_aa
 
 
 

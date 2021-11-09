@@ -42,7 +42,7 @@ impl Id {
 /// We have 2 types of sequences Sequence (i.e DNA sequence and RNA-Sequence stored in SequenceAA)
 pub enum SequenceType {
     SequenceDNA(Sequence),
-    SequenceAA(rnautils::kmeraa::SequenceAA),
+    SequenceRNA(rnautils::kmeraa::SequenceAA),
 }
 
 /// 
@@ -94,9 +94,9 @@ impl IdSeq {
 
 
     /// returns sequence if internal sequence is a AA sequence, None else
-    pub fn get_sequence_aa(&self) -> Option<&rnautils::kmeraa::SequenceAA> {
+    pub fn get_sequence_rna(&self) -> Option<&rnautils::kmeraa::SequenceAA> {
         match &self.seq {
-            SequenceType::SequenceAA(seq) => Some(seq),
+            SequenceType::SequenceRNA(seq) => Some(seq),
             _ => None,
         }
     }  // end get_sequence_aa
@@ -107,7 +107,7 @@ impl IdSeq {
     pub fn get_seq_len(&self) -> usize {
         match &self.seq {
             SequenceType::SequenceDNA(seq) => seq.size(),
-            SequenceType::SequenceAA(seq)  => seq.len(),
+            SequenceType::SequenceRNA(seq)  => seq.len(),
         }
     } // end of get_seq_len
 
