@@ -95,7 +95,7 @@ pub enum DataType {
 
 // returns true if file is a fasta file (possibly gzipped)
 // filename are of type GCA[GCF]_000091165.1_genomic.fna.gz
-pub fn is_fasta_file(file : &DirEntry) -> bool {
+pub fn is_fasta_dna_file(file : &DirEntry) -> bool {
     let filename = file.file_name().into_string().unwrap();
     if filename.ends_with("fna.gz")|| filename.ends_with("fa.gz") || filename.ends_with("fasta.gz") {
         return true;
@@ -106,9 +106,8 @@ pub fn is_fasta_file(file : &DirEntry) -> bool {
 }  // end of is_fasta_file
 
 
-// returns true if file is a fasta file (possibly gzipped)
-// filename are of type GCA[GCF]_000091165.1_genomic.fna.gz
-pub fn is_fasta_aa_file(file : &DirEntry) -> bool {
+/// returns true if file is a fasta file RNA (possibly gzipped) suffixed by .faa
+pub fn is_fasta_rna_file(file : &DirEntry) -> bool {
     let filename = file.file_name().into_string().unwrap();
     if filename.ends_with("faa.gz")|| filename.ends_with("faa") {
         return true;
@@ -141,8 +140,9 @@ pub fn process_dir(state : &mut ProcessingState, dir: &Path, filter_params : &Fi
         if path.is_dir() {
             let _ =  process_dir(state, &path, filter_params, file_task, sender)?;
         } else {
-            // check if entry is a fasta.gz file
-            if is_fasta_file(&entry) {
+            // check if entry is a fasta.gz file or a .faa file
+            // TODO should check that there is no mix of files?
+            if is_fasta_dna_file(&entry) || is_fasta_rna_file(&entry) {
                 let mut to_sketch = file_task(&entry, filter_params);
                 // put a rank id in sequences, now we have full information of where do the sequence come from
                 for i in 0..to_sketch.len() {

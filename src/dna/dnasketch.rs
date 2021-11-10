@@ -39,6 +39,7 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT>(dirpath : &Path, filt
     let block_processing = processing_params.get_block_flag();
     let mut state = ProcessingState::new();
     // a queue of signature waiting to be inserted , size must be sufficient to benefit from threaded probminhash and insert
+    // and not too large to spare memory
     let insertion_block_size = 5000;
     let mut insertion_queue : Vec<IdSeq>= Vec::with_capacity(insertion_block_size);
     // TODO must get ef_search from clap via hnswparams
@@ -56,7 +57,7 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT>(dirpath : &Path, filt
     let sketcher_params = processing_params.get_sketching_params();
     let sketcher = seqsketchjaccard::SeqSketcher::new(sketcher_params.get_kmer_size(), sketcher_params.get_sketch_size());
     // to send IdSeq to sketch from reading thread to sketcher thread
-    let (send, receive) = crossbeam_channel::bounded::<Vec<IdSeq>>(5_000);
+    let (send, receive) = crossbeam_channel::bounded::<Vec<IdSeq>>(insertion_block_size);
     // launch process_dir in a thread or async
     crossbeam_utils::thread::scope(|scope| {
         // sequence sending, productor thread
@@ -202,9 +203,13 @@ pub fn dna_process_tohnsw(dirpath : &Path, filter_params : &FilterParams, proces
     if kmer_size <= 14 {
         sketchandstore_dir_compressedkmer::<Kmer32bit>(&dirpath, &filter_params, &processing_parameters);
     }
-    else if kmer_size > 16 {
-        sketchandstore_dir_compressedkmer::<Kmer64bit>(&dirpath, &filter_params, &processing_parameters);
-    } else if kmer_size == 16 {
+    else if kmer_size == 16 {
         sketchandstore_dir_compressedkmer::<Kmer16b32bit>(&dirpath, &filter_params, &processing_parameters);
+    }
+    else if  kmer_size <= 32 {
+        sketchandstore_dir_compressedkmer::<Kmer64bit>(&dirpath, &filter_params, &processing_parameters);
+    }
+    else {
+        panic!("kmers cannot be greater than 64");
     }
 } // end of dna_process

@@ -29,14 +29,15 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT>(dirpath : &Path, filt
                 KmerGenerator<Kmer> :  KmerGenerationPattern<Kmer>, 
                 DistHamming : Distance<Kmer::Val> {
     //
-    log::trace!("sketchandstore_dir processing dir {}", dirpath.to_str().unwrap());
-    log::info!("sketchandstore_dir {}", dirpath.to_str().unwrap());
+    log::trace!("sketchandstore_dir_compressedkmerrna mode processing dir: {}", dirpath.to_str().unwrap());
+    log::info!("sketchandstore_dir_compressedkmer rna mode processing dir: {}", dirpath.to_str().unwrap());
     let start_t = SystemTime::now();
     let cpu_start = ProcessTime::now();
     //
     let block_processing = processing_params.get_block_flag();
     let mut state = ProcessingState::new();
     // a queue of signature waiting to be inserted , size must be sufficient to benefit from threaded probminhash and insert
+    // and not too large to spare memory
     let insertion_block_size = 5000;
     let mut insertion_queue : Vec<IdSeq>= Vec::with_capacity(insertion_block_size);
     // TODO must get ef_search from clap via hnswparams
@@ -45,16 +46,17 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT>(dirpath : &Path, filt
     hnsw.set_extend_candidates(true);
     //
     // Sketcher allocation, we do not need reverse complement hashing as we sketch assembled genomes. (Jianshu Zhao)
+    // The 5 in the closure kmer_hash_fn should be alphabet.get_nb_bits() and for RNA alphabet it is 5! not 2 as for DNA kmer
     //
     let kmer_hash_fn = | kmer : &Kmer | -> Kmer::Val {
-        let mask : Kmer::Val = num::NumCast::from::<u64>((0b1 << 2*kmer.get_nb_base()) - 1).unwrap();
+        let mask : Kmer::Val = num::NumCast::from::<u64>((0b1 << 5*kmer.get_nb_base()) - 1).unwrap();
         let hashval = kmer.get_compressed_value() & mask;
         hashval
     };
     let sketcher_params = processing_params.get_sketching_params();
     let sketcher = SeqSketcher::new(sketcher_params.get_kmer_size(), sketcher_params.get_sketch_size());
     // to send IdSeq to sketch from reading thread to sketcher thread
-    let (send, receive) = crossbeam_channel::bounded::<Vec<IdSeq>>(5_000);
+    let (send, receive) = crossbeam_channel::bounded::<Vec<IdSeq>>(insertion_block_size);
     // launch process_dir in a thread or async
     crossbeam_utils::thread::scope(|scope| {
         // sequence sending, productor thread
@@ -204,6 +206,6 @@ pub fn rna_process_tohnsw(dirpath : &Path, filter_params : &FilterParams, proces
     else if kmer_size <= 12 {
         sketchandstore_dir_compressedkmer::<KmerAA64bit>(&dirpath, &filter_params, &processing_parameters);
     } else  {
-        panic!("kmer for Amino Acids must be less than 12");
+        panic!("kmer for Amino Acids must be less or equal to 12");
     }
 } // end of dna_process

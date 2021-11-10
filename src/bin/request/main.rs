@@ -5,7 +5,7 @@
 //! 
 //! - database is the name of directory containing hnsw dump files and seqdict dump
 //! - requestdir is a directory containing list of fasta file containing sequence to search for
-//! 
+//!
 //! [ann] is an optional subcommand asking for some statistics on distances between hnsw items
 //! In fact as in basedirname there must be a file (processingparams.json) specifying sketch size and kmer size, these
 //! 2 options are useless in standard mode.
@@ -27,7 +27,6 @@ use env_logger::{Builder};
 
 use std::path::{Path};
 
-use kmerutils::sketching::seqsketchjaccard::*;
 
 //mod files;
 use archaea::utils::*;
@@ -163,7 +162,7 @@ fn main() {
             println!("will use dumped kmer size");
         }
         // in fact sketch_params must be initialized from the dump directory
-        let _sketch_params =  SeqSketcher::new(kmer_size as usize, sketch_size as usize);  
+        let _sketch_params =  SeqSketcherParams::new(kmer_size as usize, sketch_size as usize);  
         //
         let nbng;
         if matches.is_present("neighbours") {
