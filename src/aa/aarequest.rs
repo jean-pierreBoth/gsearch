@@ -16,8 +16,8 @@ use std::fmt::{Debug};
 use hnsw_rs::prelude::*;
 
 use kmerutils::base::kmertraits::*;
-use kmerutils::rnautils::kmeraa::*;
-use kmerutils::rnautils::seqsketchjaccard::*;
+use kmerutils::aautils::kmeraa::*;
+use kmerutils::aautils::seqsketchjaccard::*;
 
 use crate::utils::{idsketch::*};
 use crate::utils::files::{process_dir,ProcessingState};
@@ -25,7 +25,7 @@ use crate::utils::files::{process_dir,ProcessingState};
 
 
 use crate::utils::*;
-use crate::dna::dnafiles::{process_file_in_one_block};
+use crate::aa::aafiles::{process_aafile_in_one_block};
 use crate::{matcher::*, answer::ReqAnswer};
 
 
@@ -42,10 +42,10 @@ fn sketch_and_request_dir_compressedkmer<Kmer:CompressedKmerT>(request_dirpath :
     let block_processing = processing_parameters.get_block_flag();
     //
     log::trace!("sketch_and_request_dir processing dir {}", request_dirpath.to_str().unwrap());
-    log::info!("sketch_and_request_dir {}", request_dirpath.to_str().unwrap());
+    log::info!("AA mode : sketch_and_request_dir {}", request_dirpath.to_str().unwrap());
     log::info!("sketch_and_request kmer size  {}  sketch size {} ", sketcher_params.get_kmer_size(), sketcher_params.get_sketch_size());
     // TODO This parameter needs to be analyzed and initialized depending on kmer size and sequences structure 
-    let out_threshold = 0.98;
+    let out_threshold = 0.99;
     // creating an output file in the current directory
     let outname = "archea.answers";
     let outpath = PathBuf::from(outname.clone());
@@ -87,7 +87,7 @@ fn sketch_and_request_dir_compressedkmer<Kmer:CompressedKmerT>(request_dirpath :
         let sender_handle = scope.spawn(move |_|   {
             let res_nb_sent;
             if block_processing {
-                res_nb_sent = process_dir(&mut state, request_dirpath, &filter_params, &process_file_in_one_block, &send);
+                res_nb_sent = process_dir(&mut state, request_dirpath, &filter_params, &process_aafile_in_one_block, &send);
             }
             else {
                 log::info!("processing by concat and split");
@@ -119,7 +119,7 @@ fn sketch_and_request_dir_compressedkmer<Kmer:CompressedKmerT>(request_dirpath :
                     Err(_) => { read_more = false;
                         // sketch the content of  insertion_queue if not empty
                         if request_queue.len() > 0 {
-                            let sequencegroup_ref : Vec<&SequenceAA> = request_queue.iter().map(|s| s.get_sequence_rna().unwrap()).collect();                   
+                            let sequencegroup_ref : Vec<&SequenceAA> = request_queue.iter().map(|s| s.get_sequence_aa().unwrap()).collect();                   
                             let seq_item : Vec<ItemDict> = request_queue.iter().map(|s| ItemDict::new(Id::new(s.get_path(), s.get_fasta_id()), s.get_seq_len())).collect();
                             if log::log_enabled!(log::Level::Debug) {
                                 for s in &seq_item  {
@@ -147,7 +147,7 @@ fn sketch_and_request_dir_compressedkmer<Kmer:CompressedKmerT>(request_dirpath :
                         request_queue.append(&mut idsequences);
                         // if request_queue is beyond threshold size we can go to threaded sketching and threading insertion
                         if request_queue.len() > request_block_size {
-                            let sequencegroup_ref : Vec<&SequenceAA> = request_queue.iter().map(|s| s.get_sequence_rna().unwrap()).collect();
+                            let sequencegroup_ref : Vec<&SequenceAA> = request_queue.iter().map(|s| s.get_sequence_aa().unwrap()).collect();
                             // collect Id
                             let seq_item : Vec<ItemDict> = request_queue.iter().map(|s| ItemDict::new(Id::new(s.get_path(), s.get_fasta_id()), s.get_seq_len())).collect();
                             // computes hash signature
@@ -212,6 +212,7 @@ pub fn get_sequence_matcher(request_dirpath : &Path, database_dirpath : &Path, p
         let hnsw = match hnsw {
             Some(hnsw) => hnsw,
             _ => {
+                log::error!("\n aa get_sequence_matcher failed to reload hnsw. do you run on AA data ?");
                 panic!("hnsw reload from dump dir {} failed", database_dirpath.to_str().unwrap());
             }
         };
@@ -224,6 +225,7 @@ pub fn get_sequence_matcher(request_dirpath : &Path, database_dirpath : &Path, p
         let hnsw = match hnsw {
             Some(hnsw) => hnsw,
             _ => {
+                log::error!("\n aa get_sequence_matcher failed to reload hnsw. do you run on AA data ?");
                 panic!("hnsw reload from dump dir {} failed", database_dirpath.to_str().unwrap());
             }
         };

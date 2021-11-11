@@ -1,6 +1,6 @@
 [package]
 name = "archaea"
-version = "0.0.1"
+version = "0.0.2"
 authors = ["jeanpierre.both@gmail.com"]
 #repository = "https://gitlab.com/jpboth/archaea"
 keywords = ["hnsw", "probminhash", "bacteria"]
@@ -69,7 +69,7 @@ log = { version = "0.4"}
 env_logger = { version = "0.9"}
 
 # optional dependency to embed hnsw grap
-#annembed = {version = "0.0.1", optional = true}
+#annembed = {version = "0.0.2", optional = true}
 annembed = {path = "../annembed", optional = true}
 
 

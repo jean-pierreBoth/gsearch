@@ -9,7 +9,7 @@ use std::io::{BufReader, BufWriter};
 use std::time::{SystemTime};
 
 use kmerutils::base::{sequence::*};
-use kmerutils::rnautils;
+use kmerutils::aautils;
 
 /// This structure is a summary of struct IdSeq
 /// It is sent to sketcher thread, serialized and dump in a file so that its rank in dump file
@@ -42,7 +42,7 @@ impl Id {
 /// We have 2 types of sequences Sequence (i.e DNA sequence and RNA-Sequence stored in SequenceAA)
 pub enum SequenceType {
     SequenceDNA(Sequence),
-    SequenceRNA(rnautils::kmeraa::SequenceAA),
+    SequenceAA(aautils::kmeraa::SequenceAA),
 }
 
 /// 
@@ -94,9 +94,9 @@ impl IdSeq {
 
 
     /// returns sequence if internal sequence is a AA sequence, None else
-    pub fn get_sequence_rna(&self) -> Option<&rnautils::kmeraa::SequenceAA> {
+    pub fn get_sequence_aa(&self) -> Option<&aautils::kmeraa::SequenceAA> {
         match &self.seq {
-            SequenceType::SequenceRNA(seq) => Some(seq),
+            SequenceType::SequenceAA(seq) => Some(seq),
             _ => None,
         }
     }  // end get_sequence_aa
@@ -107,7 +107,7 @@ impl IdSeq {
     pub fn get_seq_len(&self) -> usize {
         match &self.seq {
             SequenceType::SequenceDNA(seq) => seq.size(),
-            SequenceType::SequenceRNA(seq)  => seq.len(),
+            SequenceType::SequenceAA(seq)  => seq.len(),
         }
     } // end of get_seq_len
 

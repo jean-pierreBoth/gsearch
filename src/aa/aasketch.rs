@@ -15,12 +15,12 @@ use std::fmt::{Debug};
 use hnsw_rs::prelude::*;
 
 use kmerutils::base::kmertraits::*;
-use kmerutils::rnautils::kmeraa::*;
-use kmerutils::rnautils::seqsketchjaccard::*;
+use kmerutils::aautils::kmeraa::*;
+use kmerutils::aautils::seqsketchjaccard::*;
 
 use crate::utils::{idsketch::*};
 use crate::utils::files::{process_dir,ProcessingState};
-use crate::rna::rnafiles::{process_rnafile_in_one_block};
+use crate::aa::aafiles::{process_aafile_in_one_block};
 
 use crate::utils::parameters::*;
 
@@ -65,7 +65,7 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT>(dirpath : &Path, filt
             let start_t_prod = SystemTime::now();
             let res_nb_sent;
             if block_processing {
-                res_nb_sent = process_dir(&mut state, dirpath, filter_params, &process_rnafile_in_one_block, &send);
+                res_nb_sent = process_dir(&mut state, dirpath, filter_params, &process_aafile_in_one_block, &send);
             }
             else {
                 panic!("processing by concat and split not implemented for rna");
@@ -98,7 +98,7 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT>(dirpath : &Path, filt
                     Err(RecvError) => { read_more = false;
                         // sketch the content of  insertion_queue if not empty
                         if insertion_queue.len() > 0 {
-                            let sequencegroup_ref : Vec<&SequenceAA> = insertion_queue.iter().map(|s| s.get_sequence_rna().unwrap()).collect();
+                            let sequencegroup_ref : Vec<&SequenceAA> = insertion_queue.iter().map(|s| s.get_sequence_aa().unwrap()).collect();
                             // collect rank
                             let seq_rank :  Vec<usize> = insertion_queue.iter().map(|s| s.get_rank()).collect();
                             // collect Id
@@ -119,7 +119,7 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT>(dirpath : &Path, filt
                         insertion_queue.append(&mut idsequences);
                         // if insertion_queue is beyond threshold size we can go to threaded sketching and threading insertion
                         if insertion_queue.len() > insertion_block_size {
-                            let sequencegroup_ref : Vec<&SequenceAA> = insertion_queue.iter().map(|s| s.get_sequence_rna().unwrap()).collect();
+                            let sequencegroup_ref : Vec<&SequenceAA> = insertion_queue.iter().map(|s| s.get_sequence_aa().unwrap()).collect();
                             let seq_rank :  Vec<usize> = insertion_queue.iter().map(|s| s.get_rank()).collect();
                             // collect Id
                             let mut seq_id :  Vec<ItemDict> = insertion_queue.iter().map(|s| ItemDict::new(Id::new(s.get_path(), s.get_fasta_id()), s.get_seq_len())).collect();
@@ -196,7 +196,7 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT>(dirpath : &Path, filt
 
 
 
-pub fn rna_process_tohnsw(dirpath : &Path, filter_params : &FilterParams, processing_parameters : &ProcessingParams) {
+pub fn aa_process_tohnsw(dirpath : &Path, filter_params : &FilterParams, processing_parameters : &ProcessingParams) {
     // dispatch according to kmer_size
     let kmer_size = processing_parameters.get_sketching_params().get_kmer_size();
     //

@@ -4,7 +4,7 @@
 use std::fs::{self, DirEntry};
 
 
-use kmerutils::rnautils::kmeraa;
+use kmerutils::aautils::kmeraa;
 
 use crate::utils::{idsketch::*};
 use crate::utils::{parameters::*};
@@ -31,7 +31,7 @@ pub fn filter_out_non_aa(seq : &[u8]) -> Vec<u8> {
 /// opens parse fna files with needletail
 /// extracts records , filters out capsid and send sequences to function process_dir to execute file_task to produce sequence
 /// for any client
-pub fn process_rnafile_in_one_block(file : &DirEntry, filter_params : &FilterParams)  -> Vec<IdSeq> {
+pub fn process_aafile_in_one_block(file : &DirEntry, filter_params : &FilterParams)  -> Vec<IdSeq> {
     let mut to_sketch = Vec::<IdSeq>::new();
     //
     let pathb = file.path();
@@ -77,10 +77,10 @@ pub fn process_rnafile_in_one_block(file : &DirEntry, filter_params : &FilterPar
     // we are at end of file, we have one large sequence for the whole file
     // we have DNA seq for now
     let new_seq = kmeraa::SequenceAA::new(&one_block_seq);
-    let seqwithid = IdSeq::new(pathb.to_str().unwrap().to_string(), String::from("total sequence"), SequenceType::SequenceRNA(new_seq));
+    let seqwithid = IdSeq::new(pathb.to_str().unwrap().to_string(), String::from("total sequence"), SequenceType::SequenceAA(new_seq));
     to_sketch.push(seqwithid);
     // we must send to_sketch to some sketcher
     return to_sketch;
-} // end of process_rnafile_in_one_block
+} // end of process_aafile_in_one_block
 
 

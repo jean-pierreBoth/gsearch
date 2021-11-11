@@ -10,7 +10,7 @@
 //!  --seq if we want a processing by sequences. Default is to concatenate all sequneces in a file
 //!             in a large sequence.
 //! 
-//!  --rna : set if data to process are RNA sequences. Default is DNA
+//!  --aa : set if data to process are Amino Acid sequences. Default is DNA
 
 // must loop on sub directories , open gzipped files
 // extracts complete genomes possiby many in one file (get rid of capsid records if any)
@@ -34,7 +34,7 @@ use env_logger::{Builder};
 // our crate
 
 use archaea::dna::dnasketch::dna_process_tohnsw;
-use archaea::rna::rnasketch::rna_process_tohnsw;
+use archaea::aa::aasketch::aa_process_tohnsw;
 use archaea::utils::*;
 
 //=========================================================================
@@ -81,9 +81,9 @@ fn main() {
             .long("ef")
             .default_value("400")
             .help("parameters neighbour search at creation"))
-        .arg(Arg::with_name("rna")
-            .help("to specify rna processing")
-            .long("rna")
+        .arg(Arg::with_name("aa")
+            .help("to specify amino acid seq processing")
+            .long("aa")
             .takes_value(false))
         .arg(Arg::with_name("seq")
             .long("seq")
@@ -157,9 +157,9 @@ fn main() {
         }
         //
         let data_type;
-        if matches.is_present("rna") {
-            println!("data to processs are RNA data ");
-            data_type = DataType::RNA;
+        if matches.is_present("aa") {
+            println!("data to processs are AA data ");
+            data_type = DataType::AA;
         }
         else {
             println!("data to processs are DNA data ");
@@ -176,7 +176,7 @@ fn main() {
         //
         match data_type {
             DataType::DNA => dna_process_tohnsw(&dirpath, &filter_params, &processing_parameters),
-            DataType::RNA => rna_process_tohnsw(&dirpath, &filter_params, &processing_parameters),
+            DataType::AA => aa_process_tohnsw(&dirpath, &filter_params, &processing_parameters),
         }
         //
  } // end of main

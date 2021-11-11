@@ -5,6 +5,9 @@
 //! 
 //! - database is the name of directory containing hnsw dump files and seqdict dump
 //! - requestdir is a directory containing list of fasta file containing sequence to search for
+//!  
+//! --aa : set if data to process are Amino Acid sequences. Default is DNA
+
 //!
 //! [ann] is an optional subcommand asking for some statistics on distances between hnsw items
 //! In fact as in basedirname there must be a file (processingparams.json) specifying sketch size and kmer size, these
@@ -30,7 +33,8 @@ use std::path::{Path};
 
 //mod files;
 use archaea::utils::*;
-use archaea::dna::dnarequest::get_sequence_matcher;
+use archaea::dna::dnarequest;
+use archaea::aa::aarequest;
 
 
 // install a logger facility
@@ -74,6 +78,10 @@ fn main() {
             .short("n")
             .takes_value(true)
             .help("must specify number of neighbours in hnsw"))
+        .arg(Arg::with_name("aa")
+            .help("to specify amino acid seq processing")
+            .long("aa")
+            .takes_value(false))
         .arg(Arg::with_name("seq")
             .long("seq")
             .takes_value(false)
@@ -173,10 +181,18 @@ fn main() {
             println!("-n nbng is mandatory");
             std::process::exit(1);
         }
-        // match subcommands
-
+        // Dow process Dna or AA sequences
+        let data_type;
+        if matches.is_present("aa") {
+            println!("data to processs are AA data ");
+            data_type = DataType::AA;
+        }
+        else {
+            println!("data to processs are DNA data ");
+            data_type = DataType::DNA;            
+        }
         //
-        // matching args is finished
+        // matching args is finished we match subcommands
         //     
         let ef_search = 5000;
         log::info!("ef_search : {:?}", ef_search);
@@ -221,15 +237,31 @@ fn main() {
         };
         log::info!("reloading sequence dictionary from {} done", &seqname);
         // we have everything we want...
-        if let Ok(mut seq_matcher) = get_sequence_matcher(request_dirpath, database_dirpath, &processing_params, 
-                        &filter_params, &ann_params, &seqdict, nbng, ef_search) {
-            if processing_params.get_block_flag() == false {
-                log::info!("sequence mode, trying to analyze..");
-                let _= seq_matcher.analyze();
-            }
-        }
-        else {
-            panic!("Error occurred in get_matcher");
-        }
+        match data_type {
+            DataType::DNA => {
+                if let Ok(mut seq_matcher) = dnarequest::get_sequence_matcher(request_dirpath, database_dirpath, &processing_params, 
+                            &filter_params, &ann_params, &seqdict, nbng, ef_search) {
+                    if processing_params.get_block_flag() == false {
+                        log::info!("sequence mode, trying to analyze..");
+                        let _= seq_matcher.analyze();
+                    }
+                }
+                else {
+                    panic!("Error occurred in dnarequest::get_sequence_matcher");
+                }
+            }  // end DNA case
+            DataType::AA => {
+                if let Ok(mut seq_matcher) = aarequest::get_sequence_matcher(request_dirpath, database_dirpath, &processing_params, 
+                    &filter_params, &ann_params, &seqdict, nbng, ef_search) {
+                    if processing_params.get_block_flag() == false {
+                        log::info!("sequence mode, trying to analyze..");
+                        let _= seq_matcher.analyze();
+                    }
+                }
+                else {
+                    panic!("Error occurred in aarequest::get_sequence_matcher");
+                } 
+            } // end of AA case
+        }  // end of match on sequence type
         // 
 }  // end of main

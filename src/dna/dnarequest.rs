@@ -36,7 +36,7 @@ fn sketch_and_request_dir_compressedkmer<Kmer:CompressedKmerT>(request_dirpath :
     let block_processing = processing_parameters.get_block_flag();
     //
     log::trace!("sketch_and_request_dir processing dir {}", request_dirpath.to_str().unwrap());
-    log::info!("sketch_and_request_dir {}", request_dirpath.to_str().unwrap());
+    log::info!("Dna mode sketch_and_request_dir {}", request_dirpath.to_str().unwrap());
     log::info!("sketch_and_request kmer size  {}  sketch size {} ", sketcher_params.get_kmer_size(), sketcher_params.get_sketch_size());
     let out_threshold = 0.98;  // TODO threshold needs a test to get initialized!
     // creating an output file in the current directory
@@ -204,7 +204,8 @@ pub fn get_sequence_matcher(request_dirpath : &Path, database_dirpath : &Path, p
         let hnsw = match hnsw {
             Some(hnsw) => hnsw,
             _ => {
-                panic!("hnsw reload from dump dir {} failed", database_dirpath.to_str().unwrap());
+                log::error!("\n dna get_sequence_matcher failed to reload hnsw. do you run on DNA data ?");
+                panic!("hnsw reload from dump dir {} failed, do you run on DNA data ?", database_dirpath.to_str().unwrap());
             }
         };
         matcher = sketch_and_request_dir_compressedkmer::<Kmer32bit>(&request_dirpath, &filter_params, &seqdict, &processing_params, 
@@ -216,7 +217,8 @@ pub fn get_sequence_matcher(request_dirpath : &Path, database_dirpath : &Path, p
         let hnsw = match hnsw {
             Some(hnsw) => hnsw,
             _ => {
-                panic!("hnsw reload from dump dir {} failed", database_dirpath.to_str().unwrap());
+                log::error!("\n dna get_sequence_matcher failed to reload hnsw. do you run on DNA data ?");
+                panic!("hnsw reload from dump dir {} failed, do you run on DNA data ?", database_dirpath.to_str().unwrap());
             }
         };
         matcher = sketch_and_request_dir_compressedkmer::<Kmer64bit>(&request_dirpath, &filter_params, &seqdict, &processing_params,
@@ -228,7 +230,8 @@ pub fn get_sequence_matcher(request_dirpath : &Path, database_dirpath : &Path, p
         let hnsw = match hnsw {
             Some(hnsw) => hnsw,
             _ => {
-                panic!("hnsw reload from dump dir {} failed", database_dirpath.to_str().unwrap());
+                log::error!("\n dna get_sequence_matcher failed to reload hnsw. do you run on DNA data ?");
+                panic!("hnsw reload from dump dir {} failed, do you run on DNA data ?", database_dirpath.to_str().unwrap());
             }
         };
         matcher = sketch_and_request_dir_compressedkmer::<Kmer16b32bit>(&request_dirpath, &filter_params, &seqdict, &processing_params, 
