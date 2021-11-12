@@ -21,7 +21,7 @@ use kmerutils::base::{kmergenerator::*, Kmer32bit, Kmer64bit, CompressedKmerT};
 use kmerutils::sketching::*;
 
 use crate::utils::{idsketch::*};
-use crate::utils::files::{process_dir,ProcessingState};
+use crate::utils::files::{process_dir,ProcessingState, DataType};
 use crate::dna::dnafiles::{process_file_in_one_block, process_file_concat_split};
 
 use crate::utils::parameters::*;
@@ -66,11 +66,11 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT>(dirpath : &Path, filt
             let start_t_prod = SystemTime::now();
             let res_nb_sent;
             if block_processing {
-                res_nb_sent = process_dir(&mut state, dirpath, filter_params, &process_file_in_one_block, &send);
+                res_nb_sent = process_dir(&mut state, &DataType::DNA,  dirpath, filter_params, &process_file_in_one_block, &send);
             }
             else {
                 log::info!("processing by concat and split");
-                res_nb_sent = process_dir(&mut state, dirpath, filter_params, &process_file_concat_split, &send);
+                res_nb_sent = process_dir(&mut state, &DataType::DNA, dirpath, filter_params, &process_file_concat_split, &send);
             }
             match res_nb_sent {
                 Ok(nb_really_sent) => {

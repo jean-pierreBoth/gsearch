@@ -19,7 +19,7 @@ use kmerutils::aautils::kmeraa::*;
 use kmerutils::aautils::seqsketchjaccard::*;
 
 use crate::utils::{idsketch::*};
-use crate::utils::files::{process_dir,ProcessingState};
+use crate::utils::files::{process_dir,ProcessingState, DataType};
 use crate::aa::aafiles::{process_aafile_in_one_block};
 
 use crate::utils::parameters::*;
@@ -65,7 +65,7 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT>(dirpath : &Path, filt
             let start_t_prod = SystemTime::now();
             let res_nb_sent;
             if block_processing {
-                res_nb_sent = process_dir(&mut state, dirpath, filter_params, &process_aafile_in_one_block, &send);
+                res_nb_sent = process_dir(&mut state, &DataType::DNA, dirpath, filter_params, &process_aafile_in_one_block, &send);
             }
             else {
                 panic!("processing by concat and split not implemented for rna");

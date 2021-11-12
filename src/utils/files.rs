@@ -107,7 +107,7 @@ pub fn is_fasta_dna_file(file : &DirEntry) -> bool {
 
 
 /// returns true if file is a fasta file RNA (possibly gzipped) suffixed by .faa
-pub fn is_fasta_rna_file(file : &DirEntry) -> bool {
+pub fn is_fasta_aa_file(file : &DirEntry) -> bool {
     let filename = file.file_name().into_string().unwrap();
     if filename.ends_with("faa.gz")|| filename.ends_with("faa") {
         return true;
@@ -129,7 +129,7 @@ pub fn is_fasta_rna_file(file : &DirEntry) -> bool {
 
 /// scan directory recursively, executing function file_task on each file.
 /// adapted from from crate fd_find
-pub fn process_dir(state : &mut ProcessingState, dir: &Path, filter_params : &FilterParams, 
+pub fn process_dir(state : &mut ProcessingState, datatype: &DataType, dir: &Path, filter_params : &FilterParams, 
                 file_task: &dyn Fn(&DirEntry, &FilterParams) -> Vec<IdSeq>, 
                 sender : &crossbeam_channel::Sender::<Vec<IdSeq>>) -> io::Result<usize> {
     //
@@ -138,29 +138,43 @@ pub fn process_dir(state : &mut ProcessingState, dir: &Path, filter_params : &Fi
         let entry = entry?;
         let path = entry.path();
         if path.is_dir() {
-            let _ =  process_dir(state, &path, filter_params, file_task, sender)?;
+            let _ =  process_dir(state, &datatype, &path, filter_params, file_task, sender)?;
         } else {
             // check if entry is a fasta.gz file or a .faa file
-            // TODO should check that there is no mix of files?
-            if is_fasta_dna_file(&entry) || is_fasta_rna_file(&entry) {
-                let mut to_sketch = file_task(&entry, filter_params);
-                // put a rank id in sequences, now we have full information of where do the sequence come from
-                for i in 0..to_sketch.len() {
-                    to_sketch[i].rank = state.nb_seq;
-                    state.nb_seq += 1;
-                }
-                state.nb_file += 1;
-                if log::log_enabled!(log::Level::Info) && state.nb_file % 500 == 0 {
-                    log::info!("nb file processed : {}, nb sequences processed : {}", state.nb_file, state.nb_seq);
-                }
-                if state.nb_file % 500 == 0 {
-                    println!("nb file processed : {}, nb sequences processed : {}", state.nb_file, state.nb_seq);
-                }
-                // we must send to_sketch into channel to upper thread
-                sender.send(to_sketch).unwrap();
+            let mut to_sketch = match datatype {
+                DataType::DNA => {
+                    if is_fasta_dna_file(&entry)  {
+                        file_task(&entry, filter_params)
+                    }
+                    else {
+                        panic!("process_dir found a non dna file {:?}", entry.file_name());
+                    }
+                },
+                DataType::AA => {
+                    if is_fasta_aa_file(&entry) {
+                        file_task(&entry, filter_params)
+                    }
+                    else {
+                        panic!("process_dir found a non AA file {:?}", entry.file_name());
+                    }
+                },
+            };
+            // put a rank id in sequences, now we have full information of where do the sequence come from
+            for i in 0..to_sketch.len() {
+                to_sketch[i].rank = state.nb_seq;
+                state.nb_seq += 1;
             }
-        }
-    }
+            state.nb_file += 1;
+            if log::log_enabled!(log::Level::Info) && state.nb_file % 500 == 0 {
+                log::info!("nb file processed : {}, nb sequences processed : {}", state.nb_file, state.nb_seq);
+            }
+            if state.nb_file % 500 == 0 {
+                println!("nb file processed : {}, nb sequences processed : {}", state.nb_file, state.nb_seq);
+            }
+            // we must send to_sketch into channel to upper thread
+            sender.send(to_sketch).unwrap();
+        } // end of check on datatype
+    } // end of for 
     //
     drop(sender);
     //

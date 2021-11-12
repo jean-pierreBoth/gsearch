@@ -79,11 +79,11 @@ fn sketch_and_request_dir_compressedkmer<Kmer:CompressedKmerT>(request_dirpath :
         let sender_handle = scope.spawn(move |_|   {
             let res_nb_sent;
             if block_processing {
-                res_nb_sent = process_dir(&mut state, request_dirpath, &filter_params, &process_file_in_one_block, &send);
+                res_nb_sent = process_dir(&mut state, &DataType::DNA, request_dirpath, &filter_params, &process_file_in_one_block, &send);
             }
             else {
                 log::info!("processing by concat and split");
-                res_nb_sent = process_dir(&mut state, request_dirpath, &filter_params, &process_file_concat_split, &send);
+                res_nb_sent = process_dir(&mut state, &DataType::DNA,  request_dirpath, &filter_params, &process_file_concat_split, &send);
             }
             match res_nb_sent {
                 Ok(nb_really_sent) => {
