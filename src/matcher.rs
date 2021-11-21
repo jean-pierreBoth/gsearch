@@ -32,13 +32,13 @@ pub struct SequenceMatch {
     /// jaccard distance computed by hnsw
     distance : f32,
     ///
-    likelyhood : f64,    
+    _likelyhood : f64,    
 }
 
 
 impl  SequenceMatch {
     pub fn new(base_item : ItemDict, distance:f32) -> Self {
-        SequenceMatch{base_item : base_item, distance : distance, likelyhood : 0.}
+        SequenceMatch{base_item : base_item, distance : distance, _likelyhood : 0.}
     }
 
     /// return genome path of candidate
@@ -134,7 +134,8 @@ fn compute_genome_length(sequences : &SeqDict) -> HashMap<String, usize> {
     let mut hashed_length = HashMap::<String, usize>::new();
     //
     for seq in &sequences.0 {
-        hashed_length.entry(seq.get_id().get_path().to_string()).or_insert(seq.get_len());
+        let entry = hashed_length.entry(seq.get_id().get_path().to_string()).or_insert(0);
+        *entry += seq.get_len();
     }
     //
     return hashed_length;
@@ -146,13 +147,13 @@ fn compute_genome_length(sequences : &SeqDict) -> HashMap<String, usize> {
 #[derive(Clone)]
 pub struct Matcher {
     /// kmer size in ketching
-    kmer_size : usize,
+    _kmer_size : usize,
     /// size of sketch
-    sketch_size : usize,
-    /// genomes lenght
+    _sketch_size : usize,
+    /// genomes length. Maps a file path to a length. Useful only in split mode.
     genome_length : HashMap<String, usize>,
     /// total number of bases of database.
-    database_size : usize,
+    _database_size : usize,
     /// for each request genome, we maintain a 
     seq_matches : HashMap<RequestGenome,  HashMap<TargetGenome, MatchList> >,
     ///
@@ -162,11 +163,11 @@ pub struct Matcher {
 
 
 impl Matcher{
-    pub fn new(kmer_size : usize , sketch_size: usize, seqdict : &SeqDict) -> Self {
-        let database_size = seqdict.get_total_length();
+    pub fn new(_kmer_size : usize , _sketch_size: usize, seqdict : &SeqDict) -> Self {
+        let _database_size = seqdict.get_total_length();
         let genome_length = compute_genome_length(seqdict);
         let seq_matches = HashMap::<RequestGenome, HashMap<TargetGenome, MatchList> >::new();
-        Matcher{kmer_size, sketch_size, genome_length, database_size, seq_matches, nb_sequence_match : 0}
+        Matcher{_kmer_size, _sketch_size, genome_length, _database_size, seq_matches, nb_sequence_match : 0}
     }
 
     pub fn insert_sequence_match(&mut self, req_item : ItemDict, new_matches : Vec<SequenceMatch>) {

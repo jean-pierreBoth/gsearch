@@ -207,7 +207,7 @@ pub fn get_sequence_matcher(request_dirpath : &Path, database_dirpath : &Path, p
     let matcher : Matcher;
     // reload hnsw
     log::info!("\n reloading hnsw from {}", database_dirpath.to_str().unwrap());
-    if sk_params.get_kmer_size() < 6 {
+    if sk_params.get_kmer_size() <= 6 {
         let hnsw = reloadhnsw::reload_hnsw(database_dirpath, ann_params);
         let hnsw = match hnsw {
             Some(hnsw) => hnsw,

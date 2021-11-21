@@ -97,7 +97,8 @@ pub enum DataType {
 // filename are of type GCA[GCF]_000091165.1_genomic.fna.gz
 pub fn is_fasta_dna_file(file : &DirEntry) -> bool {
     let filename = file.file_name().into_string().unwrap();
-    if filename.ends_with("fna.gz")|| filename.ends_with("fa.gz") || filename.ends_with("fasta.gz") {
+    if filename.ends_with("fna.gz")|| filename.ends_with("fa.gz") || 
+                filename.ends_with("fasta.gz") || filename.ends_with("fna") {
         return true;
     }
     else { 
@@ -147,7 +148,8 @@ pub fn process_dir(state : &mut ProcessingState, datatype: &DataType, dir: &Path
                         file_task(&entry, filter_params)
                     }
                     else {
-                        panic!("process_dir found a non dna file {:?}", entry.file_name());
+                        log::warn!("process_dir found a non dna file {:?}", entry.file_name());
+                        Vec::<IdSeq>::new()
                     }
                 },
                 DataType::AA => {
@@ -155,7 +157,8 @@ pub fn process_dir(state : &mut ProcessingState, datatype: &DataType, dir: &Path
                         file_task(&entry, filter_params)
                     }
                     else {
-                        panic!("process_dir found a non AA file {:?}", entry.file_name());
+                        log::warn!("process_dir found a non AA file {:?}", entry.file_name());
+                        Vec::<IdSeq>::new()
                     }
                 },
             };
