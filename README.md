@@ -28,7 +28,11 @@ export LD_CONFIG_PATH="~/miniconda3/lib:$LD_CONFIG_PATH"
 
     - git clone https://github.com/jean-pierreBoth/probminhash
 
-    - get archaea directly from gitbub: (git clone https://github.com/jean-pierreBoth/archaea) as long as it is not in crate.io and run cargo build --release
+* Clone kmerutils which is not in crate.io:
+  
+    - git clone https://github.com/jean-pierreBoth/kmerutils
+
+* Get archaea directly from gitbub: (git clone https://github.com/jean-pierreBoth/archaea) as long as it is not in crate.io and run cargo build --release
 
 * A dependency is provided as a feature. It uses the crate **annembed** that gives some statistics on the hnsw graph constructed (and will provide some visualization of data).
 It is activated by running:
