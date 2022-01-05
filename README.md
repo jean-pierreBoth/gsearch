@@ -8,7 +8,7 @@ This package is developped in collaboration with Jianshu Zhao (https://github.co
 
 # Dependencies and Installation
 
-* pre-compiled binaries are available in the release page for major platforms. If you want to compile from source, see below:
+* pre-compiled binaries are available in the release page for major platforms. For linux based system, no dependencies but system level gfortran must be later than gfortran@5, which means gcc 8.3 or above. If you want to compile from source, see below:
 
 
 *  Clone hnsw-rs and probminhash or get them from crate.io
@@ -45,7 +45,7 @@ cargo build --release --features annembed_f
 cargo build --release
 
 
-### if you are using anaconda/miniconda3 or on a server, you can install them first, but remember to add library configuration path and dynamic library config path to you environmental variables. openblas must be installed at system level. Ask your system manager to installed it for you.
+### if you are using anaconda/miniconda3 or on a server, you can install them first, but remember to add library configuration path and dynamic library config path to you environmental variables. Openblas must be installed at system level for MacOS system (static link is not prefered by Apple). Ask your system manager to installed it for you.
 conda install -c anaconda zeromq libsodium
 ## we installed miniconda3 to the home directory
 LIBZMQ_LIB_DIR=~/miniconda3/lib LIBZMQ_INCLUDE_DIR=~/miniconda3/include cargo build --release --features annembed_f
@@ -65,7 +65,7 @@ Nightly rust must be used
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 ## setup nightly rust
 rustup default nightly
-## go to the kmerutils and annembed directory you just cloned, and change the line: hnsw_rs =  {version = "0.1.15"} to hnsw_rs = {path = "../hnswlib-rs"}
+## go to the kmerutils and annembed directory you just cloned, and change the line: hnsw_rs =  {version = "0.1.15"} to hnsw_rs = {path = "../hnswlib-rs"} in both Cargo.toml
 ## same processure with the above regular compiling.
 ```
 ## Sketching of genomes
