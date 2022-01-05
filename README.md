@@ -22,6 +22,8 @@ This package is developped in collaboration with Jianshu Zhao (https://github.co
 
 * Clone ARCHAEA, which is not in crate.io:
     - git clone https://github.com/jean-pierreBoth/archaea
+* Clone annembed:
+    - git clone https://github.com/jean-pierreBoth/annembed
 
 * Three libraries, zeromq, libsodium and openblas (optional for annembed_f feature) are required to successfully compile. 
 
@@ -63,7 +65,7 @@ Nightly rust must be used
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 ## setup nightly rust
 rustup default nightly
-## go to the kmerutils directory you just cloned, and change the line: hnsw_rs =  {version = "0.1.15"} to hnsw_rs = {path = "../hnswlib-rs"}
+## go to the kmerutils and annembed directory you just cloned, and change the line: hnsw_rs =  {version = "0.1.15"} to hnsw_rs = {path = "../hnswlib-rs"}
 ## same processure with the above regular compiling.
 ```
 ## Sketching of genomes
