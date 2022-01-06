@@ -86,9 +86,21 @@ takes a list of fasta files containing requests and for each fasta file dumps th
 ## Classify
  The classify module is used to assign taxonomy information from requested neighbours to query genomes. Average nucleitide identity will be calculated
 
-## compilation single module
-```
-cargo build --release --bin tohnsw
-cargo build --release --bin request
+### The last step involves a homology search using hmmer, which can be directly installed using conda or brew. If you are using apple M1 ARM/aarch64 structure. This is how you can have a native support of hmmer
 
+```
+### download h3-heno branch of hmmer here (do not git clone but download zip):
+
+https://github.com/EddyRivasLab/hmmer/tree/h3-arm
+
+## go into the donwloaded directory and download Easel develop branch here (do not git clone but download zip) :
+cd h3-arm
+https://github.com/EddyRivasLab/easel/tree/develop
+
+## compile
+autoconf
+./configure
+make -j 8
+sudo make install
+hmmsearch -h
 ```
