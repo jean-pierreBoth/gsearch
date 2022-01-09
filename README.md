@@ -24,6 +24,7 @@ This package is developped in collaboration with Jianshu Zhao (https://github.co
     - git clone https://github.com/jean-pierreBoth/archaea
 * Clone annembed:
     - git clone https://github.com/jean-pierreBoth/annembed
+    annembed is now based on intel-mkl-static by default, to change to openblas you need to change "ndarray-linalg = {version = "0.14", features = ["intel-mkl-static"]}" to "ndarray-linalg = {version = "0.14", features = ["openblas-system"]}" in the Cargo.toml, if you do not have intel-mkl installed.
 
 * Three libraries, zeromq, libsodium and openblas (optional for annembed_f feature) are required to successfully compile. 
 
@@ -35,7 +36,7 @@ sudo apt-get install libzmq-dev libsodium-dev openblas
 brew install zeromq
 brew install libsodium
 
-### with MacOS monterey, BLAS are installed in the Architecture.framework, but you can still installed it and add library path to environmental variables according to homebrew promt message
+### with MacOS monterey, BLAS are installed in the Architecture.framework, but you can still installed it and add library path to environmental variables according to homebrew promt message. See above annembed part to see how to use a different openblas in interl-mkl library
 brew install openblas
 
 cd archaea
@@ -49,7 +50,7 @@ cargo build --release
 conda install -c anaconda zeromq libsodium
 ## we installed miniconda3 to the home directory
 LIBZMQ_LIB_DIR=~/miniconda3/lib LIBZMQ_INCLUDE_DIR=~/miniconda3/include cargo build --release --features annembed_f
-### or with out annembed feature, where openblas denpendency is not required
+### or without annembed feature, where openblas denpendency is not required
 LIBZMQ_LIB_DIR=~/miniconda3/lib LIBZMQ_INCLUDE_DIR=~/miniconda3/include cargo build --release
 
 ```
@@ -65,7 +66,7 @@ Nightly rust must be used
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 ## setup nightly rust
 rustup default nightly
-## go to the kmerutils and annembed directory you just cloned, and change the line: hnsw_rs =  {version = "0.1.15"} to hnsw_rs = {path = "../hnswlib-rs"} in both Cargo.toml
+## go to the kmerutils, annembed and archaea directory you just cloned, and change the line: hnsw_rs =  {version = "0.1.15"} to hnsw_rs = {path = "../hnswlib-rs"} in both Cargo.toml
 ## same processure with the above regular compiling.
 ```
 ## Sketching of genomes
