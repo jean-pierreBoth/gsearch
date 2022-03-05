@@ -53,8 +53,8 @@ clap = {version = "2.33"}
 
 probminhash = {version = "0.1.5"}
 #probminhash = {path = "../probminhash"}
-hnsw_rs =  {version = "0.1.15"}
-#hnsw_rs = {path = "../hnswlib-rs"}
+##hnsw_rs =  {version = "0.1.15"}
+hnsw_rs = {path = "../hnswlib-rs"}
 
 #kmerutils = {git = "https://github.com/jean-pierreBoth/kmerutils"}
 #kmerutils = {git = "https://gitlab.com/jpboth/kmerutils"}

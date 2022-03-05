@@ -210,6 +210,6 @@ pub fn dna_process_tohnsw(dirpath : &Path, filter_params : &FilterParams, proces
         sketchandstore_dir_compressedkmer::<Kmer64bit>(&dirpath, &filter_params, &processing_parameters);
     }
     else {
-        panic!("kmers cannot be greater than 64");
+        panic!("kmers cannot be greater than 32");
     }
 } // end of dna_process

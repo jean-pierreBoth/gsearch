@@ -38,7 +38,7 @@ fn sketch_and_request_dir_compressedkmer<Kmer:CompressedKmerT>(request_dirpath :
     log::trace!("sketch_and_request_dir processing dir {}", request_dirpath.to_str().unwrap());
     log::info!("Dna mode sketch_and_request_dir {}", request_dirpath.to_str().unwrap());
     log::info!("sketch_and_request kmer size  {}  sketch size {} ", sketcher_params.get_kmer_size(), sketcher_params.get_sketch_size());
-    let out_threshold = 0.98;  // TODO threshold needs a test to get initialized!
+    let out_threshold = 0.99;  // TODO threshold needs a test to get initialized!
     // creating an output file in the current directory
     let outname = "archea.answers";
     let outpath = PathBuf::from(outname.clone());
@@ -199,7 +199,7 @@ pub fn get_sequence_matcher(request_dirpath : &Path, database_dirpath : &Path, p
     let matcher : Matcher;
     // reload hnsw
     log::info!("\n reloading hnsw from {}", database_dirpath.to_str().unwrap());
-    if sk_params.get_kmer_size() < 14 {
+    if sk_params.get_kmer_size() <= 14 {
         let hnsw = reloadhnsw::reload_hnsw(database_dirpath, ann_params);
         let hnsw = match hnsw {
             Some(hnsw) => hnsw,

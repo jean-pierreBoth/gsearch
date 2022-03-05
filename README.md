@@ -1,10 +1,10 @@
 # A rust classifier based on HNSW for prokaryotic genomes
 
-archaea stands for: **A Rust Classifier Hierarchical Navigable SW graphs**
+ARCHAEA stands for: <u>A</u> <u>R</u>ust <u>C</u>lassifier base on <u>H</u>ierarchical N<u>a</u>vigable SW graphs, <u>e</u>t.<u>a</u>l.**
 
-This package (**currently in development**) compute probminhash signature of  bacteria and archaea genomes and stores the id of bacteria and probminhash signature in a Hnsw structure for searching of new request genomes
+This package (**currently in development**) compute probminhash signature of  bacteria and archaea genomes and stores the id of bacteria and probminhash signature in a Hnsw structure for searching of new request genomes.
 
-This package is developped in collaboration with Jianshu Zhao (https://github.com/jianshu93)
+This package is developped in collaboration with Jean Pierre-Both (https://github.com/jean-pierreBoth)
 
 # Dependencies and Installation
 
@@ -27,7 +27,7 @@ This package is developped in collaboration with Jianshu Zhao (https://github.co
 
 * Three libraries, zeromq, libsodium and openblas (optional for annembed_f feature) are required to successfully compile. 
 
-```
+```bash
 ### if you are using Linux (ubuntu for example), install them first
 sudo apt-get install libzmq-dev libsodium-dev openblas
 
@@ -40,13 +40,11 @@ brew install openblas
 
 cd archaea
 cargo build --release --features annembed_f
-## or
-
+## or, openblas library is not needed
 cargo build --release
 
 
 ### if you are using anaconda/miniconda3 or on a server, you can install them first, but remember to add library configuration path and dynamic library config path to you environmental variables. Openblas must be installed at system level for MacOS system (static link is not prefered by Apple). Ask your system manager to installed it for you.
-conda install -c anaconda zeromq libsodium
 ## we installed miniconda3 to the home directory
 LIBZMQ_LIB_DIR=~/miniconda3/lib LIBZMQ_INCLUDE_DIR=~/miniconda3/include cargo build --release --features annembed_f
 ### or with out annembed feature, where openblas denpendency is not required
@@ -55,12 +53,12 @@ LIBZMQ_LIB_DIR=~/miniconda3/lib LIBZMQ_INCLUDE_DIR=~/miniconda3/include cargo bu
 ```
 
 * A dependency is provided as a feature. It uses the crate **annembed** that gives some statistics on the hnsw graph constructed (and will provide some visualization of data).
-It is activated by running:
+  It is activated by running:
     -   *cargo build --release --features annembed_f*
 
-## build on ARM64/aarch64, rust nightly version only
+## Build on ARM64/aarch64, rust nightly version only
 Nightly rust must be used
-```
+```bash
 ## install rustup first, and the activate it
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 ## setup nightly rust
@@ -82,13 +80,13 @@ The Dictionary is dumped in a json file *seqdict.json*
 
 For requests  the module ***request*** is being used. It reloads the dumped files, hnsw and seqdict related
 takes a list of fasta files containing requests and for each fasta file dumps the asked number of nearest neighbours.
-  
+
 ## Classify
- The classify module is used to assign taxonomy information from requested neighbours to query genomes. Average nucleitide identity will be calculated
+ The classify module is used to assign taxonomy information from requested neighbours to query genomes. Average nucleitide identity will be calculated. 
 
 ### The last step involves a homology search using hmmer, which can be directly installed using conda or brew. If you are using apple M1 ARM/aarch64 structure. This is how you can have a native support of hmmer
 
-```
+```bash
 ### download h3-heno branch of hmmer here (do not git clone but download zip):
 
 https://github.com/EddyRivasLab/hmmer/tree/h3-arm
@@ -97,10 +95,27 @@ https://github.com/EddyRivasLab/hmmer/tree/h3-arm
 cd h3-arm
 https://github.com/EddyRivasLab/easel/tree/develop
 
-## compile
+## compile, or you can download binaries from here: https://github.com/jianshu93/hmmer-h3-arm
 autoconf
 ./configure
 make -j 8
 sudo make install
 hmmsearch -h
 ```
+
+# Usage
+
+```bash
+### build database given genome file directory
+tohnsw -d db_dir_nt -s 12000 -k 21 --ef 1600 -n 128
+tohnsw -d db_dir_aa -s 24000 -k 7 --ef 1600 -n 128 --aa
+### request neighbours for each genomes in query_dir given pre-built database path
+request -b ./ -d query_dir_nt -n 50
+request -b ./ -d query_dir_aa -n 50 --aa
+```
+
+
+
+# Pre-built databases
+
+We provide pre-built genome/proteome database graph file for bacteria/archaea, virus and fungi. Proteome database are based on genes for each genome, predicted by prodigal (https://github.com/hyattpd/Prodigal) for bacteria/archaea/virus and GeneMark-ES version 2 (http://exon.gatech.edu/GeneMark/license_download.cgi) for fungi. Bacteria/archaea genomes are the newest version of GTDB database (https://gtdb.ecogenomic.org), which defines a bacterial speces at 95% ANI. Note that ARCHAEA can also run for even higher resolution species database such as 99% ANI. Virus data base are based on the JGI IMG/VR database newest version (https://genome.jgi.doe.gov/portal/IMG_VR/IMG_VR.home.html), which also define a virus OTU (vOTU) at 95% ANI. Fungi database are based on the entire RefSeq fungal genomes, we dereplicated and define a fungal speices at 99% ANI. All three pre-built database can be available here:

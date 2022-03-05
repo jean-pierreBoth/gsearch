@@ -168,7 +168,7 @@ fn main() {
         // We have everything   
         // max_nb_conn must be adapted to the number of neighbours we will want in searches.
         let max_nb_conn : u8 = 128.min(nbng as u8);
-        let hnswparams = HnswParams::new(700_000, ef_construction, max_nb_conn);
+        let hnswparams = HnswParams::new(1_500_000, ef_construction, max_nb_conn);
         //
         // do not filter small seqs when running file in a whole block
         let filter_params = FilterParams::new(0);
