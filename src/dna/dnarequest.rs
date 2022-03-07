@@ -239,7 +239,8 @@ pub fn get_sequence_matcher(request_dirpath : &Path, database_dirpath : &Path, p
         return Ok(matcher)  
     }
     else {
-        Err(String::from("bad value fro kmer size"))
+        log::error!("bad value for kmer size. 15 is not allowed");
+        Err(String::from("bad value for kmer size"))
     }
 }  // end of get_sequence_matcher
 
