@@ -151,6 +151,7 @@ pub struct Matcher {
     /// size of sketch
     _sketch_size : usize,
     /// genomes length. Maps a file path to a length. Useful only in split mode.
+#[allow(unused)]
     genome_length : HashMap<String, usize>,
     /// total number of bases of database.
     _database_size : usize,
