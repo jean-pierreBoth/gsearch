@@ -167,7 +167,9 @@ fn main() {
         }
         // We have everything   
         // max_nb_conn must be adapted to the number of neighbours we will want in searches.
-        let max_nb_conn : u8 = 128.min(nbng as u8);
+        
+        // Maximum allowed nbng for hnswlib-rs is 256. Larger nbng will not work and default to 256.
+        let max_nb_conn : u8 = 256.min(nbng as u8);
         let hnswparams = HnswParams::new(1_500_000, ef_construction, max_nb_conn);
         //
         // do not filter small seqs when running file in a whole block
