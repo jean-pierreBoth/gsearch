@@ -4,7 +4,7 @@ ARCHAEA stands for: <u>A</u> <u>R</u>ust <u>C</u>lassifier base on <u>H</u>ierar
 
 This package (**currently in development**) compute probminhash signature of  bacteria and archaea genomes and stores the id of bacteria and probminhash signature in a Hnsw structure for searching of new request genomes.
 
-This package is developped in collaboration with Jean Pierre-Both (https://github.com/jean-pierreBoth)
+This package is developped by Jean-Pierre Both (https://github.com/jean-pierreBoth) for the software part and Jianshu Zhao (https://github.com/jianshu93) for the genomics part.
 
 # Dependencies and Installation
 
