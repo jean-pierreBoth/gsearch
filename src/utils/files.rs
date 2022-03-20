@@ -98,7 +98,7 @@ pub enum DataType {
 pub fn is_fasta_dna_file(file : &DirEntry) -> bool {
     let filename = file.file_name().into_string().unwrap();
     if filename.ends_with("fna.gz")|| filename.ends_with("fa.gz") || 
-                filename.ends_with("fasta.gz") || filename.ends_with("fna") {
+                filename.ends_with("fasta.gz") || filename.ends_with("fna") || filename.ends_with("fa") || filename.ends_with("fasta") {
         return true;
     }
     else { 
@@ -107,7 +107,7 @@ pub fn is_fasta_dna_file(file : &DirEntry) -> bool {
 }  // end of is_fasta_file
 
 
-/// returns true if file is a fasta file RNA (possibly gzipped) suffixed by .faa
+/// returns true if file is a fasta file preotein (possibly gzipped) suffixed by .faa
 pub fn is_fasta_aa_file(file : &DirEntry) -> bool {
     let filename = file.file_name().into_string().unwrap();
     if filename.ends_with("faa.gz")|| filename.ends_with("faa") {

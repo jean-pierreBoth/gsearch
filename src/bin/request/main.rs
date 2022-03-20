@@ -1,3 +1,9 @@
+// ARCHAEA v0.1.0
+// Copyright 2021-2022, Jean Pierre Both and Jianshu Zhao.
+// Licensed under the MIT license (http://opensource.org/licenses/MIT).
+// This file may not be copied, modified, or distributed except according to those terms.
+
+
 //! Module request
 //! try to match fasta sequence with repsect to database
 //! 
