@@ -11,20 +11,26 @@ This package is developped by Jean-Pierre Both (https://github.com/jean-pierreBo
 * pre-compiled binaries are available in the release page for major platforms. For linux based system, no dependencies but system level gfortran must be later than gfortran@5, which means gcc 8.3 or above. If you want to compile from source, see below:
 
 
-*  Clone hnsw-rs and probminhash or get them from crate.io
+*  Clone hnsw-rs, probminhash, kmerutils can be retrieved from crate.io or downloaded by :
+
     - git clone https://github.com/jean-pierreBoth/hnswlib-rs
 
     - git clone https://github.com/jean-pierreBoth/probminhash
-
-* Clone kmerutils which is not in crate.io:
   
     - git clone https://github.com/jean-pierreBoth/kmerutils
 
-* Clone ARCHAEA, which is not in crate.io:
+
+
+* A dependency is provided as a feature. It uses the crate **annembed** that gives some statistics on the hnsw graph constructed (and will provide some visualization of data).
+  It can be activated by the feature  **annembed_f**.  
+  By default archaea uses annembed with openblas-static (compiles and link statically openblas) but you can change in Cargo.toml to intel-mkl-static (which downloads intel-mkl-rc for you).
+  openblas-static requires gcc, gfortran and make
+
+    - git clone https://github.com/jean-pierreBoth/annembed.  
+    annembed is usage in archea is based on openblas-static by default, you can change to intel-mkl-static 
+
+* Clone ARCHAEA, which is not yet in crate.io:
     - git clone https://github.com/jean-pierreBoth/archaea
-* Clone annembed:
-    - git clone https://github.com/jean-pierreBoth/annembed
-    annembed is now based on intel-mkl-static by default, to change to openblas you need to change "ndarray-linalg = {version = "0.14", features = ["intel-mkl-static"]}" to "ndarray-linalg = {version = "0.14", features = ["openblas-system"]}" in the Cargo.toml, if you do not have intel-mkl installed.
 
 * Three libraries, zeromq, libsodium and openblas (optional for annembed_f feature) are required to successfully compile. 
 
@@ -40,7 +46,7 @@ brew install libsodium
 brew install openblas
 
 cd archaea
-cargo build --release --features annembed_f
+cargo build --release --features annembed_f  (if annembed is needed or cargo build --release=
 ## or, openblas library is not needed
 cargo build --release
 
@@ -53,9 +59,7 @@ LIBZMQ_LIB_DIR=~/miniconda3/lib LIBZMQ_INCLUDE_DIR=~/miniconda3/include cargo bu
 
 ```
 
-* A dependency is provided as a feature. It uses the crate **annembed** that gives some statistics on the hnsw graph constructed (and will provide some visualization of data).
-  It is activated by running:
-    -   *cargo build --release --features annembed_f*
+
 
 ## Build on ARM64/aarch64, rust nightly version only
 Nightly rust must be used
@@ -65,7 +69,7 @@ curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 ## setup nightly rust
 rustup default nightly
 ## go to the kmerutils, annembed and archaea directory you just cloned, and change the line: hnsw_rs =  {version = "0.1.15"} to hnsw_rs = {path = "../hnswlib-rs"} in both Cargo.toml
-## same processure with the above regular compiling.
+## same procedure with the above regular compiling.
 ```
 ## Sketching of genomes
 

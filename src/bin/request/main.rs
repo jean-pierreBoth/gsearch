@@ -21,7 +21,7 @@
 
 
 
-use clap::{App, Arg, SubCommand};
+use clap::{Command, Arg};
 
 // for logging (debug mostly, switched at compile time in cargo.toml)
 use env_logger::{Builder};
@@ -52,46 +52,46 @@ pub fn init_log() -> u64 {
 fn main() {
     let _ = init_log();
     //
-    let matches = App::new("request")
-        .arg(Arg::with_name("request_dir")
+    let matches = Command::new("request")
+        .arg(Arg::new("request_dir")
             .long("reqdir")
-            .short("r")
+            .short('r')
             .takes_value(true)
             .help("name of directory containing request genomes to index"))
-        .arg(Arg::with_name("database_dir")
+        .arg(Arg::new("database_dir")
             .long("datadir")
-            .short("b")
+            .short('b')
             .takes_value(true)
             .help("name of directory containing database reference genomes"))            
-        .arg(Arg::with_name("kmer_size")
+        .arg(Arg::new("kmer_size")
             .long("kmer")
-            .short("k")
+            .short('k')
             .takes_value(true)
             .help("expecting a kmer size"))
-        .arg(Arg::with_name("sketch size")
+        .arg(Arg::new("sketch size")
             .long("sketch")
-            .short("s")
+            .short('s')
             .default_value("8")
             .help("size of probinhash sketch, default to 8"))
-        .arg(Arg::with_name("neighbours")
+        .arg(Arg::new("neighbours")
             .long("nbng")
-            .short("n")
+            .short('n')
             .takes_value(true)
             .help("must specify number of neighbours in hnsw"))
-        .arg(Arg::with_name("aa")
+        .arg(Arg::new("aa")
             .help("to specify amino acid seq processing")
             .long("aa")
             .takes_value(false))
-        .arg(Arg::with_name("seq")
+        .arg(Arg::new("seq")
             .long("seq")
             .takes_value(false)
             .help("--seq to get a processing by sequence"))
-        .subcommand(SubCommand::with_name("ann")
+        .subcommand(Command::new("ann")
             .about("annembed usage")
-            .arg(Arg::with_name("stats")
+            .arg(Arg::new("stats")
                 .takes_value(false)
                 .long("stats")
-                .short("s")
+                .short('s')
                 .help("to get stats on nb neighbours"))
         )
         .get_matches();
@@ -99,15 +99,15 @@ fn main() {
 
         let mut ann_params = AnnParameters::new(false);
         match matches.subcommand() {
-            ("ann", Some(ann_match)) => {
+            Some(("ann", ann_match)) => {
                 log::info!("got ann subcommand");
                 if ann_match.is_present("stats") {
                     println!(" got subcommand neighbour stats option");
                     ann_params = AnnParameters::new(true);
                 }
             },
-            ("", None)               => println!("no subcommand at all"),
-            _                        => unreachable!(),
+            None         => println!("no subcommand at all"),
+            _            => unreachable!(),
         }
 
         // by default we process files in one large sequence block
