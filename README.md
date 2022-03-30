@@ -26,7 +26,7 @@ This package is developped by Jean-Pierre Both (https://github.com/jean-pierreBo
   By default archaea uses annembed with openblas-static (compiles and link statically openblas) but you can change in Cargo.toml to intel-mkl-static (which downloads intel-mkl-rc for you).
   openblas-static requires gcc, gfortran and make
 
-    - git clone https://github.com/jean-pierreBoth/annembed.  
+    - download from crate.io or git clone https://github.com/jean-pierreBoth/annembed.  
     annembed is usage in archea is based on openblas-static by default, you can change to intel-mkl-static 
 
 * Clone ARCHAEA, which is not yet in crate.io:
