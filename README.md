@@ -107,12 +107,14 @@ hmmsearch -h
 # Usage
 
 ```bash
-### build database given genome file directory
+### build database given genome file directory, fna.gz was expected. L for nt and .faa or .faa.gz for --aa. Limit for k is 32 (15 not work due to compression), for s is 65535 (u16) and for n is 255 (u8)
 tohnsw -d db_dir_nt -s 12000 -k 21 --ef 1600 -n 128
 tohnsw -d db_dir_aa -s 24000 -k 7 --ef 1600 -n 128 --aa
 ### request neighbours for each genomes in query_dir given pre-built database path
 request -b ./ -d query_dir_nt -n 50
 request -b ./ -d query_dir_aa -n 50 --aa
+
+### 
 ```
 
 
