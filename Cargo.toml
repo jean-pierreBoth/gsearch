@@ -1,12 +1,12 @@
 [package]
 name = "archaea"
-version = "0.0.2"
+version = "0.0.3"
 authors = ["jeanpierre.both@gmail.com"]
-#repository = "https://gitlab.com/jpboth/archaea"
+repository = "https://github.com/jpboth/archaea"
 keywords = ["hnsw", "probminhash", "bacteria"]
 edition = "2021"
 license = "MIT OR Apache-2.0"
-description = "probminhash hnsw archaea"
+description = "genome classification, probminhash hnsw archaea"
 
 
 
@@ -47,18 +47,18 @@ num_cpus = {version = "1.13.0"}
 
 cpu-time = {version = "1.0"}
 needletail = {version = "0.4"}
-clap = {version = "2.33"}
+clap = {version = "3.1"}
 
 ##
 
 probminhash = {version = "0.1.5"}
 #probminhash = {path = "../probminhash"}
-##hnsw_rs =  {version = "0.1.15"}
-hnsw_rs = {path = "../hnswlib-rs"}
+hnsw_rs =  {version = "0.1.15"}
+#hnsw_rs = {path = "../hnswlib-rs"}
 
-#kmerutils = {git = "https://github.com/jean-pierreBoth/kmerutils"}
 #kmerutils = {git = "https://gitlab.com/jpboth/kmerutils"}
-kmerutils = {path = "../kmerutils"}
+#kmerutils = {path = "../kmerutils"}
+kmerutils = {version = "0.0.5"}
 
 lazy_static = { version = "1.4"}
 
@@ -69,10 +69,13 @@ log = { version = "0.4"}
 env_logger = { version = "0.9"}
 
 # optional dependency to embed hnsw grap
-#annembed = {version = "0.0.2", optional = true}
-annembed = {path = "../annembed", optional = true}
+annembed = {version = "0.0.3", optional = true}
+#annembed = {path = "../annembed", optional = true}
+# hack to avoid interaction bug with intel-mkl
+anyhow = { version = "<=1.0.48" }
 
 
 [features]
 
-annembed_f = [ "annembed"]
+annembed_f = [ "annembed/openblas-static"]
+# annembed_f = [ "annembed/intel-mkl-static"]

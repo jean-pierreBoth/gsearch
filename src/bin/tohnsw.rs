@@ -28,7 +28,7 @@
 
 // hnsw should also run in a query server mode after insertion.
 
-use clap::{App, Arg};
+use clap::{Command, Arg};
 
 use std::path::Path;
 
@@ -59,40 +59,40 @@ fn main() {
     let _ = init_log();
     //
     //
-    let matches = App::new("tohnsw")
-        .arg(Arg::with_name("dir")
+    let matches = Command::new("tohnsw")
+        .arg(Arg::new("dir")
             .long("dir")
-            .short("d")
+            .short('d')
             .takes_value(true)
             .required(true)
             .help("name of directory containing genomes to index"))
-        .arg(Arg::with_name("kmer_size")
+        .arg(Arg::new("kmer_size")
             .long("kmer")
-            .short("k")
+            .short('k')
             .required(true)
             .takes_value(true)
             .help("expecting a kmer size"))
-        .arg(Arg::with_name("sketch_size")
+        .arg(Arg::new("sketch_size")
             .long("sketch")
-            .short("s")
+            .short('s')
             .required(true)
             .takes_value(true)
             .help("size of probinhash sketch, default to 256"))
-        .arg(Arg::with_name("neighbours")
+        .arg(Arg::new("neighbours")
             .long("nbng")
-            .short("n")
+            .short('n')
             .required(true)
             .takes_value(true)
             .help("must specify number of neighbours in hnsw"))
-        .arg(Arg::with_name("ef")
+        .arg(Arg::new("ef")
             .long("ef")
             .default_value("400")
             .help("parameters neighbour search at creation"))
-        .arg(Arg::with_name("aa")
+        .arg(Arg::new("aa")
             .help("to specify amino acid seq processing")
             .long("aa")
             .takes_value(false))
-        .arg(Arg::with_name("seq")
+        .arg(Arg::new("seq")
             .long("seq")
             .takes_value(false)
             .help("--seq to get a processing by sequence"))
