@@ -1,6 +1,6 @@
 [package]
 name = "archaea"
-version = "0.0.3"
+version = "0.0.4"
 authors = ["jeanpierre.both@gmail.com"]
 repository = "https://github.com/jpboth/archaea"
 keywords = ["hnsw", "probminhash", "bacteria"]
