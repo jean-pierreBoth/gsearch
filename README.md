@@ -8,31 +8,54 @@ This package is developped by Jean-Pierre Both (https://github.com/jean-pierreBo
 
 # Dependencies and Installation
 
-* pre-compiled binaries are available in the release page for major platforms. For linux based system, no dependencies but system level gfortran must be later than gfortran@5, which means gcc 8.3 or above. If you want to compile from source, see below:
+* pre-compiled binaries are available in the release page for major platforms. 
+
+* Install via conda (recommended):
+
+  On linux server where you do not have sudo privilege (install miniconda3 first):
+
+  `conda activate`
+
+  `conda install zeromq`
+
+  `conda install -c milesgranger rustup`
+
+  `rustup default nightly`
+
+  change to you miniconda installation path
+
+  `LIBZMQ_LIB_DIR=~/miniconda3/lib LIBZMQ_INCLUDE_DIR=~/miniconda3/include cargo install archaea`
+
+  `cargo install --git https://gitlab.com/Jianshu_Zhao/fraggenescanrs`
+
+  `conda install hmmer`
 
 
-*  Clone hnsw-rs, probminhash, kmerutils can be retrieved from crate.io or downloaded by :
+*  Installl from source:
+
+    Clone hnsw-rs, probminhash, kmerutils can be retrieved from crate.io or downloaded by :
 
     - git clone https://github.com/jean-pierreBoth/hnswlib-rs
-
-    - git clone https://github.com/jean-pierreBoth/probminhash
   
+    - git clone https://github.com/jean-pierreBoth/probminhash
+      
     - git clone https://github.com/jean-pierreBoth/kmerutils
 
 
 
-* A dependency is provided as a feature. It uses the crate **annembed** that gives some statistics on the hnsw graph constructed (and will provide some visualization of data).
-  It can be activated by the feature  **annembed_f**.  
-  By default archaea uses annembed with openblas-static (compiles and link statically openblas) but you can change in Cargo.toml to intel-mkl-static (which downloads intel-mkl-rc for you).
-  openblas-static requires gcc, gfortran and make
+A dependency is provided as a feature. It uses the crate **annembed** that gives some statistics on the hnsw graph constructed (and will provide some visualization of data).
+It can be activated by the feature  **annembed_f**.  
+By default archaea uses annembed with openblas-static (compiles and link statically openblas) but you can change in Cargo.toml to intel-mkl-static (which downloads intel-mkl-rc for you).
+openblas-static requires gcc, gfortran and make
 
-    - download from crate.io or git clone https://github.com/jean-pierreBoth/annembed.  
-    annembed is usage in archea is based on openblas-static by default, you can change to intel-mkl-static 
+download from crate.io or git clone https://github.com/jean-pierreBoth/annembed.  
+annembed is usage in archea is based on openblas-static by default, you can change to intel-mkl-static 
 
-* Clone ARCHAEA, which is not yet in crate.io:
-    - git clone https://github.com/jean-pierreBoth/archaea
+Clone ARCHAEA, which is not yet in crate.io:
 
-* Three libraries, zeromq, libsodium and openblas (optional for annembed_f feature) are required to successfully compile. 
+`git clone https://github.com/jean-pierreBoth/archaea`
+
+Three libraries, zeromq, libsodium and openblas (optional for annembed_f feature) are required to successfully compile. 
 
 ```bash
 ### if you are using Linux (ubuntu for example), install them first
@@ -86,10 +109,9 @@ The Dictionary is dumped in a json file *seqdict.json*
 For requests  the module ***request*** is being used. It reloads the dumped files, hnsw and seqdict related
 takes a list of fasta files containing requests and for each fasta file dumps the asked number of nearest neighbours.
 
-## Classify
- The classify module is used to assign taxonomy information from requested neighbours to query genomes. Average nucleitide identity will be calculated. 
 
-### The last step involves a homology search using hmmer, which can be directly installed using conda or brew. If you are using apple M1 ARM/aarch64 structure. This is how you can have a native support of hmmer
+
+The last step involves a homology search using hmmer, which can be directly installed using conda or brew. If you are using apple M1 ARM/aarch64 structure. This is how you can have a native support of hmmer
 
 ```bash
 ### download h3-heno branch of hmmer here (do not git clone but download zip):
