@@ -18,16 +18,28 @@ This package is developped by Jean-Pierre Both (https://github.com/jean-pierreBo
 
   `conda install zeromq`
 
+  
+
+  Install Rustup On linux:
+
   `conda install -c milesgranger rustup`
 
+  Install Rustup on MacOS:
+
+  `curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh`
+
+  
+  
   `rustup default nightly`
-
+  
   change to you miniconda installation path
-
-  `LIBZMQ_LIB_DIR=~/miniconda3/lib LIBZMQ_INCLUDE_DIR=~/miniconda3/include cargo install archaea`
-
+  
+  `a=$(which conda)`
+  
+  `LIBZMQ_LIB_DIR=${a%/*/*}/lib LIBZMQ_INCLUDE_DIR=${a%/*/*}/include cargo install archaea`
+  
   `cargo install --git https://gitlab.com/Jianshu_Zhao/fraggenescanrs`
-
+  
   `conda install hmmer`
 
 
@@ -36,7 +48,7 @@ This package is developped by Jean-Pierre Both (https://github.com/jean-pierreBo
     Clone hnsw-rs, probminhash, kmerutils can be retrieved from crate.io or downloaded by :
 
     - git clone https://github.com/jean-pierreBoth/hnswlib-rs
-  
+    
     - git clone https://github.com/jean-pierreBoth/probminhash
       
     - git clone https://github.com/jean-pierreBoth/kmerutils
