@@ -69,8 +69,8 @@ log = { version = "0.4"}
 env_logger = { version = "0.9"}
 
 # optional dependency to embed hnsw grap
-##annembed = {version = "0.0.4", optional = true}
-annembed = {path = "../annembed-archaea", optional = true}
+annembed = {version = "0.0.4", optional = true}
+##annembed = {path = "../annembed-archaea", optional = true}
 # hack to avoid interaction bug with intel-mkl
 anyhow = { version = "<=1.0.48" }
 
