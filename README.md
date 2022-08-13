@@ -1,6 +1,6 @@
 ![alt text](https://github.com/jean-pierreBoth/archaea/blob/master/GSearch-logo.jpg?raw=true)
 
-# A rust classifier based on HNSW for prokaryotic genomes
+# A rust classifier based on probminhash and HNSW for prokaryotic genomes
 
 ARCHAEA stands for: <u>A</u> <u>R</u>ust <u>C</u>lassifier base on <u>H</u>ierarchical N<u>a</u>vigable SW graphs, <u>e</u>t.<u>a</u>l.**
 
