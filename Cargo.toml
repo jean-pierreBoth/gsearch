@@ -1,6 +1,6 @@
 [package]
 name = "archaea"
-version = "0.0.6"
+version = "0.0.8"
 authors = ["jeanpierre.both@gmail.com"]
 repository = "https://github.com/jean-pierreBoth/archaea"
 keywords = ["hnsw", "probminhash", "bacteria"]
@@ -41,24 +41,23 @@ num = {version = "0.4"}
 crossbeam-utils = {version = "0.8"}
 crossbeam-channel = {version = "0.5"}
 
-parking_lot ={version="0.11"}
+parking_lot ={version="0.12"}
 rayon = {version = "1.5"}
 num_cpus = {version = "1.13.0"}
 
 cpu-time = {version = "1.0"}
 needletail = {version = "0.4"}
-clap = {version = "3.1"}
+clap = {version = "3.2"}
 
 ##
 
 probminhash = {version = "0.1.5"}
 #probminhash = {path = "../probminhash"}
-hnsw_rs =  {version = "0.1.15"}
+hnsw_rs =  {version = "0.1.16"}
 #hnsw_rs = {path = "../hnswlib-rs"}
 
-#kmerutils = {git = "https://gitlab.com/jpboth/kmerutils"}
 #kmerutils = {path = "../kmerutils"}
-kmerutils = {version = "0.0.5"}
+kmerutils = {version = "0.0.6"}
 
 lazy_static = { version = "1.4"}
 
@@ -68,14 +67,18 @@ lazy_static = { version = "1.4"}
 log = { version = "0.4"}
 env_logger = { version = "0.9"}
 
-# optional dependency to embed hnsw grap
-annembed = {version = "0.0.4", optional = true}
-##annembed = {path = "../annembed-archaea", optional = true}
-# hack to avoid interaction bug with intel-mkl
-anyhow = { version = "<=1.0.48" }
+# optional dependency to embed hnsw graph
+annembed = {version = "0.0.8", optional = true}
+#annembed = {path = "../annembed", optional = true}
+# no more pb with between anyhow intel-mkl-src
+anyhow = { version = "1.0.58" }
 
 
 [features]
 
-annembed_f = [ "annembed/openblas-static"]
-# annembed_f = [ "annembed/intel-mkl-static"]
+annembed_openblas-static = [ "annembed/openblas-static"]
+annembed_openblas-system = [ "annembed/openblas-system"]
+annembed_intel-mkl = [ "annembed/intel-mkl-static"]
+
+withzmq = ["kmerutils/withzmq"]
+
