@@ -12,14 +12,14 @@ pub fn get_graph_stats_embed<T, D>(hnsw: &Hnsw<T,D>, embed : bool) -> Result<(),
     let knbn = 8;
     log::info!("calling kgraph_from_hnsw_all, embed = {}", embed);
 
-    let kgraph_res = kgraph_from_hnsw_all::<T, D, f32>(hnsw, knbn);
+    let kgraph_res = annembed::fromhnsw::kgraph_from_hnsw_all::<T, D, f32>(hnsw, knbn);
     if let Ok(kgraph) = kgraph_res {
         // we are just interested in quantile statistics on first distance to neighbours.
         log::info!(" computing graph statistics");
         let _kgraph_stats = kgraph.get_kraph_stats();
         if embed {
             log::info!(" going to embedding");
-            let mut embed_params = EmbedderParams::new();
+            let mut embed_params = EmbedderParams::default();
             embed_params.nb_grad_batch = 15;
             embed_params.scale_rho = 0.5;
             embed_params.beta = 1.;

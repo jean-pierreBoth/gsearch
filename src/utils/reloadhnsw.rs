@@ -57,9 +57,9 @@ pub fn reload_hnsw<T>(dump_dirpath : &Path, _ann_params: &AnnParameters) -> Opti
         println!("reload_hnsw : elapsed system time(s) {}", elapsed_t);
     }
     // feature enabled (or not) in Cargo.toml, requires the crate annembed
-    #[cfg(feature="annembed_f")]
+    #[cfg(any(feature="annembed_openblas-system", feature="annembed_openblas-static" , feature="annembed_intel-mkl"))]
     if _ann_params.ask_stats() {
-        let _ = crate::utils::embed::get_graph_stats_embed(&hnsw, false);
+        let _ = super::embed::get_graph_stats_embed(&hnsw, false);
     }
     //
     return Some(hnsw);

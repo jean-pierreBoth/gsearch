@@ -54,6 +54,7 @@ request -b ./ -d query_dir_aa -n 50 --aa
     or on intel :  
     cargo build --release --features="annembed_openblas-system" --features="hnsw_rs/simdeez_f"
 
+Alternatively it is possible to modify the features section in  Cargo.toml. Just fill in the default you want.
 
 ### Some hints in case of problem are given [here](./installpb.md)
 ### Homology search

@@ -76,6 +76,9 @@ anyhow = { version = "1.0.58" }
 
 [features]
 
+default = []
+#default = ["annembed_openblas-system" ]
+
 annembed_openblas-static = [ "annembed/openblas-static"]
 annembed_openblas-system = [ "annembed/openblas-system"]
 annembed_intel-mkl = [ "annembed/intel-mkl-static"]
