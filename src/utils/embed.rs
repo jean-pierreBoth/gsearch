@@ -1,17 +1,15 @@
 //! module doing some interface to annembed
 //! Provides some statistics on hnw graph reloaded to do archaea identification/  
 //! Provide also an embedding if asked for
+//! 
 
+use csv::Writer;
+
+// our use
+use hnsw_rs::prelude::*;
 use annembed::fromhnsw::kgraph_from_hnsw_all;
 use annembed::prelude::*;
-use csv::Writer;
-use hnsw_rs::prelude::*;
-use log;
-//use ndarray::{s, Array1, Array3};
-//use std::fs::OpenOptions;
-//use std::io::prelude::*;
-//use std::io::BufReader;
-//use std::path::PathBuf;
+
 
 pub fn get_graph_stats_embed<T, D>(hnsw: &Hnsw<T, D>, embed: bool) -> Result<(), ()>
 where
@@ -37,7 +35,6 @@ where
             embed_params.dmap_init = true;
             let mut embedder = Embedder::new(&kgraph, embed_params);
             let embed_res = embedder.embed();
-
             if embed_res.is_err() {
                 log::error!("embedding failed");
                 std::process::exit(1);
