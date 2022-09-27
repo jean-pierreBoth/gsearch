@@ -72,7 +72,7 @@ annembed = {version = "0.0.8", optional = true}
 #annembed = {path = "../annembed", optional = true}
 # no more pb with between anyhow intel-mkl-src
 anyhow = { version = "1.0.58" }
-
+csv = {version = "1.1"}
 
 [features]
 
