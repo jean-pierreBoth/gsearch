@@ -28,11 +28,15 @@ where
             log::info!(" going to embedding");
             let mut embed_params = EmbedderParams::default();
             embed_params.nb_grad_batch = 15;
-            embed_params.scale_rho = 0.5;
+            embed_params.scale_rho = 0.75;
             embed_params.beta = 1.;
             embed_params.grad_step = 3.;
             embed_params.nb_sampling_by_edge = 10;
             embed_params.dmap_init = true;
+            if hnsw.get_point_indexation().get_layer_nb_point(1) > 30000 {
+                log::info!("doing hierarchical embedding from layer 1");
+                embed_params.set_hierarchy_layer(1);
+            }
             let mut embedder = Embedder::new(&kgraph, embed_params);
             let embed_res = embedder.embed();
             if embed_res.is_err() {

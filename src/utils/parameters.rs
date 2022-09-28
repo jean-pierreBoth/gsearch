@@ -65,12 +65,14 @@ impl HnswParams {
 pub struct AnnParameters {
     /// true to get statistics on neighbours
     ask_stats : bool,
+    /// do an embedding or not
+    embed : bool,
 } // end of 
 
 impl AnnParameters {
-    // default initiaization is false
-    pub fn new(ask_stats : bool) -> Self {
-        AnnParameters{ask_stats}
+    // default initiaization is false for embed
+    pub fn new(ask_stats : bool, embed : bool) -> Self {
+        AnnParameters{ask_stats, embed}
     }
 
     /// returns if stats on distance on nearest neighbours resulting from hnsw information were asked for
@@ -79,6 +81,9 @@ impl AnnParameters {
         self.ask_stats
     }
 
+    pub fn embed(&self) -> bool {
+        self.embed
+    }
 } // end of impl AnnParameters
 
 

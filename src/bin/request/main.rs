@@ -99,22 +99,34 @@ fn main() {
                 .long("stats")
                 .short('s')
                 .help("to get stats on nb neighbours"))
+            .arg(Arg::new("embed")
+                .takes_value(false)
+                .long("embed")
+                .help("--embed to do an embedding")
+            )
         )
         .get_matches();
 
 
-        let mut ann_params = AnnParameters::new(false);
+        let mut ask_stats = false;
+        let mut embed = false;
         match matches.subcommand() {
             Some(("ann", ann_match)) => {
                 log::info!("got ann subcommand");
                 if ann_match.is_present("stats") {
+                    ask_stats = true;
                     println!(" got subcommand neighbour stats option");
-                    ann_params = AnnParameters::new(true);
+                }
+                //
+                if ann_match.is_present("embed") {
+                    embed = true;
+                    println!(" got subcommand do embedding");
                 }
             },
             None         => println!("no subcommand at all"),
             _            => unreachable!(),
         }
+        let ann_params = AnnParameters::new(ask_stats, embed);
 
         // by default we process files in one large sequence block
         // decode matches, check for request_dir
