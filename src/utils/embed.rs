@@ -49,8 +49,10 @@ where
             // we can use get_embedded_reindexed as we indexed DataId contiguously in hnsw!
             let _res = write_csv_array2(&mut csv_w, &embedder.get_embedded_reindexed());
             csv_w.flush().unwrap();
-
             log::info!(" embedding finished");
+            // try to get a quality indicator
+            log::info!("calling embedder.get_quality_estimate_from_edge_length");
+            let _quality = embedder.get_quality_estimate_from_edge_length(200);
         } // end of embedding
     } else {
         log::error!("could not get graph stats from hnsw");
