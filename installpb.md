@@ -13,7 +13,6 @@
   Install Rustup.  On linux: `conda install -c milesgranger rustup` or on MacOs :  
   `curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh`
 
-  
   `rustup default nightly`
   
   change to you miniconda installation path
@@ -27,7 +26,7 @@
   `conda install hmmer`
 
 
- 
+
 
 ### zmq and libsodium install on linux
 
@@ -85,4 +84,24 @@ rustup default nightly
 ## same procedure with the above regular compiling.
 ```
 
+### Homology search
 
+
+The last step involves a homology search using hmmer, which can be directly installed using conda or brew on Intel CPUs. If you are using apple M series ARM64/aarch64 structure, you can have a native support of hmmer folloing the steps:
+
+```bash
+### download h3-heno branch of hmmer here (do not git clone but download zip):
+
+https://github.com/EddyRivasLab/hmmer/tree/h3-arm
+
+## go into the donwloaded directory and download Easel develop branch here (do not git clone but download zip) :
+cd h3-arm
+https://github.com/EddyRivasLab/easel/tree/develop
+
+## compile, or you can download binaries from here: https://github.com/jianshu93/hmmer-h3-arm
+autoconf
+./configure
+make -j 8
+sudo make install
+hmmsearch -h
+```
