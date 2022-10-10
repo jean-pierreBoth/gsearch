@@ -63,7 +63,14 @@ request -b ./ -d query_dir_universal_aa -n 50 --aa
 ###A simple installation, with annembed enabled would be:
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 cargo install archaea --features="annembed_intel-mkl"
+###on MacOS, which requires dynamic library link:
+cargo install archaea --features="annembed_openblas-system" 
 
+##Or download to local via
+git clone https://github.com/jean-pierreBoth/archaea
+cd archaea
+## build
+cargo build --release --features="annembed_openblas-static" 
 ###on MacOS, which requires dynamic library link:
 cargo build --release --features="annembed_openblas-system" 
 
