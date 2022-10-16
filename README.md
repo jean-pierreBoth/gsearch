@@ -66,6 +66,11 @@ cargo install archaea --features="annembed_intel-mkl"
 ###on MacOS, which requires dynamic library link:
 cargo install archaea --features="annembed_openblas-system" 
 
+### Install the most recent version from github:
+
+cargo install archaea --features="annembed_intel-mkl" --git https://github.com/jean-pierreBoth/archaea
+
+
 ##Or download to local via
 git clone https://github.com/jean-pierreBoth/archaea
 cd archaea
