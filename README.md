@@ -35,7 +35,7 @@ tar xzvf ./GTDB_r207_hnsw_graph.tar.gz
 cd ./GTDB_r207_hnsw_graph/nucl
 ### request neighbors for nt genomes
 request -b ./ -d query_dir_nt -n 50
-### request neighbors for aa genomes (predicated by Prodigal or FragGeneScanRs)
+### request neighbors for aa genomes (predicted by Prodigal or FragGeneScanRs)
 cd ./GTDB_r207_hnsw_graph/prot
 request -b ./ -d query_dir_aa -n 50 --aa
 ### request neighbors for aa universal gene (extracted by hmmer according to hmm files provided)
@@ -63,13 +63,17 @@ request -b ./ -d query_dir_universal_aa -n 50 --aa
 ###A simple installation, with annembed enabled would be:
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 cargo install archaea --features="annembed_intel-mkl"
-###on MacOS, which requires dynamic library link:
+
+###on MacOS, which requires dynamic library link (you have to install openblas first, the MacOS/Darwin binary provided also requires this):
+### install openblas on intel MACs (note that openblas install lib path is different on M1 MACs)
+brew install openblas
+echo 'export LDFLAGS="-L/usr/local/opt/openblas/lib"' >> ~/.bash_profile
+echo 'export CPPFLAGS="-I/usr/local/opt/openblas/include"' >> ~/.bash_profile
+echo 'export PKG_CONFIG_PATH="/usr/local/opt/openblas/lib/pkgconfig"' >> ~/.bash_profile
 cargo install archaea --features="annembed_openblas-system" 
 
 ### Install the most recent version from github:
-
 cargo install archaea --features="annembed_intel-mkl" --git https://github.com/jean-pierreBoth/archaea
-
 
 ##Or download to local via
 git clone https://github.com/jean-pierreBoth/archaea
