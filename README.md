@@ -64,9 +64,9 @@ request -b ./ -d query_dir_universal_aa -n 50 --aa
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 cargo install archaea --features="annembed_intel-mkl"
 
-###on MacOS, which requires dynamic library link (you have to install openblas first, the MacOS/Darwin binary provided also requires this):
+###on MacOS, which requires dynamic library link (you have to install openblas first and then xz, the MacOS/Darwin binary provided also requires this):
 ### install openblas on intel MACs (note that openblas install lib path is different on M1 MACs)
-brew install openblas
+brew install openblas xz
 echo 'export LDFLAGS="-L/usr/local/opt/openblas/lib"' >> ~/.bash_profile
 echo 'export CPPFLAGS="-I/usr/local/opt/openblas/include"' >> ~/.bash_profile
 echo 'export PKG_CONFIG_PATH="/usr/local/opt/openblas/lib/pkgconfig"' >> ~/.bash_profile
