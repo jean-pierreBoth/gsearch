@@ -2,7 +2,7 @@
 
 # A rust classifier based on probminhash and HNSW for microbial genomes
 
-ARCHAEA stands for: <u>A</u> <u>R</u>ust <u>C</u>lassifier base on <u>H</u>ierarchical N<u>a</u>vigable SW graphs, <u>e</u>t.<u>a</u>l.** Later on, we rename it to GSearch, stands of Genomic Search.
+ARCHAEA stands for: <u>A</u> <u>R</u>ust <u>C</u>lassifier based on <u>H</u>ierarchical N<u>a</u>vigable SW graphs, <u>e</u>t.<u>a</u>l.. Later on, we renamed it to **GSearch**, stands for <u>G</u>enomic <u>Search</u>.
 
 This package (**currently in development**) compute probminhash signature of  bacteria and archaea (or virus and fungi) genomes and stores the id of bacteria and probminhash signature in a Hnsw structure for searching of new request genomes.
 
@@ -12,7 +12,7 @@ This package is developped by Jean-Pierre Both (https://github.com/jean-pierreBo
 
 The sketching and database is done by the module ***tohnsw***.
 
-The sketching of reference genomes can take some time (one or 2 hours for 50000 bacterial genomes of NCBI for parameters giving a correct quality of sketching). Result is stored in 2 structures:
+The sketching of reference genomes can take some time (one or 2 hours for ~65,000 bacterial genomes of NCBI for parameters giving a correct quality of sketching). Result is stored in 2 structures:
 - A Hnsw structure storing rank of data processed and corresponding sketches.
 - A Dictionary associating each rank to a fasta id and fasta filename.
 
@@ -92,7 +92,11 @@ cargo install --git https://gitlab.com/Jianshu_Zhao/fraggenescanrs
 
 Alternatively it is possible to modify the features section in  Cargo.toml. Just fill in the default you want.
 
-### Some hints in case of problem (including installing/compiling on ARM CPUs) are given [here](./installpb.md)
+### Output explanation
+
+Archaea.answer is the default output file in your current directory. For each of your genome in the query_dir, there will be requested N nearest genomes found and sorted by distance (smallest to largest). if one genome in the query does not exist in the output file, meaning at this level (nt or aa), there is no such nearest genomes in the database (or distant away from the best hit in the database). You may then go to amino acid level or universal gene level.
+
+### Some hints in case of problem (including installing/compiling on ARM64 CPUs) are given [here](./installpb.md)
 
 ### Pre-built databases
 
@@ -101,4 +105,4 @@ We provide pre-built genome/proteome database graph file for bacteria/archaea, v
 - Bacteria/archaea genomes are the newest version of GTDB database (https://gtdb.ecogenomic.org), which defines a bacterial speces at 95% ANI. Note that GSearch can also run for even higher resolution species database such as 99% ANI.
 - Virus data base are based on the JGI IMG/VR database newest version (https://genome.jgi.doe.gov/portal/IMG_VR/IMG_VR.home.html), which also define a virus OTU (vOTU) at 95% ANI.  
 - Fungi database are based on the entire RefSeq fungal genomes (retrived via the MycoCosm website), we dereplicated and define a fungal speices at 99.5% ANI. 
-- All three pre-built database can be available here:http://enve-omics.ce.gatech.edu/data/gsearch 
+- All three pre-built databases are available here:http://enve-omics.ce.gatech.edu/data/gsearch 
