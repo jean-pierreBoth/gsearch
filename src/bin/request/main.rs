@@ -7,15 +7,19 @@
 //! Module request
 //! try to match fasta sequence with repsect to database
 //! 
-//! request --database [-b] basedirname --query [-r]  requestdir --nbsearch [-n] nbanswers -s sketch_size [ann]
+//! request --database [-b] basedirname --query [-r]  requestdir -n neighbours [ann]
 //! 
 //! - database is the name of directory containing hnsw dump files and seqdict dump
 //! - requestdir is a directory containing list of fasta file containing sequence to search for
 //!  
+//! -n number of neighbours asked for. number of neighbours used in possible ann directive
 //! --aa : set if data to process are Amino Acid sequences. Default is DNA
 
 //!
-//! [ann] is an optional subcommand asking for some statistics on distances between hnsw items
+//! [ann] is an optional subcommand asking for some statistics on distances between hnsw items or get an embedding of data
+//!     --stats gives statistics on distances between neighbours
+//!     --embed does a 2 dimensional embedding using the crate [annembed](https://crates.io/crates/annembed).
+//! 
 //! In fact as in basedirname there must be a file (processingparams.json) specifying sketch size and kmer size, these
 //! 2 options are useless in standard mode.
 
