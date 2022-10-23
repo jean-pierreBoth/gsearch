@@ -44,6 +44,13 @@ request -b ./ -d query_dir_universal_aa -n 50 --aa
 ```
 
 
+
+## Output explanation
+
+Archaea.answer is the default output file in your current directory.  
+ For each of your genome in the query_dir, there will be requested N nearest genomes found and sorted by distance (smallest to largest).  
+  If one genome in the query does not exist in the output file, meaning at this level (nt or aa), there is no such nearest genomes in the database (or distant away from the best hit in the database), you may then go to amino acid level or universal gene level.
+
 ## Dependencies, features and Installation
 
 ### Features
@@ -122,12 +129,6 @@ cargo build --release --features="annembed_openblas-system"
 cargo install --git https://gitlab.com/Jianshu_Zhao/fraggenescanrs
 ```
 
-
-### Output explanation
-
-Archaea.answer is the default output file in your current directory.  
- For each of your genome in the query_dir, there will be requested N nearest genomes found and sorted by distance (smallest to largest).  
-  If one genome in the query does not exist in the output file, meaning at this level (nt or aa), there is no such nearest genomes in the database (or distant away from the best hit in the database), you may then go to amino acid level or universal gene level.
 
 ### Some hints in case of problem (including installing/compiling on ARM64 CPUs) are given [here](./installpb.md)
 
