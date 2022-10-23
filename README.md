@@ -46,59 +46,92 @@ request -b ./ -d query_dir_universal_aa -n 50 --aa
 
 ## Dependencies, features and Installation
 
-### features
+### Features
 
 
 * hnsw_rs relies on the crate simdeez to accelerate distance computation. On intel you can build hnsw_rs with the feature simdeez_f
 
 * annembed relies on openblas so you must choose between  the features "annembed_openblas-static" , "annembed_openblas-system" or "annembed_intel-mkl". You may need to install gcc, gfortran and make.
-
+This can be done using the **--features** option as explained below, or by modifying the features section in  Cargo.toml. In that case just fill in the default you want.
 * kmerutils provides a feature "withzmq". This feature can be used to store compressed qualities on a server and run requests. It is not necessary in this crate.
 
 ### Simple case for install:
 
-**Pre-built binaries** are available on release page (https://github.com/jean-pierreBoth/archaea/releases/tag/v1.0) for major platforms. If you wan to install/compiling by yourself:
+**Pre-built binaries** will be available on release page (https://github.com/jean-pierreBoth/archaea/releases/tag/v1.0) for major platforms. 
+
+Otherwise it is possible to install/compile by yourself:
+
+#### First install Rust tools
 
 ```bash
-###A simple installation, with annembed enabled would be:
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
-cargo install archaea --features="annembed_intel-mkl"
+```
 
-###on MacOS, which requires dynamic library link (you have to install openblas first and then xz, the MacOS/Darwin binary provided also requires this):
-### install openblas on intel MACs (note that openblas install lib path is different on M1 MACs)
+#### archaea installation and compilation from Crates.io
+-  simple installation, with annembed enabled would be with intel-mkl
+
+```bash
+cargo install archaea --features="annembed_intel-mkl"
+```
+
+or with a system installed openblas:
+
+```bash
+cargo build --release --features="annembed_openblas-system" 
+```
+ - On MacOS, which requires dynamic library link (you have to install openblas first and then xz, the MacOS/Darwin binary provided also requires this):
+(note that openblas install lib path is different on M1 MACs).  
+So you need to run:
+
+```bash
 brew install openblas xz
 echo 'export LDFLAGS="-L/usr/local/opt/openblas/lib"' >> ~/.bash_profile
 echo 'export CPPFLAGS="-I/usr/local/opt/openblas/include"' >> ~/.bash_profile
 echo 'export PKG_CONFIG_PATH="/usr/local/opt/openblas/lib/pkgconfig"' >> ~/.bash_profile
-cargo install archaea --features="annembed_openblas-system" 
+cargo install archaea --features="annembed_openblas-system"
+```
 
-### Install the most recent version from github:
+
+- Intel:  
+  You can enable simd instruction with the feature hnsw_rs/simdeez_f.  
+Using openblas instead of intel-mkl you would run:  
+```bash
+cargo build --release --features="annembed_openblas-system" --features="hnsw_rs/simdeez_f"
+```
+
+#### Archaea installation from the most recent version from github
+
+- direct installation from github:  
+```bash
 cargo install archaea --features="annembed_intel-mkl" --git https://github.com/jean-pierreBoth/archaea
+```
 
-##Or download to local via
+- download and compilation:
+```bash
 git clone https://github.com/jean-pierreBoth/archaea
 cd archaea
 ## build
 cargo build --release --features="annembed_openblas-static" 
 ###on MacOS, which requires dynamic library link:
 cargo build --release --features="annembed_openblas-system" 
+```
 
-##or on intel using openblas instead of intel-mkl:  
-cargo build --release --features="annembed_openblas-system" --features="hnsw_rs/simdeez_f"
 
-###Then install FragGeneScanRs:
+### Then install FragGeneScanRs:
+```bash
 cargo install --git https://gitlab.com/Jianshu_Zhao/fraggenescanrs
 ```
 
-Alternatively it is possible to modify the features section in  Cargo.toml. Just fill in the default you want.
 
 ### Output explanation
 
-Archaea.answer is the default output file in your current directory. For each of your genome in the query_dir, there will be requested N nearest genomes found and sorted by distance (smallest to largest). if one genome in the query does not exist in the output file, meaning at this level (nt or aa), there is no such nearest genomes in the database (or distant away from the best hit in the database). You may then go to amino acid level or universal gene level.
+Archaea.answer is the default output file in your current directory.  
+ For each of your genome in the query_dir, there will be requested N nearest genomes found and sorted by distance (smallest to largest).  
+  If one genome in the query does not exist in the output file, meaning at this level (nt or aa), there is no such nearest genomes in the database (or distant away from the best hit in the database), you may then go to amino acid level or universal gene level.
 
 ### Some hints in case of problem (including installing/compiling on ARM64 CPUs) are given [here](./installpb.md)
 
-### Pre-built databases
+## Pre-built databases
 
 We provide pre-built genome/proteome database graph file for bacteria/archaea, virus and fungi. Proteome database are based on genes for each genome, predicted by FragGeneScanRs (https://gitlab.com/Jianshu_Zhao/fraggenescanrs) for bacteria/archaea/virus and GeneMark-ES version 2 (http://exon.gatech.edu/GeneMark/license_download.cgi) for fungi.  
 
