@@ -82,7 +82,7 @@ fn main() {
             .long("sketch")
             .short('s')
             .default_value("8")
-            .help("size of probinhash sketch, default to 8"))
+            .help("size of probminhash sketch, default to 8"))
         .arg(Arg::new("neighbours")
             .long("nbng")
             .short('n')
