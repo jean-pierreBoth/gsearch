@@ -101,7 +101,7 @@ cargo install archaea --features="annembed_openblas-system"
 
 - Intel:  
   You can enable simd instruction with the feature hnsw_rs/simdeez_f.  
-Using openblas instead of intel-mkl you would run:  
+  Using openblas instead of intel-mkl you would run:  
 ```bash
 cargo build --release --features="annembed_openblas-system" --features="hnsw_rs/simdeez_f"
 ```
@@ -140,3 +140,10 @@ We provide pre-built genome/proteome database graph file for bacteria/archaea, v
 - Virus data base are based on the JGI IMG/VR database newest version (https://genome.jgi.doe.gov/portal/IMG_VR/IMG_VR.home.html), which also define a virus OTU (vOTU) at 95% ANI.  
 - Fungi database are based on the entire RefSeq fungal genomes (retrived via the MycoCosm website), we dereplicated and define a fungal speices at 99.5% ANI. 
 - All three pre-built databases are available here:http://enve-omics.ce.gatech.edu/data/gsearch 
+
+
+
+## References
+
+1. Zhao, J.*, et al.* GSearch: Ultra-Fast and Scalable Microbial Genome Search by combining Kmer Hashing with Hierarchical Navigable Small World Graphs. *bioRxiv* 2022:2022.2010.2021.513218. [https://www.biorxiv.org/content/10.1101/2022.10.21.513218v1].
+
