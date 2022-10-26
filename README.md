@@ -74,7 +74,7 @@ Otherwise it is possible to install/compile by yourself:
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 ```
 
-#### archaea installation and compilation from Crates.io
+#### archaea installation and compilation from Crates.io (Recommended)
 -  simple installation, with annembed enabled would be with intel-mkl
 
 ```bash
