@@ -28,7 +28,7 @@ where
             log::info!(" going to embedding");
             let mut embed_params = EmbedderParams::default();
             embed_params.nb_grad_batch = 15;
-            embed_params.scale_rho = 0.50;
+            embed_params.scale_rho = 0.75;
             embed_params.beta = 1.;
             embed_params.grad_step = 3.;
             embed_params.nb_sampling_by_edge = 10;
