@@ -40,7 +40,7 @@ fn sketch_and_request_dir_compressedkmer<Kmer:CompressedKmerT>(request_dirpath :
     log::info!("sketch_and_request kmer size  {}  sketch size {} ", sketcher_params.get_kmer_size(), sketcher_params.get_sketch_size());
     let out_threshold = 0.99;  // TODO threshold needs a test to get initialized!
     // creating an output file in the current directory
-    let outname = "archaea.answers";
+    let outname = "gsearch.answers";
     let outpath = PathBuf::from(outname.clone());
     let outfile = OpenOptions::new().write(true).create(true).truncate(true).open(&outpath);
     if outfile.is_err() {

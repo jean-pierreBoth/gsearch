@@ -1,8 +1,9 @@
-![alt text](https://github.com/jean-pierreBoth/archaea/blob/master/GSearch-logo.jpg?raw=true)
+![alt text](https://github.com/jean-pierreBoth/gsearch/blob/master/GSearch-logo.jpg?raw=true)
 
 # A rust classifier based on probminhash and HNSW for microbial genomes
 
-ARCHAEA stands for: <u>A</u> <u>R</u>ust <u>C</u>lassifier based on <u>H</u>ierarchical N<u>a</u>vigable SW graphs, <u>e</u>t.<u>a</u>l.. Later on, we renamed it to **GSearch**, stands for <u>G</u>enomic <u>Search</u>.
+gsearch is the new name of the crate archaea.  It stands for **genomic search**
+ARCHAEA stands for: <u>A</u> <u>R</u>ust <u>C</u>lassifier based on <u>H</u>ierarchical N<u>a</u>vigable SW graphs, <u>e</u>t.<u>a</u>l.. 
 
 This package (**currently in development**) compute probminhash signature of  bacteria and archaea (or virus and fungi) genomes and stores the id of bacteria and probminhash signature in a Hnsw structure for searching of new request genomes.
 
@@ -47,7 +48,7 @@ request -b ./ -d query_dir_universal_aa -n 50 --aa
 
 ## Output explanation
 
-Archaea.answer is the default output file in your current directory.  
+Archaea.answers is the default output file in your current directory.  
  For each of your genome in the query_dir, there will be requested N nearest genomes found and sorted by distance (smallest to largest).  
   If one genome in the query does not exist in the output file, meaning at this level (nt or aa), there is no such nearest genomes in the database (or distant away from the best hit in the database), you may then go to amino acid level or universal gene level.
 
@@ -64,7 +65,7 @@ This can be done using the **--features** option as explained below, or by modif
 
 ### Simple case for install:
 
-**Pre-built binaries** will be available on release page (https://github.com/jean-pierreBoth/archaea/releases/tag/v0.0.10) for major platforms. 
+**Pre-built binaries** will be available on release page (https://github.com/jean-pierreBoth/gsearch/releases/tag/v0.0.10) for major platforms. 
 
 Otherwise it is possible to install/compile by yourself:
 
@@ -74,11 +75,11 @@ Otherwise it is possible to install/compile by yourself:
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 ```
 
-#### archaea installation and compilation from Crates.io (Recommended)
+#### gsearch installation and compilation from Crates.io (Recommended)
 -  simple installation, with annembed enabled would be with intel-mkl
 
 ```bash
-cargo install archaea --features="annembed_intel-mkl"
+cargo install gsearch --features="annembed_intel-mkl"
 ```
 
 or with a system installed openblas:
@@ -95,7 +96,7 @@ brew install openblas xz
 echo 'export LDFLAGS="-L/usr/local/opt/openblas/lib"' >> ~/.bash_profile
 echo 'export CPPFLAGS="-I/usr/local/opt/openblas/include"' >> ~/.bash_profile
 echo 'export PKG_CONFIG_PATH="/usr/local/opt/openblas/lib/pkgconfig"' >> ~/.bash_profile
-cargo install archaea --features="annembed_openblas-system"
+cargo install gsearch --features="annembed_openblas-system"
 ```
 
 
@@ -106,17 +107,17 @@ cargo install archaea --features="annembed_openblas-system"
 cargo build --release --features="annembed_openblas-system" --features="hnsw_rs/simdeez_f"
 ```
 
-#### Archaea installation from the most recent version from github
+#### gsearch installation from the most recent version from github
 
 - direct installation from github:  
 ```bash
-cargo install archaea --features="annembed_intel-mkl" --git https://github.com/jean-pierreBoth/archaea
+cargo install gsearch --features="annembed_intel-mkl" --git https://github.com/jean-pierreBoth/gsearch
 ```
 
 - download and compilation:
 ```bash
-git clone https://github.com/jean-pierreBoth/archaea
-cd archaea
+git clone https://github.com/jean-pierreBoth/gsearch
+cd gsearch
 ## build
 cargo build --release --features="annembed_openblas-static" 
 ###on MacOS, which requires dynamic library link:
@@ -145,5 +146,5 @@ We provide pre-built genome/proteome database graph file for bacteria/archaea, v
 
 ## References
 
-1. Jianshu Zhao, Jean Pierre-Both, Luis M. Rodriguez-R and Konstantinos T. Konstantinidis, 2022. GSearch: Ultra-Fast and Scalable Microbial Genome Search by combining Kmer Hashing with Hierarchical Navigable Small World Graphs. *bioRxiv* 2022:2022.2010.2021.513218. [https://www.biorxiv.org/content/10.1101/2022.10.21.513218v1].
+1. Jianshu Zhao, Jean Pierre-Both, Luis M. Rodriguez-R and Konstantinos T. Konstantinidis, 2022. GSearch: Ultra-Fast and Scalable Microbial Genome Search by combining Kmer Hashing with Hierarchical Navigable Small World Graphs. *bioRxiv* 2022:2022.2010.2021.513218. [biorxiv](https://www.biorxiv.org/content/10.1101/2022.10.21.513218v1).
 

@@ -1,5 +1,5 @@
 //! module doing some interface to annembed
-//! Provides some statistics on hnw graph reloaded to do archaea identification/  
+//! Provides some statistics on hnw graph reloaded to do genome identification/  
 //! Provide also an embedding if asked for
 //! 
 

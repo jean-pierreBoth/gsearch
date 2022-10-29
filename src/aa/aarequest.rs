@@ -47,7 +47,7 @@ fn sketch_and_request_dir_compressedkmer<Kmer:CompressedKmerT>(request_dirpath :
     // TODO This parameter needs to be analyzed and initialized depending on kmer size and sequences structure 
     let out_threshold = 0.99;
     // creating an output file in the current directory
-    let outname = "archea.answers";
+    let outname = "gsearch.answers";
     let outpath = PathBuf::from(outname.clone());
     let outfile = OpenOptions::new().write(true).create(true).truncate(true).open(&outpath);
     if outfile.is_err() {

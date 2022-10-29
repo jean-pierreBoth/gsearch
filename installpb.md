@@ -19,7 +19,7 @@
   
   `a=$(which conda)`
   
-  `LIBZMQ_LIB_DIR=${a%/*/*}/lib LIBZMQ_INCLUDE_DIR=${a%/*/*}/include cargo install archaea`
+  `LIBZMQ_LIB_DIR=${a%/*/*}/lib LIBZMQ_INCLUDE_DIR=${a%/*/*}/include cargo install gsearch`
   
   `cargo install --git https://gitlab.com/Jianshu_Zhao/fraggenescanrs`
   
@@ -51,7 +51,7 @@ brew install openblas
 echo 'export LDFLAGS="-L/usr/local/opt/openblas/lib"' >> ~/.bash_profile
 echo 'export CPPFLAGS="-I/usr/local/opt/openblas/include"' >> ~/.bash_profile
 echo 'export PKG_CONFIG_PATH="/usr/local/opt/openblas/lib/pkgconfig"' >> ~/.bash_profile
-cd archaea
+cd gsearch
 cargo build --release --features annembed_openblas-system
 ```
 or, if openblas library is not needed
@@ -84,7 +84,7 @@ Nightly rust must be used
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 ## setup nightly rust
 rustup default nightly
-## go to the kmerutils, annembed and archaea directory you just cloned, and change the line: hnsw_rs =  {version = "0.1.15"} to hnsw_rs = {path = "../hnswlib-rs"} in both Cargo.toml
+## go to the kmerutils, annembed and gsearch directory you just cloned, and change the line: hnsw_rs =  {version = "0.1.15"} to hnsw_rs = {path = "../hnswlib-rs"} in both Cargo.toml
 ## same procedure with the above regular compiling.
 ```
 

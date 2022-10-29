@@ -40,9 +40,9 @@ use env_logger::{Builder};
 
 // our crate
 
-use archaea::dna::dnasketch::dna_process_tohnsw;
-use archaea::aa::aasketch::aa_process_tohnsw;
-use archaea::utils::*;
+use gsearch::dna::dnasketch::dna_process_tohnsw;
+use gsearch::aa::aasketch::aa_process_tohnsw;
+use gsearch::utils::*;
 
 //=========================================================================
 

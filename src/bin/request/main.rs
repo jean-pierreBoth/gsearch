@@ -42,9 +42,9 @@ use std::path::{Path};
 
 
 //mod files;
-use archaea::utils::*;
-use archaea::dna::dnarequest;
-use archaea::aa::aarequest;
+use gsearch::utils::*;
+use gsearch::dna::dnarequest;
+use gsearch::aa::aarequest;
 
 
 // install a logger facility
@@ -92,10 +92,6 @@ fn main() {
             .help("to specify amino acid seq processing")
             .long("aa")
             .takes_value(false))
-        //.arg(Arg::new("seq")
-        //    .long("seq")
-        //    .takes_value(false)
-        //    .help("--seq to get a processing by sequence"))
         .subcommand(Command::new("ann")
             .about("annembed usage")
             .arg(Arg::new("stats")

@@ -1,12 +1,12 @@
 [package]
-name = "archaea"
-version = "0.0.11"
+name = "gsearch"
+version = "0.0.12"
 authors = ["jeanpierre.both@gmail.com","jianshu.zhao@gatech.edu"]
-repository = "https://github.com/jean-pierreBoth/archaea"
+repository = "https://github.com/jean-pierreBoth/gsearch"
 keywords = ["hnsw", "probminhash", "bacteria"]
 edition = "2021"
 license = "MIT OR Apache-2.0"
-description = "genome classification, probminhash hnsw archaea"
+description = "genome classification, probminhash hnsw, genome search"
 
 
 
