@@ -2,8 +2,7 @@
 
 # A rust classifier based on probminhash and HNSW for microbial genomes
 
-gsearch is the new name of the crate archaea.  It stands for **genomic search**
-ARCHAEA stands for: <u>A</u> <u>R</u>ust <u>C</u>lassifier based on <u>H</u>ierarchical N<u>a</u>vigable SW graphs, <u>e</u>t.<u>a</u>l.. 
+gsearch is the new name of the crate archaea.  It stands for **genomic search**.  
 
 This package (**currently in development**) compute probminhash signature of  bacteria and archaea (or virus and fungi) genomes and stores the id of bacteria and probminhash signature in a Hnsw structure for searching of new request genomes.
 
@@ -48,7 +47,7 @@ request -b ./ -d query_dir_universal_aa -n 50 --aa
 
 ## Output explanation
 
-Archaea.answers is the default output file in your current directory.  
+**gsearch.answers** is the default output file in your current directory.  
  For each of your genome in the query_dir, there will be requested N nearest genomes found and sorted by distance (smallest to largest).  
   If one genome in the query does not exist in the output file, meaning at this level (nt or aa), there is no such nearest genomes in the database (or distant away from the best hit in the database), you may then go to amino acid level or universal gene level.
 
