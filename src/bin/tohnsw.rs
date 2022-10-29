@@ -9,11 +9,16 @@
 //! tohnsw --dir [-d] dir --sketch [-s] size --nbng [-n] nb --ef m [--seq]
 //! 
 //! --dir : the name of directory containing tree of DNA files or Amino Acid files. 
-//! --sketch gives the size of probminhash sketch (integer value). Mandatory value
-//! --kmer [-k] gives the size of kmer to use for generating probminhash (integer value). Mandatory argument
+//!   
+//! --sketch gives the size of probminhash sketch (integer value). Mandatory value.  
+//! 
+//! --kmer [-k] gives the size of kmer to use for generating probminhash (integer value). Mandatory argument. 
+//!  
 //! --nbng [-n] gives the number of neihbours required in hnsw construction at each layer, in the range 24-64 is usual
 //!             it doest not means you cannot ask for more neighbours in request.
-//!  -- ef optional integer value to optimize hnsw structure creation (default to 400)
+//! 
+//!  -- ef optional integer value to optimize hnsw structure creation (default to 400)  
+//! 
 //!  --seq if we want a processing by sequences. Default is to concatenate all sequneces in a file
 //!             in a large sequence.
 //! 
