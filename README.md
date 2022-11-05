@@ -84,7 +84,7 @@ cargo install gsearch --features="annembed_intel-mkl"
 or with a system installed openblas:
 
 ```bash
-cargo build --release --features="annembed_openblas-system" 
+cargo install gsearch --release --features="annembed_openblas-system" 
 ```
  - On MacOS, which requires dynamic library link (you have to install openblas first and then xz, the MacOS/Darwin binary provided also requires this):
 (note that openblas install lib path is different on M1 MACs).  
@@ -95,6 +95,7 @@ brew install openblas xz
 echo 'export LDFLAGS="-L/usr/local/opt/openblas/lib"' >> ~/.bash_profile
 echo 'export CPPFLAGS="-I/usr/local/opt/openblas/include"' >> ~/.bash_profile
 echo 'export PKG_CONFIG_PATH="/usr/local/opt/openblas/lib/pkgconfig"' >> ~/.bash_profile
+source ~/.bash_profile
 cargo install gsearch --features="annembed_openblas-system"
 ```
 
@@ -103,7 +104,7 @@ cargo install gsearch --features="annembed_openblas-system"
   You can enable simd instruction with the feature hnsw_rs/simdeez_f.  
   Using openblas instead of intel-mkl you would run:  
 ```bash
-cargo build --release --features="annembed_openblas-system" --features="hnsw_rs/simdeez_f"
+cargo install gsearch --features="annembed_openblas-system" --features="hnsw_rs/simdeez_f"
 ```
 
 #### gsearch installation from the most recent version from github
