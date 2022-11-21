@@ -1,8 +1,7 @@
 //! stuff related to rna files work
 
 
-use std::fs::{self, DirEntry};
-
+use std::path::PathBuf;
 
 use kmerutils::aautils::kmeraa;
 
@@ -31,12 +30,11 @@ pub fn filter_out_non_aa(seq : &[u8]) -> Vec<u8> {
 /// opens parse fna files with needletail
 /// extracts records , filters out capsid and send sequences to function process_dir to execute file_task to produce sequence
 /// for any client
-pub fn process_aafile_in_one_block(file : &DirEntry, filter_params : &FilterParams)  -> Vec<IdSeq> {
+pub fn process_aafile_in_one_block(pathb : &PathBuf, filter_params : &FilterParams)  -> Vec<IdSeq> {
     let mut to_sketch = Vec::<IdSeq>::new();
     //
-    let pathb = file.path();
     log::trace!("processing file {}", pathb.to_str().unwrap());
-    let metadata = fs::metadata(pathb.clone());
+    let metadata = std::fs::metadata(pathb.clone());
     let f_len : usize;
     match metadata {
         Ok(metadata) => { f_len = metadata.len() as usize;
@@ -55,7 +53,7 @@ pub fn process_aafile_in_one_block(file : &DirEntry, filter_params : &FilterPara
     //
     while let Some(record) = reader.next() {
         if record.is_err() {
-            println!("got bd record in file {:?}", file.file_name());
+            println!("got bd record in file {:?}", pathb.as_path());
             std::process::exit(1);
         }
         // do we keep record ? we must get its id

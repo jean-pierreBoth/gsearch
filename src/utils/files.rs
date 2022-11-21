@@ -2,15 +2,14 @@
 
 use std::io;
 use std::io::{BufReader, BufWriter };
-use std::fs::{self, DirEntry};
 
 use std::fs::OpenOptions;
-use std::path::{Path};
+use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
 use serde_json::{to_writer};
 
-
+use rayon::prelude::*;
 
 use super::idsketch::{IdSeq};
 use super::parameters::*;
@@ -95,21 +94,22 @@ pub enum DataType {
 
 // returns true if file is a fasta file (possibly gzipped)
 // filename are of type GCA[GCF]_000091165.1_genomic.fna.gz
-pub fn is_fasta_dna_file(file : &DirEntry) -> bool {
-    let filename = file.file_name().into_string().unwrap();
+pub fn is_fasta_dna_file(pathb : &PathBuf) -> bool {
+    let filename = pathb.to_str().unwrap();
     if filename.ends_with("fna.gz")|| filename.ends_with("fa.gz") || 
                 filename.ends_with("fasta.gz") || filename.ends_with("fna") || filename.ends_with("fa") || filename.ends_with("fasta") {
         return true;
     }
     else { 
+        log::debug!("found non dna file : {:?}", filename);
         return false;
     }
 }  // end of is_fasta_file
 
 
 /// returns true if file is a fasta file preotein (possibly gzipped) suffixed by .faa
-pub fn is_fasta_aa_file(file : &DirEntry) -> bool {
-    let filename = file.file_name().into_string().unwrap();
+pub fn is_fasta_aa_file(pathb : &PathBuf) -> bool {
+    let filename = pathb.to_str().unwrap();
     if filename.ends_with("faa.gz")|| filename.ends_with("faa") {
         return true;
     }
@@ -121,31 +121,25 @@ pub fn is_fasta_aa_file(file : &DirEntry) -> bool {
 
 
 
-
-
-
-
-
-
-
 /// scan directory recursively, executing function file_task on each file.
 /// adapted from from crate fd_find
+/// A partially parallel version in process_files_group below
 pub fn process_dir(state : &mut ProcessingState, datatype: &DataType, dir: &Path, filter_params : &FilterParams, 
-                file_task: &dyn Fn(&DirEntry, &FilterParams) -> Vec<IdSeq>, 
+                file_task: &(dyn Fn(&PathBuf, &FilterParams) -> Vec<IdSeq> + Sync), 
                 sender : &crossbeam_channel::Sender::<Vec<IdSeq>>) -> io::Result<usize> {
     //
     // we checked that we have a directory
-    for entry in fs::read_dir(dir)? {
+    for entry in std::fs::read_dir(dir)? {
         let entry = entry?;
-        let path = entry.path();
-        if path.is_dir() {
-            let _ =  process_dir(state, &datatype, &path, filter_params, file_task, sender)?;
+        let pathb = entry.path();
+        if pathb.is_dir() {
+            let _ =  process_dir(state, &datatype, &pathb, filter_params, file_task, sender)?;
         } else {
             // check if entry is a fasta.gz file or a .faa file
             let mut to_sketch = match datatype {
                 DataType::DNA => {
-                    if is_fasta_dna_file(&entry)  {
-                        file_task(&entry, filter_params)
+                    if is_fasta_dna_file(&pathb)  {
+                        file_task(&pathb, filter_params)
                     }
                     else {
                         log::warn!("process_dir found a non dna file {:?}", entry.file_name());
@@ -153,8 +147,8 @@ pub fn process_dir(state : &mut ProcessingState, datatype: &DataType, dir: &Path
                     }
                 },
                 DataType::AA => {
-                    if is_fasta_aa_file(&entry) {
-                        file_task(&entry, filter_params)
+                    if is_fasta_aa_file(&pathb) {
+                        file_task(&pathb, filter_params)
                     }
                     else {
                         log::warn!("process_dir found a non AA file {:?}", entry.file_name());
@@ -182,5 +176,102 @@ pub fn process_dir(state : &mut ProcessingState, datatype: &DataType, dir: &Path
     drop(sender);
     //
     Ok(state.nb_seq)
-}  // end of visit_dirs
+}  // end of process_dirs
 
+
+
+
+
+/// This function is called by process dirs.
+/// aargument entries is a slice of Entry that have been checked to be files (and not directory!)
+/// process a block of entry in parallel. Block of entries should be of moderate size. (5 or 10?) depending on the number of threads of the Cpus 
+pub fn process_files_group(datatype: &DataType, filter_params : &FilterParams, 
+    pathb : &[PathBuf], file_task: &(dyn Fn(&PathBuf, &FilterParams) -> Vec<IdSeq> + Sync)) -> Vec<Vec<IdSeq>> 
+{
+    //
+    let process_file = | pathb : &PathBuf| -> Vec::<IdSeq> {
+        let to_sketch = match datatype {
+            DataType::DNA => {
+                if is_fasta_dna_file(pathb)  {
+                    file_task(pathb, filter_params)
+                }
+                else {
+                    log::warn!("process_files_group found a non dna file {:?}", pathb.as_path());
+                    Vec::<IdSeq>::new()
+                }
+            },
+            DataType::AA => {
+                if is_fasta_aa_file(pathb) {
+                    file_task(pathb, filter_params)
+                }
+                else {
+                    log::warn!("process_files_group found a non AA file {:?}", pathb.as_path());
+                    Vec::<IdSeq>::new()
+                }
+            },
+        };  
+        to_sketch      
+        };
+    //
+    let seqseq = pathb.into_par_iter().map(|file| process_file(file)).collect();
+    //
+    seqseq
+}  // end of process_files_group
+
+
+
+
+pub fn process_dir_parallel(state : &mut ProcessingState, datatype: &DataType, dir: &Path, filter_params : &FilterParams, 
+        block_size : usize,
+        file_task: &(dyn Fn(&PathBuf, &FilterParams) -> Vec<IdSeq> + Sync), 
+        sender : &crossbeam_channel::Sender::<Vec<IdSeq>>) -> io::Result<usize> {
+    //
+    // We will process files in parallel by blocks of size block_size to control memory
+    // and to balance cpu and memory with threads doing hnsw work
+    let mut path_block = Vec::<PathBuf>::with_capacity(block_size);
+    //
+    for entry in std::fs::read_dir(dir)? {
+        let entry = entry?;
+        let pathb = entry.path();
+        if pathb.is_dir() {
+            let _ =  process_dir(state, &datatype, &pathb, filter_params, file_task, sender)?;
+        } 
+        else {
+            // we have path of a file
+            if path_block.len() < block_size {
+                path_block.push(pathb.clone());
+            }
+            else {
+                std::panic!("process_dir_parallel buffer overflow , should not occur")
+            }
+            // if buffer full, process send and empty buffer
+            let seqs = process_files_group(datatype,  filter_params, &path_block, file_task);
+            for mut seqfile in seqs {
+                for i in 0..seqfile.len() {
+                    seqfile[i].rank = state.nb_seq;
+                    state.nb_seq += 1;
+                }                
+                sender.send(seqfile).unwrap();
+                state.nb_file += 1;
+            }
+            path_block.clear();
+        }
+    } // end of for on entry
+    // if there is a residue (nbfile not multiple of  BLOCK_SIZE) in path_block we must treat the residue
+    if path_block.len() > 0 {
+        let seqs = process_files_group(datatype,  filter_params, &path_block, file_task);
+        for mut seqfile in seqs {
+            for i in 0..seqfile.len() {
+                seqfile[i].rank = state.nb_seq;
+                state.nb_seq += 1;
+            }                
+            sender.send(seqfile).unwrap();
+            state.nb_file += 1;
+        }
+        path_block.clear();
+    }
+    //
+    drop(sender);
+    //    
+    Ok(state.nb_seq)
+}  // end of process_dir_parallel

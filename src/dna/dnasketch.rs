@@ -21,7 +21,7 @@ use kmerutils::base::{kmergenerator::*, Kmer32bit, Kmer64bit, CompressedKmerT};
 use kmerutils::sketching::*;
 
 use crate::utils::{idsketch::*};
-use crate::utils::files::{process_dir,ProcessingState, DataType};
+use crate::utils::files::{process_dir,process_dir_parallel, ProcessingState, DataType};
 use crate::dna::dnafiles::{process_file_in_one_block, process_file_concat_split};
 
 use crate::utils::parameters::*;
@@ -41,8 +41,11 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT>(dirpath : &Path, filt
     // a queue of signature waiting to be inserted , size must be sufficient to benefit from threaded probminhash and insert
     // and not too large to spare memory
     let insertion_block_size = 5000;
+    // set parallel_files to false for backaward compatibility, nb_files_by_group possibly needs to be adjusted 
+    let parallel_files : bool  = true;
+    let nb_files_by_group = 5;
+    //
     let mut insertion_queue : Vec<IdSeq>= Vec::with_capacity(insertion_block_size);
-    // TODO must get ef_search from clap via hnswparams
     let hnsw_params = processing_params.get_hnsw_params();
     let mut hnsw = Hnsw::<Kmer::Val, DistHamming>::new(hnsw_params.get_max_nb_connection() as usize , hnsw_params.capacity , 16, hnsw_params.get_ef(), DistHamming{});
     hnsw.set_extend_candidates(true);
@@ -67,7 +70,14 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT>(dirpath : &Path, filt
             let start_t_prod = SystemTime::now();
             let res_nb_sent;
             if block_processing {
-                res_nb_sent = process_dir(&mut state, &DataType::DNA,  dirpath, filter_params, &process_file_in_one_block, &send);
+                if parallel_files {
+                    res_nb_sent = process_dir_parallel(&mut state, &DataType::DNA,  dirpath, filter_params, 
+                                    nb_files_by_group,  &process_file_in_one_block, &send);
+                    }
+                else {
+                    res_nb_sent = process_dir(&mut state, &DataType::DNA,  dirpath, filter_params, 
+                                    &process_file_in_one_block, &send);
+                }
             }
             else {
                 log::info!("processing by concat and split");
