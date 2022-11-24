@@ -5,6 +5,11 @@ use std::io::{BufReader, BufWriter };
 
 use std::fs::OpenOptions;
 use std::path::{Path, PathBuf};
+use std::fs::File;
+use std::io::Read;
+
+use std::time::{SystemTime};
+use cpu_time::{ThreadTime};
 
 use serde::{Deserialize, Serialize};
 use serde_json::{to_writer};
@@ -125,7 +130,7 @@ pub fn is_fasta_aa_file(pathb : &PathBuf) -> bool {
 /// adapted from from crate fd_find
 /// A partially parallel version in process_files_group below
 pub fn process_dir(state : &mut ProcessingState, datatype: &DataType, dir: &Path, filter_params : &FilterParams, 
-                file_task: &(dyn Fn(&PathBuf, &FilterParams) -> Vec<IdSeq> + Sync), 
+                file_task: &dyn Fn(&PathBuf, &FilterParams) -> Vec<IdSeq>, 
                 sender : &crossbeam_channel::Sender::<Vec<IdSeq>>) -> io::Result<usize> {
     //
     // we checked that we have a directory
@@ -162,10 +167,10 @@ pub fn process_dir(state : &mut ProcessingState, datatype: &DataType, dir: &Path
                 state.nb_seq += 1;
             }
             state.nb_file += 1;
-            if log::log_enabled!(log::Level::Info) && state.nb_file % 500 == 0 {
+            if log::log_enabled!(log::Level::Info) && state.nb_file % 1000 == 0 {
                 log::info!("nb file processed : {}, nb sequences processed : {}", state.nb_file, state.nb_seq);
             }
-            if state.nb_file % 500 == 0 {
+            if state.nb_file % 1000 == 0 {
                 println!("nb file processed : {}, nb sequences processed : {}", state.nb_file, state.nb_seq);
             }
             // we must send to_sketch into channel to upper thread
@@ -181,39 +186,88 @@ pub fn process_dir(state : &mut ProcessingState, datatype: &DataType, dir: &Path
 
 
 
+/// open, just read whole file and return buffer for further Fasta processing by needletail
+pub fn file_to_buffer(pathb : &PathBuf) -> Vec<u8> {
+    log::trace!("processing file {}", pathb.to_str().unwrap());
+    let metadata = std::fs::metadata(pathb.clone());
+    let f_len : usize;
+    match metadata {
+        Ok(metadata) => { f_len = metadata.len() as usize;
+                            log::debug!("file_to_buffer got file length : {}", f_len);
+                        }
+        Err(_)       => {
+                            println!("file_to_buffer could not get length of file {} ", pathb.to_str().unwrap());
+                            f_len = 10_000_000;
+        }
+    }
+    let mut readfile : Vec<u8> = Vec::with_capacity(f_len);
+    let mut bufread = std::io::BufReader::with_capacity(f_len + 1000 ,File::open(pathb).unwrap());
+    let res = bufread.read_to_end(&mut readfile);
+    assert!(res.is_ok());
+    let nb_read = res.unwrap();
+    log::trace!("nb byte read from : {:?} , {}, length : {}", pathb.clone(), nb_read, f_len);
+    //
+    readfile
+} // end of file_to_buffer
+
+
+
 
 /// This function is called by process dirs.
 /// aargument entries is a slice of Entry that have been checked to be files (and not directory!)
 /// process a block of entry in parallel. Block of entries should be of moderate size. (5 or 10?) depending on the number of threads of the Cpus 
+/// file_task is a function parsing fasta file 
 pub fn process_files_group(datatype: &DataType, filter_params : &FilterParams, 
-    pathb : &[PathBuf], file_task: &(dyn Fn(&PathBuf, &FilterParams) -> Vec<IdSeq> + Sync)) -> Vec<Vec<IdSeq>> 
+    pathb : &[PathBuf], file_task: &(dyn Fn(&PathBuf, &[u8], &FilterParams) -> Vec<IdSeq> + Sync)) -> Vec<Vec<IdSeq>> 
 {
     //
-    let process_file = | pathb : &PathBuf| -> Vec::<IdSeq> {
-        let to_sketch = match datatype {
-            DataType::DNA => {
-                if is_fasta_dna_file(pathb)  {
-                    file_task(pathb, filter_params)
-                }
-                else {
-                    log::warn!("process_files_group found a non dna file {:?}", pathb.as_path());
-                    Vec::<IdSeq>::new()
-                }
-            },
-            DataType::AA => {
-                if is_fasta_aa_file(pathb) {
-                    file_task(pathb, filter_params)
-                }
-                else {
-                    log::warn!("process_files_group found a non AA file {:?}", pathb.as_path());
-                    Vec::<IdSeq>::new()
-                }
-            },
-        };  
-        to_sketch      
-        };
+    log::debug!("process_files_group recieved : {} files", pathb.len());
     //
-    let seqseq = pathb.into_par_iter().map(|file| process_file(file)).collect();
+    let start_t = SystemTime::now();
+    let cpu_start = ThreadTime::try_now();
+    //
+    let process_file = |pathb : &PathBuf,  buffer : &[u8] | -> Vec::<IdSeq> {
+        if buffer.len() > 0 {
+            file_task(pathb, buffer, filter_params)
+        }
+        else {
+            Vec::<IdSeq>::new()
+        }     
+    };
+    // get read results for each files
+    let files_read : Vec<Vec<u8>> = pathb.iter().map(| path|  match datatype {
+        DataType::DNA => {
+            if is_fasta_dna_file(path)  {
+                file_to_buffer(path)
+            }
+            else { 
+                log::warn!(" encountering a not dna file : {:?}", path);
+                Vec::<u8>::new() }
+        },
+        DataType::AA => {
+            if is_fasta_aa_file(path)  {
+                file_to_buffer(path)
+            }
+            else { Vec::<u8>::new() }
+        },
+    }).collect(); 
+    //
+    if log::log_enabled!(log::Level::Debug) {
+        if cpu_start.is_ok() {
+            let cpu_time = cpu_start.unwrap().try_elapsed();
+            if cpu_time.is_ok() {
+                log::debug!(" files read! cpu_time (ms) : {:?}", cpu_time.unwrap().as_millis());
+            }
+        }
+        let elapsed_t = start_t.elapsed().unwrap().as_millis() as f32;
+        log::debug!(" files read! elapsed (ms) : {:?}", elapsed_t);
+    }
+    //
+    // now we decompress and parse fasta buffers.
+    // 
+    let couples : Vec<(&PathBuf, &[u8])>= pathb.iter().zip(&files_read).map(|c| (c.0,c.1.as_slice())).collect();
+    // this is what we  wanted, fasta buffer parsing in // !!
+    let seqseq = couples.into_par_iter().map(|file| process_file(&file.0, file.1)).collect();
     //
     seqseq
 }  // end of process_files_group
@@ -222,54 +276,53 @@ pub fn process_files_group(datatype: &DataType, filter_params : &FilterParams,
 
 
 pub fn process_dir_parallel(state : &mut ProcessingState, datatype: &DataType, dir: &Path, filter_params : &FilterParams, 
-        block_size : usize,
-        file_task: &(dyn Fn(&PathBuf, &FilterParams) -> Vec<IdSeq> + Sync), 
+        block_size : usize, path_block : &mut Vec<PathBuf>,
+        file_task: &(dyn Fn(&PathBuf, &[u8], &FilterParams) -> Vec<IdSeq> + Sync), 
         sender : &crossbeam_channel::Sender::<Vec<IdSeq>>) -> io::Result<usize> {
     //
     // We will process files in parallel by blocks of size block_size to control memory
     // and to balance cpu and memory with threads doing hnsw work
-    let mut path_block = Vec::<PathBuf>::with_capacity(block_size);
+    let mut nb_entries = 0usize;
     //
     for entry in std::fs::read_dir(dir)? {
         let entry = entry?;
         let pathb = entry.path();
         if pathb.is_dir() {
-            let _ =  process_dir(state, &datatype, &pathb, filter_params, file_task, sender)?;
+            let _ =  process_dir_parallel(state, &datatype, &pathb, filter_params, block_size, path_block, file_task, sender)?;
         } 
         else {
+            nb_entries += 1;
             // we have path of a file
             if path_block.len() < block_size {
                 path_block.push(pathb.clone());
+                // now if buffer is full we do the work, process send and empty buffer
+                if path_block.len() == block_size {
+                    let seqs = process_files_group(datatype,  filter_params, &path_block, file_task);
+                    for mut seqfile in seqs {
+                        for i in 0..seqfile.len() {
+                            seqfile[i].rank = state.nb_seq;
+                            state.nb_seq += 1;
+                        }                
+                        state.nb_file += 1;
+                        sender.send(seqfile).unwrap();
+                    }
+                    if log::log_enabled!(log::Level::Info) && state.nb_file % 1000 == 0 {
+                        log::info!("nb file processed : {}, nb sequences processed : {}", state.nb_file, state.nb_seq);
+                    }
+                    if state.nb_file % 1000 == 0 {
+                        println!("nb file processed : {}, nb sequences processed : {}", state.nb_file, state.nb_seq);
+                    }
+                    path_block.clear();
+                }
             }
-            else {
+            else if path_block.len() == block_size {
+                // cannot happen beccause we checked if we needed to send mesg and flush buffer
                 std::panic!("process_dir_parallel buffer overflow , should not occur")
             }
-            // if buffer full, process send and empty buffer
-            let seqs = process_files_group(datatype,  filter_params, &path_block, file_task);
-            for mut seqfile in seqs {
-                for i in 0..seqfile.len() {
-                    seqfile[i].rank = state.nb_seq;
-                    state.nb_seq += 1;
-                }                
-                sender.send(seqfile).unwrap();
-                state.nb_file += 1;
-            }
-            path_block.clear();
         }
     } // end of for on entry
-    // if there is a residue (nbfile not multiple of  BLOCK_SIZE) in path_block we must treat the residue
-    if path_block.len() > 0 {
-        let seqs = process_files_group(datatype,  filter_params, &path_block, file_task);
-        for mut seqfile in seqs {
-            for i in 0..seqfile.len() {
-                seqfile[i].rank = state.nb_seq;
-                state.nb_seq += 1;
-            }                
-            sender.send(seqfile).unwrap();
-            state.nb_file += 1;
-        }
-        path_block.clear();
-    }
+    // in fact in gtdb we have only one pure file in bottom directories!!! so this is useful only to realize it or in other cases.
+    log::debug!("process_dir_parallel got nb entries dir : {:?} nb_entries : {}", dir, nb_entries);
     //
     drop(sender);
     //    

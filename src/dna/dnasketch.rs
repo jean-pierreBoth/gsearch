@@ -4,8 +4,10 @@
 //! 
 
 use std::time::{SystemTime};
-use cpu_time::ProcessTime;
-use std::path::Path;
+use cpu_time::{ProcessTime,ThreadTime};
+
+
+use std::path::{Path, PathBuf};
 
 // for multithreading
 use crossbeam_channel::*;
@@ -21,12 +23,13 @@ use kmerutils::base::{kmergenerator::*, Kmer32bit, Kmer64bit, CompressedKmerT};
 use kmerutils::sketching::*;
 
 use crate::utils::{idsketch::*};
-use crate::utils::files::{process_dir,process_dir_parallel, ProcessingState, DataType};
-use crate::dna::dnafiles::{process_file_in_one_block, process_file_concat_split};
+use crate::utils::files::{process_dir,process_dir_parallel, process_files_group, ProcessingState, DataType};
+use crate::dna::dnafiles::{process_file_in_one_block, process_buffer_in_one_block, process_file_concat_split};
 
 use crate::utils::parameters::*;
 
-fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT>(dirpath : &Path, filter_params: &FilterParams, processing_params : &ProcessingParams) 
+fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT>(dirpath : &Path, filter_params: &FilterParams, 
+                    processing_params : &ProcessingParams, parallel_io : bool) 
         where Kmer::Val : num::PrimInt + Clone + Copy + Send + Sync + Serialize + DeserializeOwned + Debug,
                 KmerGenerator<Kmer> :  KmerGenerationPattern<Kmer>, 
                 DistHamming : Distance<Kmer::Val> {
@@ -42,8 +45,7 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT>(dirpath : &Path, filt
     // and not too large to spare memory
     let insertion_block_size = 5000;
     // set parallel_files to false for backaward compatibility, nb_files_by_group possibly needs to be adjusted 
-    let parallel_files : bool  = true;
-    let nb_files_by_group = 5;
+    let nb_files_by_group = 500;
     //
     let mut insertion_queue : Vec<IdSeq>= Vec::with_capacity(insertion_block_size);
     let hnsw_params = processing_params.get_hnsw_params();
@@ -65,16 +67,49 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT>(dirpath : &Path, filt
     // launch process_dir in a thread or async
     crossbeam_utils::thread::scope(|scope| {
         // sequence sending, productor thread
-        let mut nb_sent = 0;
         let sender_handle = scope.spawn(move |_|   {
-            let start_t_prod = SystemTime::now();
+        let nb_sent : usize;
+        let start_t_prod = SystemTime::now();
             let res_nb_sent;
             if block_processing {
-                if parallel_files {
-                    res_nb_sent = process_dir_parallel(&mut state, &DataType::DNA,  dirpath, filter_params, 
-                                    nb_files_by_group,  &process_file_in_one_block, &send);
+                log::info!("sketchandstore_dir_compressedkmer : block processing");
+                if parallel_io {
+                    let mut nb_sent_parallel;
+                    log::info!("sketchandstore_dir_compressedkmer : calling process_dir_parallel");
+                    let mut path_block = Vec::<PathBuf>::with_capacity(nb_files_by_group);
+                    let res_nb_sent_parallel = process_dir_parallel(&mut state, &DataType::DNA,  dirpath, filter_params, 
+                                    nb_files_by_group,  &mut path_block, &process_buffer_in_one_block, &send);
+                    // we must treat residue in path_block if any
+                    match res_nb_sent_parallel {
+                        Ok(nb) => { nb_sent_parallel = nb;},
+                        _             => {  log::error!("\n some error occurred in process_dir_parallel");
+                                            std::panic!("\n some error occurred in process_dir_parallel");
+                                        },
+                    };
+                    if path_block.len() > 0 {
+                        log::info!("process_dir_parallel sending residue, size : {}", path_block.len());
+                        let seqs = process_files_group(&DataType::DNA, filter_params, &path_block, &process_buffer_in_one_block);
+                        for mut seqfile in seqs {
+                            for i in 0..seqfile.len() {
+                                seqfile[i].rank = state.nb_seq;
+                                state.nb_seq += 1;
+                            }                
+                            state.nb_file += 1;
+                            nb_sent_parallel += 1;
+                            send.send(seqfile).unwrap();
+                        }
+                        path_block.clear();
+                        if log::log_enabled!(log::Level::Info) && state.nb_file % 1000 == 0 {
+                            log::info!("nb file processed : {}, nb sequences processed : {}", state.nb_file, state.nb_seq);
+                        }
+                        if state.nb_file % 1000 == 0 {
+                            println!("nb file processed : {}, nb sequences processed : {}", state.nb_file, state.nb_seq);
+                        }
                     }
+                    res_nb_sent = Ok(nb_sent_parallel);
+                } // end case parallel
                 else {
+                    log::info!("sketchandstore_dir_compressedkmer : calling process_dir serial");
                     res_nb_sent = process_dir(&mut state, &DataType::DNA,  dirpath, filter_params, 
                                     &process_file_in_one_block, &send);
                 }
@@ -89,7 +124,9 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT>(dirpath : &Path, filt
                     println!("process_dir processed nb sequences : {}", nb_sent);
                 }
                 Err(_) => {
+                    nb_sent = 0;
                     println!("some error occured in process_dir");
+                    log::error!("some error occured in process_dir");
                 }
             };
             drop(send);
@@ -99,8 +136,11 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT>(dirpath : &Path, filt
             let _ = state.dump_json(&Path::new("./"));
             Box::new(nb_sent)
         });
+        //
         // sequence reception, consumer thread
+        //
         let receptor_handle = scope.spawn(move |_| {
+            let sender_cpu = ThreadTime::try_now();
             let mut seqdict = SeqDict::new(100000);
             // we must read messages, sketch and insert into hnsw
             let mut read_more = true;
@@ -181,6 +221,13 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT>(dirpath : &Path, filt
             }
             // and finally dump processing parameters in file name "parameters.json"
             let _ = processing_params.dump_json(&Path::new("./"));
+            // get time for io and fasta parsing
+            if sender_cpu.is_ok() {
+                let cpu_time = sender_cpu.unwrap().try_elapsed();
+                if cpu_time.is_ok() {
+                    log::info!("sender needed : {}", cpu_time.unwrap().as_secs());
+                }
+            }
             //
             Box::new(seqdict.0.len())
         }); // end of receptor thread
@@ -192,13 +239,13 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT>(dirpath : &Path, filt
             log::error!("an error occurred  nb msg sent : {}, nb msg received : {}", nb_sent, nb_received);
         }
     }).unwrap();  // end of scope
-    //
+    // get total time 
     let cpu_time = cpu_start.elapsed().as_secs();
     let elapsed_t = start_t.elapsed().unwrap().as_secs() as f32;
 
     if log::log_enabled!(log::Level::Info) {
-        log::info!("process_dir : cpu time(s) {}", cpu_time);
-        log::info!("process_dir : elapsed time(s) {}", elapsed_t);
+        log::info!("processing of directory  : total (io+hashing+hnsw) cpu time(s) {}", cpu_time);
+        log::info!("processing of directory : total (io+hashing+hnsw) elapsed time(s) {}", elapsed_t);
     }
     else {
         println!("process_dir : cpu time(s) {}", cpu_time);
@@ -207,18 +254,18 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT>(dirpath : &Path, filt
 } // end of sketchandstore_dir_compressedkmer 
 
 
-pub fn dna_process_tohnsw(dirpath : &Path, filter_params : &FilterParams, processing_parameters : &ProcessingParams) {
+pub fn dna_process_tohnsw(dirpath : &Path, filter_params : &FilterParams, processing_parameters : &ProcessingParams, parallel_io : bool) {
     // dispatch according to kmer_size
     let kmer_size = processing_parameters.get_sketching_params().get_kmer_size();
     //
     if kmer_size <= 14 {
-        sketchandstore_dir_compressedkmer::<Kmer32bit>(&dirpath, &filter_params, &processing_parameters);
+        sketchandstore_dir_compressedkmer::<Kmer32bit>(&dirpath, &filter_params, &processing_parameters, parallel_io);
     }
     else if kmer_size == 16 {
-        sketchandstore_dir_compressedkmer::<Kmer16b32bit>(&dirpath, &filter_params, &processing_parameters);
+        sketchandstore_dir_compressedkmer::<Kmer16b32bit>(&dirpath, &filter_params, &processing_parameters, parallel_io);
     }
     else if  kmer_size <= 32 {
-        sketchandstore_dir_compressedkmer::<Kmer64bit>(&dirpath, &filter_params, &processing_parameters);
+        sketchandstore_dir_compressedkmer::<Kmer64bit>(&dirpath, &filter_params, &processing_parameters, parallel_io);
     }
     else {
         panic!("kmers cannot be greater than 32");

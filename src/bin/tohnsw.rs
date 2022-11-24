@@ -23,6 +23,10 @@
 //!             in a large sequence.
 //! 
 //!  --aa : set if data to process are Amino Acid sequences. Default is DNA
+//! 
+//!  --pio : option to read uncompressed files and then parallelize decompressing/fasta parsing. 
+//!          Useful, with many cores if io lags behind hashing/hnsw insertion.
+//!          Implemented only for dna files presently
 
 // must loop on sub directories , open gzipped files
 // extracts complete genomes possiby many in one file (get rid of capsid records if any)
@@ -101,6 +105,10 @@ fn main() {
             .long("seq")
             .takes_value(false)
             .help("--seq to get a processing by sequence"))
+        .arg(Arg::new("pario")
+            .long("pio")
+            .takes_value(false)
+            .help("--pio to optimize io"))
         .get_matches();
     //
     // by default we process DNA files in one large sequence block
@@ -177,6 +185,15 @@ fn main() {
             println!("data to processs are DNA data ");
             data_type = DataType::DNA;            
         }
+        // parallel io
+        let pario: bool;
+        if matches.is_present("pario") {
+            println!("parallel io");
+            pario = true;
+        }
+        else {
+            pario = false;
+        }
         // We have everything   
         // max_nb_conn must be adapted to the number of neighbours we will want in searches.
         
@@ -189,7 +206,7 @@ fn main() {
         let processing_parameters = ProcessingParams::new(hnswparams, sketch_params, block_processing);
         //
         match data_type {
-            DataType::DNA => dna_process_tohnsw(&dirpath, &filter_params, &processing_parameters),
+            DataType::DNA => dna_process_tohnsw(&dirpath, &filter_params, &processing_parameters, pario),
             DataType::AA => aa_process_tohnsw(&dirpath, &filter_params, &processing_parameters),
         }
         //
