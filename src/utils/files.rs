@@ -144,37 +144,40 @@ pub fn process_dir(state : &mut ProcessingState, datatype: &DataType, dir: &Path
             let mut to_sketch = match datatype {
                 DataType::DNA => {
                     if is_fasta_dna_file(&pathb)  {
-                        file_task(&pathb, filter_params)
+                        Some(file_task(&pathb, filter_params))
                     }
                     else {
                         log::warn!("process_dir found a non dna file {:?}", entry.file_name());
-                        Vec::<IdSeq>::new()
+                        None
                     }
                 },
                 DataType::AA => {
                     if is_fasta_aa_file(&pathb) {
-                        file_task(&pathb, filter_params)
+                        Some(file_task(&pathb, filter_params))
                     }
                     else {
                         log::warn!("process_dir found a non AA file {:?}", entry.file_name());
-                        Vec::<IdSeq>::new()
+                        None
                     }
                 },
             };
             // put a rank id in sequences, now we have full information of where do the sequence come from
-            for i in 0..to_sketch.len() {
-                to_sketch[i].rank = state.nb_seq;
-                state.nb_seq += 1;
+            if to_sketch.is_some() {
+                let to_sketch_ref = to_sketch.as_mut().unwrap();
+                for i in 0..to_sketch_ref.len() {
+                    to_sketch_ref[i].rank = state.nb_seq;
+                    state.nb_seq += 1;
+                }
+                state.nb_file += 1;
+                if log::log_enabled!(log::Level::Info) && state.nb_file % 1000 == 0 {
+                    log::info!("nb file processed : {}, nb sequences processed : {}", state.nb_file, state.nb_seq);
+                }
+                if state.nb_file % 1000 == 0 {
+                    println!("nb file processed : {}, nb sequences processed : {}", state.nb_file, state.nb_seq);
+                }
+                // we must send to_sketch into channel to upper thread
+                sender.send(to_sketch.unwrap()).unwrap();
             }
-            state.nb_file += 1;
-            if log::log_enabled!(log::Level::Info) && state.nb_file % 1000 == 0 {
-                log::info!("nb file processed : {}, nb sequences processed : {}", state.nb_file, state.nb_seq);
-            }
-            if state.nb_file % 1000 == 0 {
-                println!("nb file processed : {}, nb sequences processed : {}", state.nb_file, state.nb_seq);
-            }
-            // we must send to_sketch into channel to upper thread
-            sender.send(to_sketch).unwrap();
         } // end of check on datatype
     } // end of for 
     //
@@ -226,12 +229,12 @@ pub fn process_files_group(datatype: &DataType, filter_params : &FilterParams,
     let start_t = SystemTime::now();
     let cpu_start = ThreadTime::try_now();
     //
-    let process_file = |pathb : &PathBuf,  buffer : &[u8] | -> Vec::<IdSeq> {
+    let process_file = |pathb : &PathBuf,  buffer : &[u8] | -> Option<Vec::<IdSeq>> {
         if buffer.len() > 0 {
-            file_task(pathb, buffer, filter_params)
+            Some(file_task(pathb, buffer, filter_params))
         }
         else {
-            Vec::<IdSeq>::new()
+            None
         }     
     };
     // get read results for each files
@@ -248,7 +251,10 @@ pub fn process_files_group(datatype: &DataType, filter_params : &FilterParams,
             if is_fasta_aa_file(path)  {
                 file_to_buffer(path)
             }
-            else { Vec::<u8>::new() }
+            else { 
+                log::warn!(" encountering a not aa file : {:?}", path);
+                Vec::new()
+            }
         },
     }).collect(); 
     //
@@ -265,9 +271,15 @@ pub fn process_files_group(datatype: &DataType, filter_params : &FilterParams,
     //
     // now we decompress and parse fasta buffers.
     // 
-    let couples : Vec<(&PathBuf, &[u8])>= pathb.iter().zip(&files_read).map(|c| (c.0,c.1.as_slice())).collect();
+    let mut to_be_processed : Vec<(&PathBuf, &[u8])> = Vec::with_capacity(pathb.len());
+    let couples = pathb.iter().zip(&files_read);
+    for c in couples {
+        if c.1.len() > 0 {
+            to_be_processed.push((c.0,c.1));
+        }
+    }
     // this is what we  wanted, fasta buffer parsing in // !!
-    let seqseq = couples.into_par_iter().map(|file| process_file(&file.0, file.1)).collect();
+    let seqseq = to_be_processed.into_par_iter().map(|file| process_file(&file.0, file.1).unwrap()).collect();
     //
     seqseq
 }  // end of process_files_group

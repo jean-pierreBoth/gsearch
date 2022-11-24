@@ -234,9 +234,9 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT>(dirpath : &Path, filt
         // now we must join handles
         let nb_sent = sender_handle.join().unwrap();
         let nb_received = receptor_handle.join().unwrap();
-        log::debug!("sketchandstore, nb_sent = {}, nb_received = {}", nb_sent, nb_received);
+        log::info!("sketchandstore, nb_sent = {}, nb_received = {}", nb_sent, nb_received);
         if nb_sent != nb_received {
-            log::error!("an error occurred  nb msg sent : {}, nb msg received : {}", nb_sent, nb_received);
+            log::warn!("an error occurred  nb msg sent : {}, nb msg received : {}", nb_sent, nb_received);
         }
     }).unwrap();  // end of scope
     // get total time 
