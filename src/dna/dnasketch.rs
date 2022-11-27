@@ -22,15 +22,15 @@ use hnsw_rs::prelude::*;
 use kmerutils::base::{kmergenerator::*, Kmer32bit, Kmer64bit, CompressedKmerT};
 use kmerutils::sketching::*;
 
-use crate::utils::{idsketch::*};
+use crate::utils::{idsketch::*, reloadhnsw};
 use crate::utils::files::{process_dir,process_dir_parallel, process_files_group, ProcessingState, DataType};
 use crate::dna::dnafiles::{process_file_in_one_block, process_buffer_in_one_block, process_file_concat_split};
 
 use crate::utils::parameters::*;
 
 fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT>(dirpath : &Path, filter_params: &FilterParams, 
-                    processing_params : &ProcessingParams, parallel_io : bool) 
-        where Kmer::Val : num::PrimInt + Clone + Copy + Send + Sync + Serialize + DeserializeOwned + Debug,
+                    processing_params : &ProcessingParams, other_params : &ComputingParams) 
+        where Kmer::Val : 'static + num::PrimInt + Clone + Copy + Send + Sync + Serialize + DeserializeOwned + Debug,
                 KmerGenerator<Kmer> :  KmerGenerationPattern<Kmer>, 
                 DistHamming : Distance<Kmer::Val> {
     //
@@ -48,8 +48,30 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT>(dirpath : &Path, filt
     let nb_files_by_group = 500;
     //
     let mut insertion_queue : Vec<IdSeq>= Vec::with_capacity(insertion_block_size);
-    let hnsw_params = processing_params.get_hnsw_params();
-    let mut hnsw = Hnsw::<Kmer::Val, DistHamming>::new(hnsw_params.get_max_nb_connection() as usize , hnsw_params.capacity , 16, hnsw_params.get_ef(), DistHamming{});
+    let mut hnsw : Hnsw::<Kmer::Val, DistHamming>;
+    if other_params.get_adding_mode() {
+        // in this case we must reload
+        let dirpath = std::env::current_dir();
+        if dirpath.is_err() {
+            log::error!("sketchandstore_dir_compressedkmer cannot get current directory");
+            std::panic!("sketchandstore_dir_compressedkmer cannot get current directory");
+        }
+        let dirpath = dirpath.unwrap();
+        log::info!("sketchandstore_dir_compressedkmer will reload hnsw data from director {:?}", dirpath);
+        let hnsw_opt = reloadhnsw::reload_hnsw(&dirpath, &AnnParameters::default());
+        if hnsw_opt.is_none() {
+            log::error!("cannot reload hnsw from directory : {:?}", &dirpath);
+            std::process::exit(1);
+        }
+        else { 
+            hnsw = hnsw_opt.unwrap();
+        }
+    } 
+    else {
+        // creation mode
+        let hnsw_params = processing_params.get_hnsw_params();
+        hnsw = Hnsw::<Kmer::Val, DistHamming>::new(hnsw_params.get_max_nb_connection() as usize , hnsw_params.capacity , 16, hnsw_params.get_ef(), DistHamming{});
+    }
     hnsw.set_extend_candidates(true);
     hnsw.set_keeping_pruned(false);
     //
@@ -73,7 +95,7 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT>(dirpath : &Path, filt
             let res_nb_sent;
             if block_processing {
                 log::info!("sketchandstore_dir_compressedkmer : block processing");
-                if parallel_io {
+                if other_params.get_parallel_io() {
                     let mut nb_sent_parallel;
                     log::info!("sketchandstore_dir_compressedkmer : calling process_dir_parallel");
                     let mut path_block = Vec::<PathBuf>::with_capacity(nb_files_by_group);
@@ -254,18 +276,18 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT>(dirpath : &Path, filt
 } // end of sketchandstore_dir_compressedkmer 
 
 
-pub fn dna_process_tohnsw(dirpath : &Path, filter_params : &FilterParams, processing_parameters : &ProcessingParams, parallel_io : bool) {
+pub fn dna_process_tohnsw(dirpath : &Path, filter_params : &FilterParams, processing_parameters : &ProcessingParams, others_params : &ComputingParams) {
     // dispatch according to kmer_size
     let kmer_size = processing_parameters.get_sketching_params().get_kmer_size();
     //
     if kmer_size <= 14 {
-        sketchandstore_dir_compressedkmer::<Kmer32bit>(&dirpath, &filter_params, &processing_parameters, parallel_io);
+        sketchandstore_dir_compressedkmer::<Kmer32bit>(&dirpath, &filter_params, &processing_parameters, others_params);
     }
     else if kmer_size == 16 {
-        sketchandstore_dir_compressedkmer::<Kmer16b32bit>(&dirpath, &filter_params, &processing_parameters, parallel_io);
+        sketchandstore_dir_compressedkmer::<Kmer16b32bit>(&dirpath, &filter_params, &processing_parameters, others_params);
     }
     else if  kmer_size <= 32 {
-        sketchandstore_dir_compressedkmer::<Kmer64bit>(&dirpath, &filter_params, &processing_parameters, parallel_io);
+        sketchandstore_dir_compressedkmer::<Kmer64bit>(&dirpath, &filter_params, &processing_parameters, others_params);
     }
     else {
         panic!("kmers cannot be greater than 32");

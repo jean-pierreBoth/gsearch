@@ -27,6 +27,10 @@
 //!  --pio : option to read uncompressed files and then parallelize decompressing/fasta parsing. 
 //!          Useful, with many cores if io lags behind hashing/hnsw insertion.
 //!          Implemented only for dna files presently
+//! 
+//! --add : This option is dedicated to adding new data to a hnsw structure.  
+//!         The program reloads a previous dump of the hnsw structures. tohnsw must (presently) be launched from the directory
+//!         containing the dump as the program looks for the files "hnswdump.hnsw.data" and "hnswdump.hnsw.graph" created previously.
 
 // must loop on sub directories , open gzipped files
 // extracts complete genomes possiby many in one file (get rid of capsid records if any)
@@ -109,6 +113,11 @@ fn main() {
             .long("pio")
             .takes_value(false)
             .help("--pio to optimize io"))
+        .arg(Arg::new("add")
+            .long("add")
+            .takes_value(false)
+            .help("--add to add sequence entries from a directory into hnsw")
+        )
         .get_matches();
     //
     // by default we process DNA files in one large sequence block
@@ -185,7 +194,7 @@ fn main() {
             println!("data to processs are DNA data ");
             data_type = DataType::DNA;            
         }
-        // parallel io
+        // now we fill other parameters : parallel fasta parsing and adding mode in hnsw
         let pario: bool;
         if matches.is_present("pario") {
             println!("parallel io");
@@ -194,6 +203,16 @@ fn main() {
         else {
             pario = false;
         }
+        // adding sequences
+        let addseq: bool;
+        if matches.is_present("add") {
+            println!("adding sequences");
+            addseq = true;
+        }
+        else {
+            addseq = false;
+        }
+        let other_params = ComputingParams::new(pario, addseq);
         // We have everything   
         // max_nb_conn must be adapted to the number of neighbours we will want in searches.
         
@@ -206,7 +225,7 @@ fn main() {
         let processing_parameters = ProcessingParams::new(hnswparams, sketch_params, block_processing);
         //
         match data_type {
-            DataType::DNA => dna_process_tohnsw(&dirpath, &filter_params, &processing_parameters, pario),
+            DataType::DNA => dna_process_tohnsw(&dirpath, &filter_params, &processing_parameters, &other_params),
             DataType::AA => aa_process_tohnsw(&dirpath, &filter_params, &processing_parameters),
         }
         //

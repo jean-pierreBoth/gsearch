@@ -69,6 +69,14 @@ pub struct AnnParameters {
     embed : bool,
 } // end of 
 
+
+impl Default for AnnParameters {
+    fn default() -> Self {
+        AnnParameters{ask_stats:false, embed:false}
+    }
+} // end of default for AnnParameters
+
+
 impl AnnParameters {
     // default initiaization is false for embed
     pub fn new(ask_stats : bool, embed : bool) -> Self {
@@ -208,3 +216,32 @@ impl ProcessingParams {
 
 //=====================================================================================
 
+/// Some others parameters not necessary for reload
+pub struct ComputingParams {
+    /// set to true when parsing fasta files in done in //
+    parallel_io : bool,
+    /// set to true when we increase a hnsw database
+    adding_mode : bool,
+}
+
+
+impl Default for ComputingParams {
+    fn default() -> Self {
+        ComputingParams{parallel_io: false , adding_mode: false}
+    }
+}
+
+
+impl ComputingParams {
+    pub fn new(parallel_io : bool, adding_mode : bool) -> Self {
+        ComputingParams{parallel_io, adding_mode}
+    }
+
+    pub fn get_parallel_io(&self) -> bool {
+        self.parallel_io
+    }
+
+    pub fn get_adding_mode(&self) -> bool {
+        self.adding_mode
+    }
+} // end of ComputingParams
