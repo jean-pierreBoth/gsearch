@@ -178,14 +178,13 @@ impl SeqDict {
 
     /// reload from dump to avoid parsing again files. 
     /// To be used with reload of Hnsw structure to run as a service
-    pub fn reload(filename : &String) -> Result<SeqDict, String>  {
+    pub fn reload_json(filepath : &PathBuf) -> Result<SeqDict, String>  {
         //
-        log::info!("reloading database ids from : {}", filename);
+        log::info!("reloading database ids from : {}", filepath.display());
         let start_t = SystemTime::now();
         //
-        println!("reloading database ids from : {}", filename);
+        println!("reloading database ids from : {}", filepath.display());
         let mut sequences =  Vec::<ItemDict>::with_capacity(100000);
-        let filepath = PathBuf::from(filename);
         let fileres = OpenOptions::new().read(true).open(&filepath);
         if fileres.is_err() {
             log::error!("SeqDict reload : reload could not open file {:?}", filepath.as_os_str());

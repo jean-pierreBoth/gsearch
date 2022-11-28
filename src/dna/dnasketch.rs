@@ -24,6 +24,7 @@ use kmerutils::sketching::*;
 
 use crate::utils::{idsketch::*, reloadhnsw};
 use crate::utils::files::{process_dir,process_dir_parallel, process_files_group, ProcessingState, DataType};
+
 use crate::dna::dnafiles::{process_file_in_one_block, process_buffer_in_one_block, process_file_concat_split};
 
 use crate::utils::parameters::*;
@@ -40,15 +41,16 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT>(dirpath : &Path, filt
     let cpu_start = ProcessTime::now();
     //
     let block_processing = processing_params.get_block_flag();
-    let mut state = ProcessingState::new();
     // a queue of signature waiting to be inserted , size must be sufficient to benefit from threaded probminhash and insert
     // and not too large to spare memory
     let insertion_block_size = 5000;
     // set parallel_files to false for backaward compatibility, nb_files_by_group possibly needs to be adjusted 
     let nb_files_by_group = 500;
-    //
     let mut insertion_queue : Vec<IdSeq>= Vec::with_capacity(insertion_block_size);
+    //
     let mut hnsw : Hnsw::<Kmer::Val, DistHamming>;
+    let mut state :ProcessingState;
+    //
     if other_params.get_adding_mode() {
         // in this case we must reload
         let dirpath = std::env::current_dir();
@@ -66,11 +68,20 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT>(dirpath : &Path, filt
         else { 
             hnsw = hnsw_opt.unwrap();
         }
+        let reload_res = ProcessingState::reload_json(&dirpath);
+        if reload_res.is_ok() {
+            state = reload_res.unwrap();
+        }
+        else {
+            log::error!("cannot reload processing state (file 'processing_state.json' from directory : {:?}", &dirpath);
+            std::process::exit(1);           
+        }
     } 
     else {
         // creation mode
         let hnsw_params = processing_params.get_hnsw_params();
         hnsw = Hnsw::<Kmer::Val, DistHamming>::new(hnsw_params.get_max_nb_connection() as usize , hnsw_params.capacity , 16, hnsw_params.get_ef(), DistHamming{});
+        state = ProcessingState::new();
     }
     hnsw.set_extend_candidates(true);
     hnsw.set_keeping_pruned(false);
@@ -163,7 +174,23 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT>(dirpath : &Path, filt
         //
         let receptor_handle = scope.spawn(move |_| {
             let sender_cpu = ThreadTime::try_now();
-            let mut seqdict = SeqDict::new(100000);
+            let mut seqdict : SeqDict;
+            if other_params.get_adding_mode() {
+                // must reload seqdict
+                let filepath = dirpath.clone();
+                let filepath = filepath.join("/seqdict.json");
+                let res_reload = SeqDict::reload_json(&filepath);
+                if res_reload.is_err() {
+                    log::error!("cannot reload SeqDict (file 'seq.json' from directory : {:?}", &dirpath);
+                    std::process::exit(1);   
+                }
+                else {
+                    seqdict = res_reload.unwrap();
+                }
+            }
+            else {
+                seqdict =  SeqDict::new(100000);
+            }
             // we must read messages, sketch and insert into hnsw
             let mut read_more = true;
             while read_more {
