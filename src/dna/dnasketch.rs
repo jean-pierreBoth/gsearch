@@ -55,11 +55,11 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT>(dirpath : &Path, filt
         // in this case we must reload
         let dirpath = std::env::current_dir();
         if dirpath.is_err() {
-            log::error!("sketchandstore_dir_compressedkmer cannot get current directory");
-            std::panic!("sketchandstore_dir_compressedkmer cannot get current directory");
+            log::error!("dnasketch::sketchandstore_dir_compressedkmer cannot get current directory");
+            std::panic!("dnasketch::sketchandstore_dir_compressedkmer cannot get current directory");
         }
         let dirpath = dirpath.unwrap();
-        log::info!("sketchandstore_dir_compressedkmer will reload hnsw data from director {:?}", dirpath);
+        log::info!("dnasketch::sketchandstore_dir_compressedkmer will reload hnsw data from director {:?}", dirpath);
         let hnsw_opt = reloadhnsw::reload_hnsw(&dirpath, &AnnParameters::default());
         if hnsw_opt.is_none() {
             log::error!("cannot reload hnsw from directory : {:?}", &dirpath);
@@ -73,7 +73,7 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT>(dirpath : &Path, filt
             state = reload_res.unwrap();
         }
         else {
-            log::error!("cannot reload processing state (file 'processing_state.json' from directory : {:?}", &dirpath);
+            log::error!("dnasketch::cannot reload processing state (file 'processing_state.json' from directory : {:?}", &dirpath);
             std::process::exit(1);           
         }
     } 
@@ -105,10 +105,10 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT>(dirpath : &Path, filt
         let start_t_prod = SystemTime::now();
             let res_nb_sent;
             if block_processing {
-                log::info!("sketchandstore_dir_compressedkmer : block processing");
+                log::info!("dnasketch::sketchandstore_dir_compressedkmer : block processing");
                 if other_params.get_parallel_io() {
                     let mut nb_sent_parallel;
-                    log::info!("sketchandstore_dir_compressedkmer : calling process_dir_parallel");
+                    log::info!("dnasketch::sketchandstore_dir_compressedkmer : calling process_dir_parallel");
                     let mut path_block = Vec::<PathBuf>::with_capacity(nb_files_by_group);
                     let res_nb_sent_parallel = process_dir_parallel(&mut state, &DataType::DNA,  dirpath, filter_params, 
                                     nb_files_by_group,  &mut path_block, &process_buffer_in_one_block, &send);
@@ -120,7 +120,7 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT>(dirpath : &Path, filt
                                         },
                     };
                     if path_block.len() > 0 {
-                        log::info!("process_dir_parallel sending residue, size : {}", path_block.len());
+                        log::info!("dnasketch::process_dir_parallel sending residue, size : {}", path_block.len());
                         let seqs = process_files_group(&DataType::DNA, filter_params, &path_block, &process_buffer_in_one_block);
                         for mut seqfile in seqs {
                             for i in 0..seqfile.len() {
@@ -142,7 +142,7 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT>(dirpath : &Path, filt
                     res_nb_sent = Ok(nb_sent_parallel);
                 } // end case parallel
                 else {
-                    log::info!("sketchandstore_dir_compressedkmer : calling process_dir serial");
+                    log::info!("dnasketch::sketchandstore_dir_compressedkmer : calling process_dir serial");
                     res_nb_sent = process_dir(&mut state, &DataType::DNA,  dirpath, filter_params, 
                                     &process_file_in_one_block, &send);
                 }
@@ -177,11 +177,15 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT>(dirpath : &Path, filt
             let mut seqdict : SeqDict;
             if other_params.get_adding_mode() {
                 // must reload seqdict
-                let filepath = dirpath.clone();
-                let filepath = filepath.join("/seqdict.json");
+                let mut filepath = PathBuf::new();
+                filepath.push("seqdict.json");
                 let res_reload = SeqDict::reload_json(&filepath);
                 if res_reload.is_err() {
-                    log::error!("cannot reload SeqDict (file 'seq.json' from directory : {:?}", &dirpath);
+                    let cwd = std::env::current_dir();
+                    if cwd.is_ok() {
+                        log::info!("current directory : {:?}", cwd.unwrap());
+                    }
+                    log::error!("cannot reload SeqDict (file 'seq.json' from current directory");
                     std::process::exit(1);   
                 }
                 else {
