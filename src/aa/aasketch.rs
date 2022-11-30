@@ -3,14 +3,12 @@
 
 use std::time::{SystemTime};
 use cpu_time::ProcessTime;
-use std::path::Path;
-
 // for multithreading
 use crossbeam_channel::*;
 use serde::{de::DeserializeOwned, Serialize};
 
 use std::fmt::{Debug};
-
+use std::path::{Path, PathBuf};
 // our crate
 use hnsw_rs::prelude::*;
 
@@ -18,14 +16,14 @@ use kmerutils::base::kmertraits::*;
 use kmerutils::aautils::kmeraa::*;
 use kmerutils::aautils::seqsketchjaccard::*;
 
-use crate::utils::{idsketch::*};
+use crate::utils::{idsketch::*, reloadhnsw};
 use crate::utils::files::{process_dir,ProcessingState, DataType};
 use crate::aa::aafiles::{process_aafile_in_one_block};
 
 use crate::utils::parameters::*;
 
-fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT>(dirpath : &Path, filter_params: &FilterParams, processing_params : &ProcessingParams) 
-        where Kmer::Val : num::PrimInt + Clone + Copy + Send + Sync + Serialize + DeserializeOwned + Debug,
+fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT>(dirpath : &Path, filter_params: &FilterParams, processing_params : &ProcessingParams, other_params : &ComputingParams) 
+        where Kmer::Val : 'static + num::PrimInt + Clone + Copy + Send + Sync + Serialize + DeserializeOwned + Debug,
                 KmerGenerator<Kmer> :  KmerGenerationPattern<Kmer>, 
                 DistHamming : Distance<Kmer::Val> {
     //
@@ -35,14 +33,46 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT>(dirpath : &Path, filt
     let cpu_start = ProcessTime::now();
     //
     let block_processing = processing_params.get_block_flag();
-    let mut state = ProcessingState::new();
+    //let mut state = ProcessingState::new();
     // a queue of signature waiting to be inserted , size must be sufficient to benefit from threaded probminhash and insert
     // and not too large to spare memory
     let insertion_block_size = 5000;
     let mut insertion_queue : Vec<IdSeq>= Vec::with_capacity(insertion_block_size);
     // TODO must get ef_search from clap via hnswparams
-    let hnsw_params = processing_params.get_hnsw_params();
-    let mut hnsw = Hnsw::<Kmer::Val, DistHamming>::new(hnsw_params.get_max_nb_connection() as usize , hnsw_params.capacity , 16, hnsw_params.get_ef(), DistHamming{});
+    let mut hnsw : Hnsw::<Kmer::Val, DistHamming>;
+    let mut state : ProcessingState;
+    if other_params.get_adding_mode() {
+         // in this case we must reload
+        let dirpath = std::env::current_dir();
+        if dirpath.is_err() {
+            log::error!("dnasketch::sketchandstore_dir_compressedkmer cannot get current directory");
+            std::panic!("dnasketch::sketchandstore_dir_compressedkmer cannot get current directory");
+        }
+        let dirpath = dirpath.unwrap();
+        log::info!("dnasketch::sketchandstore_dir_compressedkmer will reload hnsw data from director {:?}", dirpath);
+        let hnsw_opt = reloadhnsw::reload_hnsw(&dirpath, &AnnParameters::default());
+        if hnsw_opt.is_none() {
+            log::error!("cannot reload hnsw from directory : {:?}", &dirpath);
+            std::process::exit(1);
+        }
+        else { 
+            hnsw = hnsw_opt.unwrap();
+        }
+        let reload_res = ProcessingState::reload_json(&dirpath);
+        if reload_res.is_ok() {
+            state = reload_res.unwrap();
+        }
+        else {
+            log::error!("dnasketch::cannot reload processing state (file 'processing_state.json' from directory : {:?}", &dirpath);
+            std::process::exit(1);           
+        }
+    } 
+    else {
+        // creation mode
+        let hnsw_params = processing_params.get_hnsw_params();
+        hnsw = Hnsw::<Kmer::Val, DistHamming>::new(hnsw_params.get_max_nb_connection() as usize , hnsw_params.capacity , 16, hnsw_params.get_ef(), DistHamming{});
+        state = ProcessingState::new();
+     }
     hnsw.set_extend_candidates(true);
     hnsw.set_keeping_pruned(false);
     //
@@ -89,7 +119,27 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT>(dirpath : &Path, filt
         });
         // sequence reception, consumer thread
         let receptor_handle = scope.spawn(move |_| {
-            let mut seqdict = SeqDict::new(100000);
+            let mut seqdict : SeqDict;
+            if other_params.get_adding_mode() {
+                // must reload seqdict
+                let mut filepath = PathBuf::new();
+                filepath.push("seqdict.json");
+                let res_reload = SeqDict::reload_json(&filepath);
+                if res_reload.is_err() {
+                    let cwd = std::env::current_dir();
+                    if cwd.is_ok() {
+                        log::info!("current directory : {:?}", cwd.unwrap());
+                    }
+                    log::error!("cannot reload SeqDict (file 'seq.json' from current directory");
+                    std::process::exit(1);   
+                }
+                else {
+                    seqdict = res_reload.unwrap();
+                }
+            }
+            else {
+                seqdict =  SeqDict::new(100000);
+            }
             // we must read messages, sketch and insert into hnsw
             let mut read_more = true;
             while read_more {
@@ -197,15 +247,15 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT>(dirpath : &Path, filt
 
 
 
-pub fn aa_process_tohnsw(dirpath : &Path, filter_params : &FilterParams, processing_parameters : &ProcessingParams) {
+pub fn aa_process_tohnsw(dirpath : &Path, filter_params : &FilterParams, processing_parameters : &ProcessingParams, others_params : &ComputingParams) {
     // dispatch according to kmer_size
     let kmer_size = processing_parameters.get_sketching_params().get_kmer_size();
     //
     if kmer_size <= 6 {
-        sketchandstore_dir_compressedkmer::<KmerAA32bit>(&dirpath, &filter_params, &processing_parameters);
+        sketchandstore_dir_compressedkmer::<KmerAA32bit>(&dirpath, &filter_params, &processing_parameters, others_params);
     }
     else if kmer_size <= 12 {
-        sketchandstore_dir_compressedkmer::<KmerAA64bit>(&dirpath, &filter_params, &processing_parameters);
+        sketchandstore_dir_compressedkmer::<KmerAA64bit>(&dirpath, &filter_params, &processing_parameters, others_params);
     } else  {
         panic!("kmer for Amino Acids must be less or equal to 12");
     }

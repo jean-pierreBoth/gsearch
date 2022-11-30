@@ -226,7 +226,7 @@ fn main() {
         //
         match data_type {
             DataType::DNA => dna_process_tohnsw(&dirpath, &filter_params, &processing_parameters, &other_params),
-            DataType::AA => aa_process_tohnsw(&dirpath, &filter_params, &processing_parameters),
+            DataType::AA => aa_process_tohnsw(&dirpath, &filter_params, &processing_parameters, &other_params),
         }
         //
  } // end of main
