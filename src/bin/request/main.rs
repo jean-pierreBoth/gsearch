@@ -244,7 +244,7 @@ fn main() {
         }
         // reload SeqDict
         let seqname = Path::new(&database_dir);
-        let seqname = seqname.join("/seqdict.json");
+        let seqname = seqname.join("seqdict.json");
         log::info!("\n reloading sequence dictionary from {}", &seqname.display());
         let seqdict = SeqDict::reload_json(&seqname);
         let seqdict = match seqdict {
