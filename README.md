@@ -74,7 +74,7 @@ This can be done using the **--features** option as explained below, or by modif
 
 ### Simple case for install:
 
-**Pre-built binaries** will be available on release page (https://github.com/jean-pierreBoth/gsearch/releases/tag/v0.0.10) for major platforms. 
+**Pre-built binaries** will be available on release page (https://github.com/jean-pierreBoth/gsearch/releases/tag/v0.0.12) for major platforms. 
 
 Otherwise it is possible to install/compile by yourself:
 
