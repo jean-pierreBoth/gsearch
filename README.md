@@ -94,7 +94,7 @@ cargo install gsearch --features="annembed_intel-mkl"
 or with a system installed openblas:
 
 ```bash
-cargo install gsearch --release --features="annembed_openblas-system" 
+cargo install gsearch --features="annembed_openblas-system" 
 ```
  - On MacOS, which requires dynamic library link (you have to install openblas first and then xz, the MacOS/Darwin binary provided also requires this):
 (note that openblas install lib path is different on M1 MACs).  
