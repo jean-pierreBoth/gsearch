@@ -6,7 +6,7 @@ gsearch is the new name of the crate archaea.  It stands for **genomic search**.
 
 This package (**currently in development**) compute probminhash signature of  bacteria and archaea (or virus and fungi) genomes and stores the id of bacteria and probminhash signature in a Hnsw structure for searching of new request genomes.
 
-This package is developped by Jean-Pierre Both (https://github.com/jean-pierreBoth) for the software part and Jianshu Zhao (https://github.com/jianshu93) for the genomics part.
+This package is developped by Jean-Pierre Both (https://github.com/jean-pierreBoth) for the software part and Jianshu Zhao (https://github.com/jianshu93) for the genomics part. We also created a mirror of this repo on GitLab (https://gitlab.com/Jianshu_Zhao/archaea), just in case Github service is not available in some region, e.g, China.
 
 ## Sketching of genomes/tohnsw
 
