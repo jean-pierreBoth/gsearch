@@ -1,4 +1,4 @@
-//! rna sketching
+//! amino acid (AA) sketching
 
 
 use std::time::{SystemTime};
