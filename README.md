@@ -48,13 +48,13 @@ tar xzvf ./test_data.tar.gz
 
 cd ./GTDB_r207_hnsw_graph/nucl
 ### request neighbors for nt genomes (here -n is how many neighbors you want to return for each of your query genome)
-request -b ./ -d ../../test_data/query_dir_nt -n 50
+request -b ./ -r ../../test_data/query_dir_nt -n 50
 ### or request neighbors for aa genomes (predicted by Prodigal or FragGeneScanRs)
 cd ./GTDB_r207_hnsw_graph/prot
-request -b ./ -d ../../test_data/query_dir_aa -n 50 --aa
+request -b ./ -r ../../test_data/query_dir_aa -n 50 --aa
 ### or request neighbors for aa universal gene (extracted by hmmer according to hmm files from gtdb, we also provide one in release page)
 cd ./GTDB_r207_hnsw_graph/universal
-request -b ./ -d ../../test_data/query_dir_universal_aa -n 50 --aa
+request -b ./ -r ../../test_data/query_dir_universal_aa -n 50 --aa
 
 ### When there are new genomes  after comparing with the current database (GTDB v207, e.g. ANI < 95% with any genome after searcing, corresponding to 0.9850 ProbMinHash distance), those genomes can be added to the database:
 ###must run in the existing database file folder
