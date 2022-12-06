@@ -72,9 +72,10 @@ tohnsw -d db_dir_nt (new genomes directory in AA format predicted by prodigal/Fr
 This can be done using the **--features** option as explained below, or by modifying the features section in  Cargo.toml. In that case just fill in the default you want.
 * kmerutils provides a feature "withzmq". This feature can be used to store compressed qualities on a server and run requests. It is not necessary in this crate.
 
-### Simple case for install:
+# Simple case for install:
 
-**Pre-built binaries** will be available on release page (https://github.com/jean-pierreBoth/gsearch/releases/tag/v0.0.12) for major platforms. 
+**Pre-built binaries** will be available on release page (https://github.com/jean-pierreBoth/gsearch/releases/tag/v0.0.12) for major platforms. We recommend you use the linux one (GSearch_Linux_x86-64_intel-mkl-static.zip
+) in this release page for convenience because the only dependency is GCC (Recent Linux version does not allow static compiling of GCC libraries like libc.so.6).
 
 Otherwise it is possible to install/compile by yourself:
 
