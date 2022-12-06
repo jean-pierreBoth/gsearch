@@ -33,11 +33,6 @@ Otherwise it is possible to install/compile by yourself (see install section)
 
 
 ```bash
-### database is huge, users are welcome to download gtdb database here: (https://data.ace.uq.edu.au/public/gtdb/data/releases/release207/207.0/genomic_files_reps/gtdb_genomes_reps_r207.tar.gz) and here (https://data.ace.uq.edu.au/public/gtdb/data/releases/release207/207.0/genomic_files_reps/gtdb_proteins_aa_reps_r207.tar.gz)
-### build database given genome file directory, fna.gz was expected. L for nt and .faa or .faa.gz for --aa. Limit for k is 32 (15 not work due to compression), for s is 65535 (u16) and for n is 255 (u8)
-tohnsw -d db_dir_nt -s 12000 -k 16 --ef 1600 -n 128
-tohnsw -d db_dir_aa -s 12000 -k 7 --ef 1600 -n 128 --aa
-
 ### request neighbours for each genomes (fna, fasta, faa et.al. are supported) in query_dir_nt or aa using pre-built database:
 wget http://enve-omics.ce.gatech.edu/data/public_gsearch/GTDB_r207_hnsw_graph.tar.gz
 tar xzvf ./GTDB_r207_hnsw_graph.tar.gz
@@ -55,6 +50,12 @@ request -b ./ -r ../../test_data/query_dir_aa -n 50 --aa
 ### or request neighbors for aa universal gene (extracted by hmmer according to hmm files from gtdb, we also provide one in release page)
 cd ./GTDB_r207_hnsw_graph/universal
 request -b ./ -r ../../test_data/query_dir_universal_aa -n 50 --aa
+
+
+### Building database. database is huge in size, users are welcome to download gtdb database here: (https://data.ace.uq.edu.au/public/gtdb/data/releases/release207/207.0/genomic_files_reps/gtdb_genomes_reps_r207.tar.gz) and here (https://data.ace.uq.edu.au/public/gtdb/data/releases/release207/207.0/genomic_files_reps/gtdb_proteins_aa_reps_r207.tar.gz)
+### build database given genome file directory, fna.gz was expected. L for nt and .faa or .faa.gz for --aa. Limit for k is 32 (15 not work due to compression), for s is 65535 (u16) and for n is 255 (u8)
+tohnsw -d db_dir_nt -s 12000 -k 16 --ef 1600 -n 128
+tohnsw -d db_dir_aa -s 12000 -k 7 --ef 1600 -n 128 --aa
 
 ### When there are new genomes  after comparing with the current database (GTDB v207, e.g. ANI < 95% with any genome after searcing, corresponding to 0.9850 ProbMinHash distance), those genomes can be added to the database:
 ###must run in the existing database file folder
