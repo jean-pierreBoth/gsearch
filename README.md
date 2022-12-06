@@ -24,8 +24,16 @@ For requests  the module ***request*** is being used. It reloads the dumped file
 takes a list of fasta files containing requests and for each fasta file dumps the asked number of nearest neighbours.
 
 ## Usage
+## Simple case for install:
+
+**Pre-built binaries** will be available on release page (https://github.com/jean-pierreBoth/gsearch/releases/tag/v0.0.12) for major platforms. We recommend you use the linux one (GSearch_Linux_x86-64_intel-mkl-static.zip
+) in this release page for convenience because the only dependency is GCC (Recent Linux version does not allow static compiling of GCC libraries like libc.so.6).
+
+Otherwise it is possible to install/compile by yourself (see install section)
+
 
 ```bash
+### database is huge, users are welcome to download gtdb database here: (https://data.ace.uq.edu.au/public/gtdb/data/releases/release207/207.0/genomic_files_reps/gtdb_genomes_reps_r207.tar.gz) and here (https://data.ace.uq.edu.au/public/gtdb/data/releases/release207/207.0/genomic_files_reps/gtdb_proteins_aa_reps_r207.tar.gz)
 ### build database given genome file directory, fna.gz was expected. L for nt and .faa or .faa.gz for --aa. Limit for k is 32 (15 not work due to compression), for s is 65535 (u16) and for n is 255 (u8)
 tohnsw -d db_dir_nt -s 12000 -k 16 --ef 1600 -n 128
 tohnsw -d db_dir_aa -s 12000 -k 7 --ef 1600 -n 128 --aa
@@ -33,15 +41,20 @@ tohnsw -d db_dir_aa -s 12000 -k 7 --ef 1600 -n 128 --aa
 ### request neighbours for each genomes (fna, fasta, faa et.al. are supported) in query_dir_nt or aa using pre-built database:
 wget http://enve-omics.ce.gatech.edu/data/public_gsearch/GTDB_r207_hnsw_graph.tar.gz
 tar xzvf ./GTDB_r207_hnsw_graph.tar.gz
+
+### get test data, we provide 2 genomes at nt, AA and universal gene level
+wget https://github.com/jean-pierreBoth/gsearch/releases/download/v0.0.12/test_data.tar.gz
+tar xzvf ./test_data.tar.gz
+
 cd ./GTDB_r207_hnsw_graph/nucl
 ### request neighbors for nt genomes (here -n is how many neighbors you want to return for each of your query genome)
-request -b ./ -d query_dir_nt -n 50
-### request neighbors for aa genomes (predicted by Prodigal or FragGeneScanRs)
+request -b ./ -d ../../test_data/query_dir_nt -n 50
+### or request neighbors for aa genomes (predicted by Prodigal or FragGeneScanRs)
 cd ./GTDB_r207_hnsw_graph/prot
-request -b ./ -d query_dir_aa -n 50 --aa
-### request neighbors for aa universal gene (extracted by hmmer according to hmm files provided)
+request -b ./ -d ../../test_data/query_dir_aa -n 50 --aa
+### or request neighbors for aa universal gene (extracted by hmmer according to hmm files from gtdb, we also provide one in release page)
 cd ./GTDB_r207_hnsw_graph/universal
-request -b ./ -d query_dir_universal_aa -n 50 --aa
+request -b ./ -d ../../test_data/query_dir_universal_aa -n 50 --aa
 
 ### When there are new genomes  after comparing with the current database (GTDB v207, e.g. ANI < 95% with any genome after searcing, corresponding to 0.9850 ProbMinHash distance), those genomes can be added to the database:
 ###must run in the existing database file folder
@@ -72,12 +85,9 @@ tohnsw -d db_dir_nt (new genomes directory in AA format predicted by prodigal/Fr
 This can be done using the **--features** option as explained below, or by modifying the features section in  Cargo.toml. In that case just fill in the default you want.
 * kmerutils provides a feature "withzmq". This feature can be used to store compressed qualities on a server and run requests. It is not necessary in this crate.
 
-# Simple case for install:
 
-**Pre-built binaries** will be available on release page (https://github.com/jean-pierreBoth/gsearch/releases/tag/v0.0.12) for major platforms. We recommend you use the linux one (GSearch_Linux_x86-64_intel-mkl-static.zip
-) in this release page for convenience because the only dependency is GCC (Recent Linux version does not allow static compiling of GCC libraries like libc.so.6).
 
-Otherwise it is possible to install/compile by yourself:
+# Install
 
 #### First install Rust tools
 
