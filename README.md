@@ -62,7 +62,7 @@ cd ./GTDB_r207_hnsw_graph/nucl
 ### old .graph,.data and all .json files will be updated to the new one. Then the new one can be used for requesting as an updated database
 tohnsw -d db_dir_nt (new genomes directory) -s 12000 -k 16 --ef 1600 -n 128 --add
 ### or add at the amino acid level:
-cd ./GTDB_r207_hnsw_graph/
+cd ./GTDB_r207_hnsw_graph/prot
 tohnsw -d db_dir_nt (new genomes directory in AA format predicted by prodigal/FragGeneScanRs) -s 12000 -k 16 --ef 1600 -n 128 --aa --add
 ```
 
