@@ -26,7 +26,7 @@ takes a list of fasta files containing requests and for each fasta file dumps th
 ## Usage
 ## Simple case for install:
 
-**Pre-built binaries** will be available on release page (https://github.com/jean-pierreBoth/gsearch/releases/tag/v0.0.12) for major platforms. We recommend you use the linux one (GSearch_Linux_x86-64_intel-mkl-static.zip
+**Pre-built binaries** will be available on release page (https://github.com/jean-pierreBoth/gsearch/releases/tag/v0.0.12) for major platforms (no need to install but just download and make it executable). We recommend you use the linux one (GSearch_Linux_x86-64_intel-mkl-static.zip
 ) in this release page for convenience because the only dependency is GCC (Recent Linux version does not allow static compiling of GCC libraries like libc.so.6).
 
 Otherwise it is possible to install/compile by yourself (see install section)
