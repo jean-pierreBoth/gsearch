@@ -1,4 +1,4 @@
-//! stuff related to rna files work
+//! stuff related to amino acid (AA) files work
 
 
 use std::path::PathBuf;
