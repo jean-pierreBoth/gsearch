@@ -33,6 +33,17 @@ Otherwise it is possible to install/compile by yourself (see install section)
 
 
 ```bash
+### get the binary (make sure you have recent GCC installed):
+
+wget https://github.com/jean-pierreBoth/gsearch/releases/download/v0.0.12/GSearch_Linux_x86-64_intel-mkl-static.zip
+unzip GSearch_Linux_x86-64_intel-mkl-static.zip
+chmod a+x ./GSearch_Linux_x86-64_intel-mkl-static/*
+### put it under your system/usr bin directory (/usr/local/bin/ as an example) where it can be called:
+cp ./GSearch_Linux_x86-64_intel-mkl-static/* /usr/local/bin/
+### check install
+tohnsw -h
+request -h
+
 ### request neighbours for each genomes (fna, fasta, faa et.al. are supported) in query_dir_nt or aa using pre-built database:
 wget http://enve-omics.ce.gatech.edu/data/public_gsearch/GTDB_r207_hnsw_graph.tar.gz
 tar xzvf ./GTDB_r207_hnsw_graph.tar.gz
