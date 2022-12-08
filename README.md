@@ -33,7 +33,7 @@ Otherwise it is possible to install/compile by yourself (see install section)
 
 
 ```bash
-### get the binary (make sure you have recent GCC installed):
+### get the binary (make sure you have recent Linux installed, e.g., Ubuntu 18.0.4 or anove):
 
 wget https://github.com/jean-pierreBoth/gsearch/releases/download/v0.0.12/GSearch_Linux_x86-64_intel-mkl-static.zip
 unzip GSearch_Linux_x86-64_intel-mkl-static.zip
