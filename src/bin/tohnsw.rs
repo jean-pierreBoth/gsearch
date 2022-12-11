@@ -90,7 +90,7 @@ fn main() {
             .short('s')
             .required(true)
             .takes_value(true)
-            .help("size of probinhash sketch, default to 256"))
+            .help("size of probminhash sketch, default to 256"))
         .arg(Arg::new("neighbours")
             .long("nbng")
             .short('n')
