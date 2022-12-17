@@ -44,6 +44,13 @@ cp ./GSearch_Linux_x86-64_intel-mkl-static/* /usr/local/bin/
 tohnsw -h
 request -h
 
+### check install MacOS, you may need to change the system setup to allow external binary to run by type the following first and use your admin password:
+
+sudo spctl --master-disable
+### and then 
+tohnsw -h
+request -h
+
 ### request neighbours for each genomes (fna, fasta, faa et.al. are supported) in query_dir_nt or aa using pre-built database:
 wget http://enve-omics.ce.gatech.edu/data/public_gsearch/GTDB_r207_hnsw_graph.tar.gz
 tar xzvf ./GTDB_r207_hnsw_graph.tar.gz
