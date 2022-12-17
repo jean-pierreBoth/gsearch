@@ -33,10 +33,16 @@ Otherwise it is possible to install/compile by yourself (see install section)
 
 
 ```bash
-### get the binary (make sure you have recent Linux installed, e.g., Ubuntu 18.0.4 or anove):
+### get the binary for linux (make sure you have recent Linux installed with GCC, e.g., Ubuntu 18.0.4 or above):
 
 wget https://github.com/jean-pierreBoth/gsearch/releases/download/v0.0.12/GSearch_Linux_x86-64_intel-mkl-static.zip
 unzip GSearch_Linux_x86-64_intel-mkl-static.zip
+
+## get the binary for macOS:
+wget https://github.com/jean-pierreBoth/gsearch/releases/download/v0.0.12/GSearch_darwin_universal.zip
+unzip GSearch_darwin_universal.zip
+
+### make it excutable (changed it accordingly on macOS)
 chmod a+x ./GSearch_Linux_x86-64_intel-mkl-static/*
 ### put it under your system/usr bin directory (/usr/local/bin/ as an example) where it can be called:
 cp ./GSearch_Linux_x86-64_intel-mkl-static/* /usr/local/bin/
