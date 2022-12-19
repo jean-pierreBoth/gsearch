@@ -45,7 +45,7 @@ unzip GSearch_darwin_universal.zip
 ### make it excutable (changed it accordingly on macOS)
 chmod a+x ./GSearch_Linux_x86-64_intel-mkl-static/*
 ### put it under your system/usr bin directory (/usr/local/bin/ as an example) where it can be called:
-cp ./GSearch_Linux_x86-64_intel-mkl-static/* /usr/local/bin/
+mv ./GSearch_Linux_x86-64_intel-mkl-static/* /usr/local/bin/
 ### check install
 tohnsw -h
 request -h
