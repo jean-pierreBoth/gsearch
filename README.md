@@ -81,7 +81,7 @@ request -b ./ -r ../../test_data/query_dir_universal_aa -n 50 --aa
 tohnsw -d db_dir_nt -s 12000 -k 16 --ef 1600 -n 128
 tohnsw -d db_dir_aa -s 12000 -k 7 --ef 1600 -n 128 --aa
 
-### When there are new genomes  after comparing with the current database (GTDB v207, e.g. ANI < 95% with any genome after searcing, corresponding to 0.9850 ProbMinHash distance), those genomes can be added to the database:
+### When there are new genomes  after comparing with the current database (GTDB v207, e.g. ANI < 95% with any genome after searcing, corresponding to >0.875 ProbMinHash distance), those genomes can be added to the database:
 ###must run in the existing database file folder
 cd ./GTDB_r207_hnsw_graph/nucl
 ### old .graph,.data and all .json files will be updated to the new one. Then the new one can be used for requesting as an updated database
