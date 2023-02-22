@@ -29,7 +29,7 @@ use crate::dna::dnafiles::{process_file_in_one_block, process_buffer_in_one_bloc
 
 use crate::utils::parameters::*;
 
-fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT>(dirpath : &Path, filter_params: &FilterParams, 
+fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT+KmerBuilder<Kmer>>(dirpath : &Path, filter_params: &FilterParams, 
                     processing_params : &ProcessingParams, other_params : &ComputingParams) 
         where Kmer::Val : 'static + num::PrimInt + Clone + Copy + Send + Sync + Serialize + DeserializeOwned + Debug,
                 KmerGenerator<Kmer> :  KmerGenerationPattern<Kmer>, 
@@ -204,7 +204,9 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT>(dirpath : &Path, filt
                     Err(RecvError) => { read_more = false;
                         // sketch the content of  insertion_queue if not empty
                         if insertion_queue.len() > 0 {
+                            log::debug!("end of reception");
                             let sequencegroup_ref : Vec<&Sequence> = insertion_queue.iter().map(|s| s.get_sequence_dna().unwrap()).collect();
+                            log::debug!("end of reception received nb seq : {}", sequencegroup_ref.len());
                             // collect rank
                             let seq_rank :  Vec<usize> = insertion_queue.iter().map(|s| s.get_rank()).collect();
                             // collect Id
@@ -226,11 +228,13 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT>(dirpath : &Path, filt
                         // if insertion_queue is beyond threshold size we can go to threaded sketching and threading insertion
                         if insertion_queue.len() > insertion_block_size {
                             let sequencegroup_ref : Vec<&Sequence> = insertion_queue.iter().map(|s| s.get_sequence_dna().unwrap()).collect();
+                            log::debug!("received nb seq : {}", sequencegroup_ref.len());
                             let seq_rank :  Vec<usize> = insertion_queue.iter().map(|s| s.get_rank()).collect();
                             // collect Id
                             let mut seq_id :  Vec<ItemDict> = insertion_queue.iter().map(|s| ItemDict::new(Id::new(s.get_path(), s.get_fasta_id()), s.get_seq_len())).collect();
                             seqdict.0.append(&mut seq_id);
                             // computes hash signature
+                            log::debug!("calling sketch_probminhash3a_compressedkmer");
                             let signatures = sketcher.sketch_probminhash3a_compressedkmer(&sequencegroup_ref, kmer_hash_fn);
                             // we have Vec<u32> signatures we must go back to a vector of IdSketch, inserting unique id, for hnsw insertion
                             let mut data_for_hnsw = Vec::<(&Vec<Kmer::Val>, usize)>::with_capacity(signatures.len());

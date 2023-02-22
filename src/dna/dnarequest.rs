@@ -25,7 +25,7 @@ use crate::{matcher::*, answer::ReqAnswer};
 
 
 
-fn sketch_and_request_dir_compressedkmer<Kmer:CompressedKmerT>(request_dirpath : &Path, filter_params: &FilterParams, 
+fn sketch_and_request_dir_compressedkmer<Kmer:CompressedKmerT + KmerBuilder<Kmer>>(request_dirpath : &Path, filter_params: &FilterParams, 
                     seqdict : &SeqDict, processing_parameters : &ProcessingParams, 
                     hnsw : &Hnsw<Kmer::Val,DistHamming>, knbn : usize, ef_search : usize) -> Matcher
             where Kmer::Val : num::PrimInt + Clone + Copy + Send + Sync + Serialize + DeserializeOwned + Debug,
