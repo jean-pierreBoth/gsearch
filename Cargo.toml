@@ -1,6 +1,6 @@
 [package]
 name = "gsearch"
-version = "0.1.0"
+version = "0.1.1"
 authors = ["jeanpierre.both@gmail.com","jianshu.zhao@gatech.edu"]
 repository = "https://github.com/jean-pierreBoth/gsearch"
 keywords = ["hnsw", "probminhash", "bacteria"]
@@ -56,8 +56,8 @@ probminhash = {version = "0.1.6"}
 hnsw_rs =  {version = "0.1.16"}
 #hnsw_rs = {path = "../hnswlib-rs"}
 
-#kmerutils = {path = "../kmerutils"}
-kmerutils = {version = "0.0.7"}
+kmerutils = {path = "../kmerutils"}
+#kmerutils = {version = "0.0.8"}
 
 lazy_static = { version = "1.4"}
 

@@ -22,7 +22,7 @@ use crate::aa::aafiles::{process_aafile_in_one_block};
 
 use crate::utils::parameters::*;
 
-fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT>(dirpath : &Path, filter_params: &FilterParams, processing_params : &ProcessingParams, other_params : &ComputingParams) 
+fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT + KmerBuilder<Kmer>>(dirpath : &Path, filter_params: &FilterParams, processing_params : &ProcessingParams, other_params : &ComputingParams) 
         where Kmer::Val : 'static + num::PrimInt + Clone + Copy + Send + Sync + Serialize + DeserializeOwned + Debug,
                 KmerGenerator<Kmer> :  KmerGenerationPattern<Kmer>, 
                 DistHamming : Distance<Kmer::Val> {

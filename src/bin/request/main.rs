@@ -40,6 +40,7 @@ use env_logger::{Builder};
 
 use std::path::{Path};
 
+use kmerutils::sketcharg::{SketchAlgo, SeqSketcherParams};
 
 //mod files;
 use gsearch::utils::*;
@@ -178,6 +179,22 @@ fn main() {
         else {
             println!("will use dumped sketch size");
         }
+        // sketching algorithm
+        let mut sketch_algo = SketchAlgo::PROB3A;
+        if matches.is_present("sketch_algo") {
+            let algo = matches.value_of("sketch_algo").ok_or("").unwrap().parse::<String>().unwrap();
+            println!("sketching algo {}", algo);
+            if algo == String::from("super") {
+                sketch_algo = SketchAlgo::SUPER;
+            }
+            else if algo == String::from("prob") {
+                sketch_algo = SketchAlgo::PROB3A;
+            }
+            else {
+                println!("unknown asketching algo");
+                std::panic!("unknown asketching algo");
+            }
+        }
         //
         let mut kmer_size = 28;
         if matches.is_present("kmer_size") {
@@ -188,7 +205,7 @@ fn main() {
             println!("will use dumped kmer size");
         }
         // in fact sketch_params must be initialized from the dump directory
-        let _sketch_params =  SeqSketcherParams::new(kmer_size as usize, sketch_size as usize);  
+        let _sketch_params =  SeqSketcherParams::new(kmer_size as usize, sketch_size as usize, sketch_algo);  
         //
         let nbng;
         if matches.is_present("neighbours") {

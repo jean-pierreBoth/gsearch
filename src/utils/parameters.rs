@@ -8,7 +8,7 @@ use std::io::{BufReader, BufWriter };
 use serde::{Deserialize, Serialize};
 use serde_json::{to_writer};
 
-
+pub use kmerutils::sketcharg::*;
 
 /// a structure to filter files or sequences we treat
 pub struct FilterParams {
@@ -97,33 +97,7 @@ impl AnnParameters {
 
 //=========================================================================================
 
-// This is redundant with struct Sketcher for DNA case and RNA case, but it makes
-// possible the factorization of all parameters
 
-#[derive(Copy,Clone,Serialize,Deserialize)]
-pub struct SeqSketcherParams {
-    kmer_size : usize,
-    sketch_size : usize  
-}
-
-
-impl SeqSketcherParams {
-    /// 
-    pub fn new(kmer_size: usize, sketch_size : usize) -> Self {
-        SeqSketcherParams{kmer_size, sketch_size}
-    }
-
-    /// returns kmer size
-    pub fn get_kmer_size(&self) -> usize {
-        self.kmer_size
-    }
-
-    /// return sketch size
-    pub fn get_sketch_size(&self) -> usize {
-        self.sketch_size
-    }  
-
-}  // end of SeqSketcherParams
 
 //==========================================================================================
 

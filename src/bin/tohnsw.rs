@@ -1,4 +1,4 @@
-// ARCHAEA v0.1.0
+// GSEARCH v0.1.0
 // Copyright 2021-2022, Jean Pierre Both and Jianshu Zhao.
 // Licensed under the MIT license (http://opensource.org/licenses/MIT).
 // This file may not be copied, modified, or distributed except according to those terms.
@@ -11,6 +11,9 @@
 //! --dir : the name of directory containing tree of DNA files or Amino Acid files. 
 //!   
 //! --sketch gives the size of probminhash sketch (integer value). Mandatory value.  
+//! 
+//! --algo specifiy the sketching algorithm to be used. Default is ProbMinhash. SuperMinHash can specified by --algo super.
+//!         passing --algo prob   for asking ProbMinhash is possible
 //! 
 //! --kmer [-k] gives the size of kmer to use for generating probminhash (integer value). Mandatory argument. 
 //!  
@@ -91,6 +94,11 @@ fn main() {
             .required(true)
             .takes_value(true)
             .help("size of probminhash sketch, default to 256"))
+        .arg(Arg::new("sketch_algo")
+            .long("algo")
+            .takes_value(true)
+            .default_value("prob")
+            .help("specify algo for sketching, prob for probminhash or super for superminhash"))
         .arg(Arg::new("neighbours")
             .long("nbng")
             .short('n')
@@ -141,7 +149,9 @@ fn main() {
             println!("error not a directory : {:?}", datadir);
             std::process::exit(1);
         }
+        //
         // get sketching params
+        //
         let sketch_size;
         if matches.is_present("sketch_size") {
             sketch_size = matches.value_of("sketch_size").ok_or("").unwrap().parse::<u16>().unwrap();
@@ -150,7 +160,23 @@ fn main() {
         else {
             panic!("sketch_size is mandatory");
         }
-        //
+        // sketching algorithm
+        let mut sketch_algo = SketchAlgo::PROB3A;
+        if matches.is_present("sketch_algo") {
+            let algo = matches.value_of("sketch_algo").ok_or("").unwrap().parse::<String>().unwrap();
+            println!("sketching algo {}", algo);
+            if algo == String::from("super") {
+                sketch_algo = SketchAlgo::SUPER;
+            }
+            else if algo == String::from("prob") {
+                sketch_algo = SketchAlgo::PROB3A;
+            }
+            else {
+                println!("unknown asketching algo");
+                std::panic!("unknown asketching algo");
+            }
+        }
+        // kmer size
         let kmer_size;
         if matches.is_present("kmer_size") {
             kmer_size = matches.value_of("kmer_size").ok_or("").unwrap().parse::<u16>().unwrap();
@@ -159,7 +185,7 @@ fn main() {
         else {
             panic!(" kmer size is mandatory");
         }
-        let sketch_params =  SeqSketcherParams::new(kmer_size as usize, sketch_size as usize);  
+        let sketch_params =  SeqSketcherParams::new(kmer_size as usize, sketch_size as usize, sketch_algo);  
         //
         let nbng;
         if matches.is_present("neighbours") {
