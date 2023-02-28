@@ -118,7 +118,7 @@ fn sketch_and_request_dir_compressedkmer<Kmer:CompressedKmerT + KmerBuilder<Kmer
                                     log::debug!("treating request : {}", s.get_id().get_path());
                                 }
                             }   
-                            let signatures = sketcher.sketch_probminhash3a_compressedkmer(&sequencegroup_ref, kmer_hash_fn);                            
+                            let signatures = sketcher.sketch_probminhash3a(&sequencegroup_ref, kmer_hash_fn);                            
                             // we have Vec<u64> signatures we must go back to a vector of IdSketch for hnsw insertion
                             let knn_neighbours  = hnsw.parallel_search(&signatures, knbn, ef_search);
                             for i in 0..knn_neighbours.len() {
@@ -143,7 +143,7 @@ fn sketch_and_request_dir_compressedkmer<Kmer:CompressedKmerT + KmerBuilder<Kmer
                             // collect Id
                             let seq_item : Vec<ItemDict> = request_queue.iter().map(|s| ItemDict::new(Id::new(s.get_path(), s.get_fasta_id()), s.get_seq_len())).collect();
                             // computes hash signature
-                            let signatures = sketcher.sketch_probminhash3a_compressedkmer(&sequencegroup_ref, kmer_hash_fn);
+                            let signatures = sketcher.sketch_probminhash3a(&sequencegroup_ref, kmer_hash_fn);
                             // we have Vec<u64> signatures we must go back to a vector of IdSketch, inserting unique id, for hnsw insertion
                             // parallel search
                             let knn_neighbours  = hnsw.parallel_search(&signatures, knbn, ef_search);

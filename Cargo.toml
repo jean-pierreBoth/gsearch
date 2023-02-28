@@ -51,9 +51,12 @@ clap = {version = "3.2"}
 
 ##
 
-probminhash = {version = "0.1.6"}
-#probminhash = {path = "../probminhash"}
-hnsw_rs =  {version = "0.1.16"}
+#probminhash = {version = "0.1.6"}
+probminhash = {path = "../probminhash"}
+
+hnsw_rs =  {version = "0.1.18"}
+# hnsw_rs =  {git = "https://github.com/jean-pierreBoth/hnswlib-rs"}
+# nsw_rs = {git = "https://gitlab.com/jpboth/hnswlib-rs.git"}
 #hnsw_rs = {path = "../hnswlib-rs"}
 
 kmerutils = {path = "../kmerutils"}
@@ -68,8 +71,10 @@ log = { version = "0.4"}
 env_logger = { version = "0.9"}
 
 # optional dependency to embed hnsw graph
-annembed = {version = "0.0.8", optional = true}
+annembed = {version = "0.0.9", optional = true}
 #annembed = {path = "../annembed", optional = true}
+
+
 # no more pb with between anyhow intel-mkl-src
 anyhow = { version = "1.0.58" }
 csv = {version = "1.1"}
