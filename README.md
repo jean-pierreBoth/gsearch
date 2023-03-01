@@ -36,7 +36,7 @@ conda config --add channels bioconda
 conda install gsearch c bioconda
 ```
 
-## Otherwise it is possible to install/compile by yourself (see install section)
+Otherwise it is possible to install/compile by yourself (see install section)
 
 
 ```bash
