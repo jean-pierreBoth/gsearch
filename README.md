@@ -33,7 +33,7 @@ takes a list of fasta files containing requests and for each fasta file dumps th
 
 ```bash
 conda config --add channels bioconda
-conda install gsearch c bioconda
+conda install gsearch -c bioconda
 ```
 
 Otherwise it is possible to install/compile by yourself (see install section)
