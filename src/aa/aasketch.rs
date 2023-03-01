@@ -9,12 +9,14 @@ use serde::{de::DeserializeOwned, Serialize};
 
 use std::fmt::{Debug};
 use std::path::{Path, PathBuf};
+
+
 // our crate
 use hnsw_rs::prelude::*;
 
 use kmerutils::base::kmertraits::*;
 use kmerutils::aautils::kmeraa::*;
-use kmerutils::aautils::seqsketchjaccard::*;
+use kmerutils::aautils::seqsketchjaccard::{SeqSketcherAAT, ProbHash3aSketch, SuperHashSketch};
 
 use crate::utils::{idsketch::*, reloadhnsw};
 use crate::utils::files::{process_dir,ProcessingState, DataType};
@@ -22,10 +24,15 @@ use crate::aa::aafiles::{process_aafile_in_one_block};
 
 use crate::utils::parameters::*;
 
-fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT + KmerBuilder<Kmer>>(dirpath : &Path, filter_params: &FilterParams, processing_params : &ProcessingParams, other_params : &ComputingParams) 
-        where Kmer::Val : 'static + num::PrimInt + Clone + Copy + Send + Sync + Serialize + DeserializeOwned + Debug,
+fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT + KmerBuilder<Kmer>, Sketcher : SeqSketcherAAT<Kmer> + Send + Sync >(dirpath : &Path, 
+                        sketcher : Sketcher,
+                        filter_params: &FilterParams, 
+                        processing_params : &ProcessingParams, 
+                        other_params : &ComputingParams) 
+
+        where   <Sketcher as SeqSketcherAAT<Kmer>>::Sig : 'static + Clone + Copy + Send + Sync + Serialize + DeserializeOwned + Debug,
                 KmerGenerator<Kmer> :  KmerGenerationPattern<Kmer>, 
-                DistHamming : Distance<Kmer::Val> {
+                DistHamming : Distance<<Sketcher as SeqSketcherAAT<Kmer>>::Sig> {
     //
     log::trace!("sketchandstore_dir_compressedkmerrna mode processing dir: {}", dirpath.to_str().unwrap());
     log::info!("sketchandstore_dir_compressedkmer rna mode processing dir: {}", dirpath.to_str().unwrap());
@@ -39,19 +46,19 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT + KmerBuilder<Kmer>>(d
     let insertion_block_size = 5000;
     let mut insertion_queue : Vec<IdSeq>= Vec::with_capacity(insertion_block_size);
     // TODO must get ef_search from clap via hnswparams
-    let mut hnsw : Hnsw::<Kmer::Val, DistHamming>;
+    let mut hnsw : Hnsw::< <Sketcher as SeqSketcherAAT<Kmer>>::Sig, DistHamming>;
     let mut state : ProcessingState;
     if other_params.get_adding_mode() {
          // in this case we must reload
         let dirpath = std::env::current_dir();
         if dirpath.is_err() {
-            log::error!("dnasketch::sketchandstore_dir_compressedkmer cannot get current directory");
-            std::panic!("dnasketch::sketchandstore_dir_compressedkmer cannot get current directory");
+            log::error!("aasketch::sketchandstore_dir_compressedkmer cannot get current directory");
+            std::panic!("aasketch::sketchandstore_dir_compressedkmer cannot get current directory");
         }
         let dirpath = dirpath.unwrap();
-        log::info!("dnasketch::sketchandstore_dir_compressedkmer will reload hnsw data from director {:?}", dirpath);
+        log::info!("aasketch::sketchandstore_dir_compressedkmer will reload hnsw data from director {:?}", dirpath);
         let hnsw_opt = reloadhnsw::reload_hnsw(&dirpath, &AnnParameters::default());
-        if hnsw_opt.is_none() {
+        if hnsw_opt.is_err() {
             log::error!("cannot reload hnsw from directory : {:?}", &dirpath);
             std::process::exit(1);
         }
@@ -63,14 +70,14 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT + KmerBuilder<Kmer>>(d
             state = reload_res.unwrap();
         }
         else {
-            log::error!("dnasketch::cannot reload processing state (file 'processing_state.json' from directory : {:?}", &dirpath);
+            log::error!("aasketch::cannot reload processing state (file 'processing_state.json' from directory : {:?}", &dirpath);
             std::process::exit(1);           
         }
     } 
     else {
         // creation mode
         let hnsw_params = processing_params.get_hnsw_params();
-        hnsw = Hnsw::<Kmer::Val, DistHamming>::new(hnsw_params.get_max_nb_connection() as usize , hnsw_params.capacity , 16, hnsw_params.get_ef(), DistHamming{});
+        hnsw = Hnsw::< <Sketcher as SeqSketcherAAT<Kmer>>::Sig, DistHamming>::new(hnsw_params.get_max_nb_connection() as usize , hnsw_params.capacity , 16, hnsw_params.get_ef(), DistHamming{});
         state = ProcessingState::new();
      }
     hnsw.set_extend_candidates(true);
@@ -84,8 +91,7 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT + KmerBuilder<Kmer>>(d
         let hashval = kmer.get_compressed_value() & mask;
         hashval
     };
-    let sketcher_params = processing_params.get_sketching_params();
-    let sketcher = SeqSketcher::new(sketcher_params.get_kmer_size(), sketcher_params.get_sketch_size());
+
     // to send IdSeq to sketch from reading thread to sketcher thread
     let (send, receive) = crossbeam_channel::bounded::<Vec<IdSeq>>(insertion_block_size);
     // launch process_dir in a thread or async
@@ -99,7 +105,7 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT + KmerBuilder<Kmer>>(d
                 res_nb_sent = process_dir(&mut state, &DataType::AA, dirpath, filter_params, &process_aafile_in_one_block, &send);
             }
             else {
-                panic!("processing by concat and split not implemented for rna");
+                panic!("processing by concat and split not implemented for aa sequences");
             }
             match res_nb_sent {
                 Ok(nb_really_sent) => {
@@ -155,9 +161,9 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT + KmerBuilder<Kmer>>(d
                             // collect Id
                             let mut seq_id :  Vec<ItemDict> = insertion_queue.iter().map(|s| ItemDict::new(Id::new(s.get_path(), s.get_fasta_id()), s.get_seq_len())).collect();
                             seqdict.0.append(&mut seq_id);
-                            let signatures = sketcher.sketch_probminhash3a_compressedkmeraa(&sequencegroup_ref, kmer_hash_fn);                            
+                            let signatures = sketcher.sketch_compressedkmeraa(&sequencegroup_ref, kmer_hash_fn);                            
                             // we have Vec<u64> signatures we must go back to a vector of IdSketch for hnsw insertion
-                            let mut data_for_hnsw = Vec::<(&Vec<Kmer::Val>, usize)>::with_capacity(signatures.len());
+                            let mut data_for_hnsw = Vec::<(&Vec< <Sketcher as SeqSketcherAAT<Kmer>>::Sig>, usize)>::with_capacity(signatures.len());
                             for i in 0..signatures.len() {
                                 data_for_hnsw.push((&signatures[i], seq_rank[i]));
                             }
@@ -176,9 +182,9 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT + KmerBuilder<Kmer>>(d
                             let mut seq_id :  Vec<ItemDict> = insertion_queue.iter().map(|s| ItemDict::new(Id::new(s.get_path(), s.get_fasta_id()), s.get_seq_len())).collect();
                             seqdict.0.append(&mut seq_id);
                             // computes hash signature
-                            let signatures = sketcher.sketch_probminhash3a_compressedkmeraa(&sequencegroup_ref, kmer_hash_fn);
+                            let signatures = sketcher.sketch_compressedkmeraa(&sequencegroup_ref, kmer_hash_fn);
                             // we have Vec<Kmer::Val> signatures we must go back to a vector of IdSketch, inserting unique id, for hnsw insertion
-                            let mut data_for_hnsw = Vec::<(&Vec<Kmer::Val>, usize)>::with_capacity(signatures.len());
+                            let mut data_for_hnsw = Vec::<(&Vec< <Sketcher as SeqSketcherAAT<Kmer>>::Sig>, usize)>::with_capacity(signatures.len());
                             for i in 0..signatures.len() {
                                 data_for_hnsw.push((&signatures[i], seq_rank[i]));
                             }
@@ -248,15 +254,36 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT + KmerBuilder<Kmer>>(d
 
 
 pub fn aa_process_tohnsw(dirpath : &Path, filter_params : &FilterParams, processing_parameters : &ProcessingParams, others_params : &ComputingParams) {
-    // dispatch according to kmer_size
-    let kmer_size = processing_parameters.get_sketching_params().get_kmer_size();
     //
-    if kmer_size <= 6 {
-        sketchandstore_dir_compressedkmer::<KmerAA32bit>(&dirpath, &filter_params, &processing_parameters, others_params);
-    }
-    else if kmer_size <= 12 {
-        sketchandstore_dir_compressedkmer::<KmerAA64bit>(&dirpath, &filter_params, &processing_parameters, others_params);
-    } else  {
-        panic!("kmer for Amino Acids must be less or equal to 12");
+    let sketch_params = processing_parameters.get_sketching_params();
+    let kmer_size = sketch_params.get_kmer_size();
+    //
+    match sketch_params.get_algo() {
+        SketchAlgo::PROB3A => {
+            //
+            if kmer_size <= 6 {
+                let sketcher = ProbHash3aSketch::<KmerAA32bit>::new(sketch_params);
+                sketchandstore_dir_compressedkmer::<KmerAA32bit, ProbHash3aSketch::<KmerAA32bit>>(&dirpath, sketcher, &filter_params, &processing_parameters, others_params);
+            }
+            else if kmer_size <= 12 {
+                let sketcher = ProbHash3aSketch::<KmerAA64bit>::new(sketch_params);
+                sketchandstore_dir_compressedkmer::<KmerAA64bit, ProbHash3aSketch::<KmerAA64bit>>(&dirpath, sketcher, &filter_params, &processing_parameters, others_params);
+            } else  {
+                panic!("kmer for Amino Acids must be less or equal to 12");
+            }
+        }
+        SketchAlgo::SUPER => {
+            if kmer_size <= 6 {
+                let sketcher = SuperHashSketch::<KmerAA32bit>::new(sketch_params);
+                sketchandstore_dir_compressedkmer::<KmerAA32bit, SuperHashSketch::<KmerAA32bit>>(&dirpath, sketcher, &filter_params, &processing_parameters, others_params);
+            }
+            else if kmer_size <= 12 {
+                let sketcher = SuperHashSketch::<KmerAA64bit>::new(sketch_params);
+                sketchandstore_dir_compressedkmer::<KmerAA64bit, SuperHashSketch::<KmerAA64bit>>(&dirpath, sketcher, &filter_params, &processing_parameters, others_params);                
+            }
+            else {
+                panic!("kmer for Amino Acids must be less or equal to 12");
+            }
+        }
     }
 } // end of dna_process

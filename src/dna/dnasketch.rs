@@ -70,7 +70,7 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT+KmerBuilder<Kmer>, Ske
         let dirpath = dirpath.unwrap();
         log::info!("dnasketch::sketchandstore_dir_compressedkmer will reload hnsw data from director {:?}", dirpath);
         let hnsw_opt = reloadhnsw::reload_hnsw(&dirpath, &AnnParameters::default());
-        if hnsw_opt.is_none() {
+        if hnsw_opt.is_err() {
             log::error!("cannot reload hnsw from directory : {:?}", &dirpath);
             std::process::exit(1);
         }
@@ -342,7 +342,6 @@ pub fn dna_process_tohnsw(dirpath : &Path, filter_params : &FilterParams, proces
             if kmer_size <= 14 {
                 // allocated the correct sketcher
                 let sketcher = ProbHash3aSketch::<Kmer32bit>::new(sketchparams);
-                //
                 sketchandstore_dir_compressedkmer::<Kmer32bit, ProbHash3aSketch::<Kmer32bit> >(&dirpath, sketcher, &filter_params, &processing_parameters, others_params);
             }
             else if kmer_size == 16 {
@@ -361,7 +360,6 @@ pub fn dna_process_tohnsw(dirpath : &Path, filter_params : &FilterParams, proces
             if kmer_size <= 14 {
                 // allocated the correct sketcher
                 let sketcher = SuperHashSketch::<Kmer32bit>::new(sketchparams);
-                //
                 sketchandstore_dir_compressedkmer::<Kmer32bit, SuperHashSketch::<Kmer32bit> >(&dirpath, sketcher, &filter_params, &processing_parameters, others_params);
             }
             else if kmer_size == 16 {

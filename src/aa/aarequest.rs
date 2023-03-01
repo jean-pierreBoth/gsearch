@@ -31,12 +31,15 @@ use crate::{matcher::*, answer::ReqAnswer};
 
 
 
-fn sketch_and_request_dir_compressedkmer<Kmer:CompressedKmerT + KmerBuilder<Kmer>>(request_dirpath : &Path, filter_params: &FilterParams, 
-                    seqdict : &SeqDict, processing_parameters : &ProcessingParams, 
-                    hnsw : &Hnsw<Kmer::Val,DistHamming>, knbn : usize, ef_search : usize) -> Matcher
-            where Kmer::Val : num::PrimInt + Clone + Copy + Send + Sync + Serialize + DeserializeOwned + Debug,
+fn sketch_and_request_dir_compressedkmer<Kmer:CompressedKmerT + KmerBuilder<Kmer>, Sketcher : SeqSketcherAAT<Kmer> + Send + Sync>(request_dirpath : &Path, 
+                    sketcher : Sketcher,
+                    filter_params: &FilterParams, seqdict : &SeqDict, processing_parameters : &ProcessingParams, 
+                    hnsw: &Hnsw< <Sketcher as SeqSketcherAAT<Kmer>>::Sig ,DistHamming>, 
+                    knbn : usize, ef_search : usize) -> Matcher
+
+            where <Sketcher as SeqSketcherAAT<Kmer>>::Sig : 'static + Clone + Copy + Send + Sync + Serialize + DeserializeOwned + Debug,
                   KmerGenerator<Kmer> :  KmerGenerationPattern<Kmer>, 
-                  DistHamming : Distance<Kmer::Val> {
+                  DistHamming : Distance<<Sketcher as SeqSketcherAAT<Kmer>>::Sig>  {
     //
     let sketcher_params = processing_parameters.get_sketching_params();
     let block_processing = processing_parameters.get_block_flag();
@@ -73,7 +76,8 @@ fn sketch_and_request_dir_compressedkmer<Kmer:CompressedKmerT + KmerBuilder<Kmer
         let hashval = kmer.get_compressed_value() & mask;
         hashval
     };
-    let sketcher = SeqSketcher::new(sketcher_params.get_kmer_size(), sketcher_params.get_sketch_size());
+
+
     // create something for likelyhood computation
     let mut matcher = Matcher::new(processing_parameters.get_kmer_size(), sketcher_params.get_sketch_size(), seqdict);
     //
@@ -126,7 +130,7 @@ fn sketch_and_request_dir_compressedkmer<Kmer:CompressedKmerT + KmerBuilder<Kmer
                                     log::debug!("treating request : {}", s.get_id().get_path());
                                 }
                             }   
-                            let signatures = sketcher.sketch_probminhash3a_compressedkmeraa(&sequencegroup_ref, kmer_hash_fn);                            
+                            let signatures = sketcher.sketch_compressedkmeraa(&sequencegroup_ref, kmer_hash_fn);                            
                             // we have Vec<u64> signatures we must go back to a vector of IdSketch for hnsw insertion
                             let knn_neighbours  = hnsw.parallel_search(&signatures, knbn, ef_search);
                             for i in 0..knn_neighbours.len() {
@@ -151,7 +155,7 @@ fn sketch_and_request_dir_compressedkmer<Kmer:CompressedKmerT + KmerBuilder<Kmer
                             // collect Id
                             let seq_item : Vec<ItemDict> = request_queue.iter().map(|s| ItemDict::new(Id::new(s.get_path(), s.get_fasta_id()), s.get_seq_len())).collect();
                             // computes hash signature
-                            let signatures = sketcher.sketch_probminhash3a_compressedkmeraa(&sequencegroup_ref, kmer_hash_fn);
+                            let signatures = sketcher.sketch_compressedkmeraa(&sequencegroup_ref, kmer_hash_fn);
                             // we have Vec<u64> signatures we must go back to a vector of IdSketch, inserting unique id, for hnsw insertion
                             // parallel search
                             let knn_neighbours  = hnsw.parallel_search(&signatures, knbn, ef_search);
@@ -198,43 +202,59 @@ fn sketch_and_request_dir_compressedkmer<Kmer:CompressedKmerT + KmerBuilder<Kmer
 
 // This function returns paired sequence by probminhash and hnsw 
 pub fn get_sequence_matcher(request_dirpath : &Path, database_dirpath : &Path, processing_params : &ProcessingParams,
-                     filter_params : &FilterParams, ann_params: &AnnParameters, seqdict : &SeqDict, 
-                     nbng : u16, ef_search : usize) -> Result<Matcher, String> {
+            filter_params : &FilterParams, ann_params: &AnnParameters, seqdict : &SeqDict, 
+            nbng : u16, ef_search : usize) -> Result<Matcher, String> {
     //
-    let sk_params = processing_params.get_sketching_params();
-    log::info!("sketch params reloaded kmer size : {}, sketch size {}", sk_params.get_kmer_size(), sk_params.get_sketch_size());
-    //
+    let sketch_params = processing_params.get_sketching_params();
+    let kmer_size = sketch_params.get_kmer_size();
+    log::info!("sketch params reloaded kmer size : {}, sketch size {}", kmer_size, sketch_params.get_sketch_size());
     let matcher : Matcher;
-    // reload hnsw
-    log::info!("\n reloading hnsw from {}", database_dirpath.to_str().unwrap());
-    if sk_params.get_kmer_size() <= 6 {
-        let hnsw = reloadhnsw::reload_hnsw(database_dirpath, ann_params);
-        let hnsw = match hnsw {
-            Some(hnsw) => hnsw,
-            _ => {
-                log::error!("\n aa get_sequence_matcher failed to reload hnsw. do you run on AA data ?");
-                panic!("hnsw reload from dump dir {} failed", database_dirpath.to_str().unwrap());
+    //
+    match sketch_params.get_algo() {
+        SketchAlgo::PROB3A => {
+            match kmer_size {
+                1..=6 => {
+                    let hnsw = reloadhnsw::reload_hnsw::< <KmerAA32bit as CompressedKmerT>::Val>(database_dirpath, ann_params)?;
+                    let sketcher = ProbHash3aSketch::<KmerAA32bit>::new(sketch_params);
+                    matcher = sketch_and_request_dir_compressedkmer::<KmerAA32bit, ProbHash3aSketch::<KmerAA32bit> >(&request_dirpath, sketcher, 
+                            &filter_params, &seqdict, &processing_params, 
+                            &hnsw, nbng as usize, ef_search);
+                }
+                7..=12 => {
+                    let hnsw = reloadhnsw::reload_hnsw::< <KmerAA64bit as CompressedKmerT>::Val>(database_dirpath, ann_params)?;
+                    let sketcher = ProbHash3aSketch::<KmerAA64bit>::new(sketch_params);
+                    matcher = sketch_and_request_dir_compressedkmer::<KmerAA64bit, ProbHash3aSketch::<KmerAA64bit> >(&request_dirpath, sketcher,
+                            &filter_params, &seqdict, &processing_params, 
+                            &hnsw, nbng as usize, ef_search);
+                }
+                _ => {
+                    return Err(String::from("bad value for kmer size"));                   
+                }
             }
-        };
-        matcher = sketch_and_request_dir_compressedkmer::<KmerAA32bit>(&request_dirpath, &filter_params, &seqdict, &processing_params, 
-                    &hnsw, nbng as usize, ef_search);
-        return Ok(matcher)  
-    }
-    else if sk_params.get_kmer_size() <= 15 {
-        let hnsw = reloadhnsw::reload_hnsw(database_dirpath, ann_params);
-        let hnsw = match hnsw {
-            Some(hnsw) => hnsw,
-            _ => {
-                log::error!("\n aa get_sequence_matcher failed to reload hnsw. do you run on AA data ?");
-                panic!("hnsw reload from dump dir {} failed", database_dirpath.to_str().unwrap());
+        }
+        SketchAlgo::SUPER => {
+            match kmer_size {
+                1..=6 => {
+                    let hnsw = reloadhnsw::reload_hnsw::< <SuperHashSketch<KmerAA32bit> as SeqSketcherAAT<KmerAA32bit>>::Sig>(database_dirpath, ann_params)?;
+                    let sketcher = SuperHashSketch::<KmerAA32bit>::new(sketch_params);
+                    matcher = sketch_and_request_dir_compressedkmer::<KmerAA32bit, SuperHashSketch<KmerAA32bit> >(&request_dirpath, sketcher, 
+                            &filter_params, &seqdict, &processing_params, 
+                            &hnsw, nbng as usize, ef_search);
+                }
+                7..=15 => {
+                    let hnsw = reloadhnsw::reload_hnsw::< <SuperHashSketch<KmerAA32bit> as SeqSketcherAAT<KmerAA32bit>>::Sig >(database_dirpath, ann_params)?;
+                    let sketcher = SuperHashSketch::<KmerAA64bit>::new(sketch_params);
+                    matcher = sketch_and_request_dir_compressedkmer::<KmerAA64bit, SuperHashSketch::<KmerAA64bit> >(&request_dirpath, sketcher, 
+                            &filter_params, &seqdict, &processing_params, 
+                            &hnsw, nbng as usize, ef_search);
+                }
+                _ => {
+                    return Err(String::from("bad value for kmer size"));                   
+                }
             }
-        };
-        matcher = sketch_and_request_dir_compressedkmer::<KmerAA64bit>(&request_dirpath, &filter_params, &seqdict, &processing_params,
-                    &hnsw, nbng as usize, ef_search);
-        return Ok(matcher)  
-    }
-    else {
-        Err(String::from("too large value for kmer size"))
-    }
+        }
+    }; // end global match on algo
+    //
+    return Ok(matcher);
 }  // end of get_sequence_matcher
 

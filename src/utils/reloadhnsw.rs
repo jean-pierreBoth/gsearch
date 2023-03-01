@@ -22,7 +22,7 @@ use crate::utils::AnnParameters;
     We know filename : hnswdump.hnsw.data and hnswdump.hnsw.graph
     The allow(unused_variables) is here to avoid a warning on ann_params when compiling without feature f_annembed
  */
-pub fn reload_hnsw<T>(dump_dirpath : &Path, ann_params: &AnnParameters) -> Option<Hnsw<T, DistHamming>>  
+pub fn reload_hnsw<T>(dump_dirpath : &Path, ann_params: &AnnParameters) -> Result<Hnsw<T, DistHamming>, String>  
             where T : 'static + Clone + Send + Sync + Serialize + DeserializeOwned ,
                 DistHamming : Distance<T>  {
     // just concat dirpath to filenames and get pathbuf
@@ -30,8 +30,8 @@ pub fn reload_hnsw<T>(dump_dirpath : &Path, ann_params: &AnnParameters) -> Optio
     log::info!("reload_hnsw, loading graph from {}",graph_path.to_str().unwrap());
     let graphfile = OpenOptions::new().read(true).open(&graph_path);
     if graphfile.is_err() {
-        println!("test_dump_reload: could not open file {:?}", graph_path.as_os_str());
-        return None;
+        println!("reload_hnsw: could not open file {:?}", graph_path.as_os_str());
+        return Err(String::from("reload_hnsw: could not open file"));
     }
     let graphfile = graphfile.unwrap();
     let mut graphfile = BufReader::with_capacity(50_000_000, graphfile);
@@ -41,7 +41,7 @@ pub fn reload_hnsw<T>(dump_dirpath : &Path, ann_params: &AnnParameters) -> Optio
     let datafile = OpenOptions::new().read(true).open(&data_path);
     if datafile.is_err() {
         println!("test_dump_reload: could not open file {:?}", data_path.as_os_str());
-        return None;
+        return Err(String::from("reload_hnsw: could not open file"));
     }
     let datafile = datafile.unwrap();
     let mut datafile = BufReader::with_capacity(50_000_000,datafile);
@@ -62,7 +62,7 @@ pub fn reload_hnsw<T>(dump_dirpath : &Path, ann_params: &AnnParameters) -> Optio
         let _ = super::embed::get_graph_stats_embed(&hnsw, ann_params.embed());
     }
     //
-    return Some(hnsw);
+    return Ok(hnsw);
     //  
 } // end of reload_hnsw
 
