@@ -74,7 +74,7 @@ fn sketch_and_request_dir_compressedkmer<Kmer:CompressedKmerT + KmerBuilder<Kmer
     let mut matcher = Matcher::new(processing_parameters.get_kmer_size(), sketcher_params.get_sketch_size(), seqdict);
     //
     // to send IdSeq to sketch from reading thread to sketcher thread
-    let (send, receive) = crossbeam_channel::bounded::<Vec<IdSeq>>(1_000);
+    let (send, receive) = crossbeam_channel::bounded::<Vec<IdSeq>>(request_block_size + 10);
     // launch process_dir in a thread or async
     crossbeam_utils::thread::scope(|scope| {
 

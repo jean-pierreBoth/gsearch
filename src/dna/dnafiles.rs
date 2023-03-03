@@ -132,7 +132,7 @@ pub fn process_file_in_one_block(pathb : &PathBuf, filter_params : &FilterParams
 
 
 /// This function will parse with needletail (and do the decompressing) the whole bytes of file pathb contained in  bufread.
-/// In this way process_buffer_in_one_block do not have any IO to do and we can // the fasta parsing without disk constraints.
+/// In this way process_buffer_in_one_block do not have any IO to do and can b called // for fasta parsing without disk constraints.
 /// We nevertheless needs pathb to fill in IdSeq
 pub fn process_buffer_in_one_block(pathb : &PathBuf, bufread : &[u8], filter_params : &FilterParams)  -> Vec<IdSeq> {
     //
@@ -140,8 +140,14 @@ pub fn process_buffer_in_one_block(pathb : &PathBuf, bufread : &[u8], filter_par
     //
     let mut reader = needletail::parse_fastx_reader(bufread).expect("expecting valid filename");
     // We allocate one large block tht will contain the whole filtered genome. 
-    // TODO We should get the file length to optimize the length
-    let mut one_block_seq = Vec::<u8>::new();
+    let mut one_block_seq : Vec::<u8>;
+    if pathb.ends_with(".gz") {
+        // The decompressed file  is larger than the compressed one
+        one_block_seq = Vec::<u8>::with_capacity(bufread.len() * 2);
+    }
+    else {
+        one_block_seq = Vec::<u8>::with_capacity(bufread.len());
+    }
     //
     while let Some(record) = reader.next() {
         if record.is_err() {
@@ -165,6 +171,7 @@ pub fn process_buffer_in_one_block(pathb : &PathBuf, bufread : &[u8], filter_par
         }
     }
     // we are at end of file, we have one large sequence for the whole file
+    log::debug!("decompressed seq for file : {:?}, len is : {}", pathb.file_name().unwrap_or_default(), one_block_seq.len());
     // we have DNA seq for now
     let new_seq = Sequence::new(&one_block_seq,2);
     let seqwithid = IdSeq::new(pathb.to_str().unwrap().to_string(), String::from("total sequence"), SequenceType::SequenceDNA(new_seq));

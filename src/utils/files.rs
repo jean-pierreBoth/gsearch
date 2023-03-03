@@ -3,9 +3,8 @@
 use std::io;
 use std::io::{BufReader, BufWriter };
 
-use std::fs::OpenOptions;
+use std::fs::{OpenOptions, File};
 use std::path::{Path, PathBuf};
-use std::fs::File;
 use std::io::Read;
 
 use std::time::{SystemTime};
@@ -190,13 +189,13 @@ pub fn process_dir(state : &mut ProcessingState, datatype: &DataType, dir: &Path
 
 
 /// open, just read whole file and return buffer for further Fasta processing by needletail
-pub fn file_to_buffer(pathb : &PathBuf) -> Vec<u8> {
+fn file_to_buffer(pathb : &PathBuf) -> Vec<u8> {
     log::trace!("processing file {}", pathb.to_str().unwrap());
     let metadata = std::fs::metadata(pathb.clone());
     let f_len : usize;
     match metadata {
         Ok(metadata) => { f_len = metadata.len() as usize;
-                            log::debug!("file_to_buffer got file length : {}", f_len);
+                            log::debug!("file_to_buffer got file {:?}, length : {}",pathb.file_name().unwrap_or_default(),  f_len);
                         }
         Err(_)       => {
                             println!("file_to_buffer could not get length of file {} ", pathb.to_str().unwrap());
@@ -217,10 +216,13 @@ pub fn file_to_buffer(pathb : &PathBuf) -> Vec<u8> {
 
 
 /// This function is called by process dirs.
-/// aargument entries is a slice of Entry that have been checked to be files (and not directory!)
-/// process a block of entry in parallel. Block of entries should be of moderate size. (5 or 10?) depending on the number of threads of the Cpus 
-/// file_task is a function parsing fasta file 
-pub fn process_files_group(datatype: &DataType, filter_params : &FilterParams, 
+/// aargument entries is a slice of directory Entry that have been checked to be files (and not directory!).  
+/// Files have ben previously sequentially read and transformed into u8 slices, then we can execute file_task in parallel
+/// slices associated to files. fIn our usage ile_task does the decompressing and parsing of fasta files.  
+/// 
+/// **Block of entries should be of size depending on the number of threads of the Cpus and the memory at disposal and the size of decompressed files**.
+/// 
+pub(crate) fn process_files_group(datatype: &DataType, filter_params : &FilterParams, 
     pathb : &[PathBuf], file_task: &(dyn Fn(&PathBuf, &[u8], &FilterParams) -> Vec<IdSeq> + Sync)) -> Vec<Vec<IdSeq>> 
 {
     //
@@ -281,13 +283,15 @@ pub fn process_files_group(datatype: &DataType, filter_params : &FilterParams,
     // this is what we  wanted, fasta buffer parsing in // !!
     let seqseq = to_be_processed.into_par_iter().map(|file| process_file(&file.0, file.1).unwrap()).collect();
     //
+    log::debug!(" end of process_files_group");
+    //
     seqseq
 }  // end of process_files_group
 
 
 
 
-pub fn process_dir_parallel(state : &mut ProcessingState, datatype: &DataType, dir: &Path, filter_params : &FilterParams, 
+pub(crate) fn process_dir_parallel(state : &mut ProcessingState, datatype: &DataType, dir: &Path, filter_params : &FilterParams, 
         block_size : usize, path_block : &mut Vec<PathBuf>,
         file_task: &(dyn Fn(&PathBuf, &[u8], &FilterParams) -> Vec<IdSeq> + Sync), 
         sender : &crossbeam_channel::Sender::<Vec<IdSeq>>) -> io::Result<usize> {
@@ -307,6 +311,13 @@ pub fn process_dir_parallel(state : &mut ProcessingState, datatype: &DataType, d
             // we have path of a file
             if path_block.len() < block_size {
                 path_block.push(pathb.clone());
+                match pathb.metadata() {
+                    Ok(meta) => {
+                        let f_len = meta.len();
+                        log::debug!(" filename : {:?}, length = {}", pathb.file_name().unwrap_or_default(), f_len);
+                    }
+                    Err(_) => {},
+                }
                 // now if buffer is full we do the work, process send and empty buffer
                 if path_block.len() == block_size {
                     let seqs = process_files_group(datatype,  filter_params, &path_block, file_task);

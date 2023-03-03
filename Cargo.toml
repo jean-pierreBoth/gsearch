@@ -60,6 +60,7 @@ hnsw_rs =  {version = "0.1.18"}
 #hnsw_rs = {path = "../hnswlib-rs"}
 
 kmerutils = {path = "../kmerutils"}
+# kmerutils = {git = "https://gitlab.com/jpboth/kmerutils.git"}
 #kmerutils = {version = "0.0.8"}
 
 lazy_static = { version = "1.4"}
