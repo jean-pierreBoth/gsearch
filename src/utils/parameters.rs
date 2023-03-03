@@ -190,10 +190,10 @@ impl ProcessingParams {
 
 //=====================================================================================
 
-/// Some others parameters not necessary for reload
+/// Some others parameters or io optimization not necessary for reload
 pub struct ComputingParams {
-    /// set to true when parsing fasta files in done in //
-    parallel_io : bool,
+    /// if nb_files_par is > 0, then we uncopress fasta files in // by blocks of size nb_files_par files
+    nb_files_par : usize,
     /// set to true when we increase a hnsw database
     adding_mode : bool,
 }
@@ -201,19 +201,32 @@ pub struct ComputingParams {
 
 impl Default for ComputingParams {
     fn default() -> Self {
-        ComputingParams{parallel_io: false , adding_mode: false}
+        ComputingParams{nb_files_par: 0 , adding_mode: false}
     }
 }
 
 
 impl ComputingParams {
-    pub fn new(parallel_io : bool, adding_mode : bool) -> Self {
-        ComputingParams{parallel_io, adding_mode}
+    pub fn new(nb_files_par : usize, adding_mode : bool) -> Self {
+        ComputingParams{nb_files_par, adding_mode}
     }
 
     pub fn get_parallel_io(&self) -> bool {
-        self.parallel_io
+        let par = if self.nb_files_par > 0 {
+            true
+        }
+        else {
+            false
+        };
+        //
+        return par
+    } // end of get_parallel_io
+
+    /// return the number of files for // io
+    pub fn get_nb_files_par(&self) -> usize {
+        self.nb_files_par
     }
+
 
     pub fn get_adding_mode(&self) -> bool {
         self.adding_mode

@@ -27,9 +27,10 @@
 //! 
 //!  --aa : set if data to process are Amino Acid sequences. Default is DNA
 //! 
-//!  --pio : option to read uncompressed files and then parallelize decompressing/fasta parsing. 
-//!          Useful, with many cores if io lags behind hashing/hnsw insertion.
-//!          Implemented only for dna files presently
+//!  --pio : option to read compressed files and then parallelize decompressing/fasta parsing. 
+//!         Useful, with many cores if io lags behind hashing/hnsw insertion. to speed up io.  
+//!         **Necessary to limit/custom the number of files or sequences simultanuously loaded in memory if files are very large (tens of Gb)**.  
+//!         Implemented only for dna files presently
 //! 
 //! --add : This option is dedicated to adding new data to a hnsw structure.  
 //!         The program reloads a previous dump of the hnsw structures. tohnsw must (presently) be launched from the directory
@@ -119,8 +120,8 @@ fn main() {
             .help("--seq to get a processing by sequence"))
         .arg(Arg::new("pario")
             .long("pio")
-            .takes_value(false)
-            .help("--pio to optimize io"))
+            .takes_value(true)
+            .help("--pio nfiles"))
         .arg(Arg::new("add")
             .long("add")
             .takes_value(false)
@@ -221,13 +222,13 @@ fn main() {
             data_type = DataType::DNA;            
         }
         // now we fill other parameters : parallel fasta parsing and adding mode in hnsw
-        let pario: bool;
+        let nb_files_par : usize;
         if matches.is_present("pario") {
-            println!("parallel io");
-            pario = true;
+            nb_files_par = matches.value_of("pario").ok_or("").unwrap().parse::<usize>().unwrap();
+            println!("parallel io, nb_files_par : {}", nb_files_par);
         }
         else {
-            pario = false;
+            nb_files_par = 0;
         }
         // adding sequences
         let addseq: bool;
@@ -238,7 +239,7 @@ fn main() {
         else {
             addseq = false;
         }
-        let other_params = ComputingParams::new(pario, addseq);
+        let other_params = ComputingParams::new(nb_files_par, addseq);
         // We have everything   
         // max_nb_conn must be adapted to the number of neighbours we will want in searches.
         

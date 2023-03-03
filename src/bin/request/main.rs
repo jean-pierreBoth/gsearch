@@ -1,4 +1,4 @@
-// ARCHAEA v0.1.0
+// GSEARCH v0.1.0
 // Copyright 2021-2022, Jean Pierre Both and Jianshu Zhao.
 // Licensed under the MIT license (http://opensource.org/licenses/MIT).
 // This file may not be copied, modified, or distributed except according to those terms.
@@ -13,6 +13,12 @@
 //! - requestdir is a directory containing list of fasta file containing sequence to search for
 //!  
 //! -n number of neighbours asked for. number of neighbours used in possible ann directive
+//! 
+//! --pio : option to read compressed request files and then parallelize decompressing/fasta parsing. 
+//!         Useful, with many cores if io lags behind hashing, to speed up io.  
+//!         **The number of files or sequences simultanuously loaded in memory must be limites to fit in memory if files are very large (tens of Gb)**.  
+//!         Implemented only for dna files presently
+//! 
 //! --aa : set if data to process are Amino Acid sequences. Default is DNA
 
 //!
@@ -84,6 +90,10 @@ fn main() {
             .short('s')
             .default_value("8")
             .help("size of probminhash sketch, default to 8"))
+        .arg(Arg::new("pario")
+            .long("pio")
+            .takes_value(true)
+            .help("--pio nfiles"))
         .arg(Arg::new("neighbours")
             .long("nbng")
             .short('n')
@@ -216,6 +226,15 @@ fn main() {
             println!("-n nbng is mandatory");
             std::process::exit(1);
         }
+        // now we fill other parameters : parallel fasta parsing and adding mode in hnsw
+        let nb_files_par : usize;
+        if matches.is_present("pario") {
+            nb_files_par = matches.value_of("pario").ok_or("").unwrap().parse::<usize>().unwrap();
+            println!("parallel io, nb_files_par : {}", nb_files_par);
+        }
+        else {
+            nb_files_par = 0;
+        }
         // Dow process Dna or AA sequences
         let data_type;
         if matches.is_present("aa") {
@@ -245,6 +264,9 @@ fn main() {
         };
         let sk_params = processing_params.get_sketching_params();
         log::info!("sketch params reloaded kmer size : {}, sketch size {}", sk_params.get_kmer_size(), sk_params.get_sketch_size());
+        // 
+        let other_params = ComputingParams::new(nb_files_par, false);
+
         //
         // reload processing state
         //
@@ -275,7 +297,7 @@ fn main() {
         match data_type {
             DataType::DNA => {
                 if let Ok(mut seq_matcher) = dnarequest::get_sequence_matcher(request_dirpath, database_dirpath, &processing_params, 
-                            &filter_params, &ann_params, &seqdict, nbng, ef_search) {
+                            &filter_params, &ann_params, &other_params, &seqdict, nbng, ef_search) {
                     if processing_params.get_block_flag() == false {
                         log::info!("sequence mode, trying to analyze..");
                         let _= seq_matcher.analyze();

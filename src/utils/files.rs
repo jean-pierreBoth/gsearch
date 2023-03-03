@@ -215,7 +215,7 @@ fn file_to_buffer(pathb : &PathBuf) -> Vec<u8> {
 
 
 
-/// This function is called by process dirs.
+/// This function is called by process_dir_parallel_rec
 /// aargument entries is a slice of directory Entry that have been checked to be files (and not directory!).  
 /// Files have ben previously sequentially read and transformed into u8 slices, then we can execute file_task in parallel
 /// slices associated to files. fIn our usage ile_task does the decompressing and parsing of fasta files.  
@@ -290,8 +290,8 @@ pub(crate) fn process_files_group(datatype: &DataType, filter_params : &FilterPa
 
 
 
-
-pub(crate) fn process_dir_parallel(state : &mut ProcessingState, datatype: &DataType, dir: &Path, filter_params : &FilterParams, 
+// recursive parallel processing of directores
+pub(crate) fn process_dir_parallel_rec(state : &mut ProcessingState, datatype: &DataType, dir: &Path, filter_params : &FilterParams, 
         block_size : usize, path_block : &mut Vec<PathBuf>,
         file_task: &(dyn Fn(&PathBuf, &[u8], &FilterParams) -> Vec<IdSeq> + Sync), 
         sender : &crossbeam_channel::Sender::<Vec<IdSeq>>) -> io::Result<usize> {
@@ -304,20 +304,21 @@ pub(crate) fn process_dir_parallel(state : &mut ProcessingState, datatype: &Data
         let entry = entry?;
         let pathb = entry.path();
         if pathb.is_dir() {
-            let _ =  process_dir_parallel(state, &datatype, &pathb, filter_params, block_size, path_block, file_task, sender)?;
+            let _ =  process_dir_parallel_rec(state, &datatype, &pathb, filter_params, block_size, path_block, file_task, sender)?;
         } 
         else {
             nb_entries += 1;
             // we have path of a file
-            if path_block.len() < block_size {
-                path_block.push(pathb.clone());
-                match pathb.metadata() {
-                    Ok(meta) => {
-                        let f_len = meta.len();
-                        log::debug!(" filename : {:?}, length = {}", pathb.file_name().unwrap_or_default(), f_len);
-                    }
-                    Err(_) => {},
+            match pathb.metadata() {
+                Ok(meta) => {
+                    let f_len = meta.len();
+                    log::debug!(" filename : {:?}, length = {}", pathb.file_name().unwrap_or_default(), f_len);
                 }
+                Err(_) => {},
+            }
+            if path_block.len() < block_size {
+                // we push the file
+                path_block.push(pathb.clone());
                 // now if buffer is full we do the work, process send and empty buffer
                 if path_block.len() == block_size {
                     let seqs = process_files_group(datatype,  filter_params, &path_block, file_task);
@@ -350,4 +351,55 @@ pub(crate) fn process_dir_parallel(state : &mut ProcessingState, datatype: &Data
     drop(sender);
     //    
     Ok(state.nb_seq)
-}  // end of process_dir_parallel
+}  // end of process_dir_parallel_rec
+
+
+
+// driver for parallel io processing. 
+// It calls the recursive function process_dir_parallel_rec and then treat residue of message not sent as buffer to send is not full 
+// at end of directory tree exploration
+pub(crate) fn process_dir_parallel(state : &mut ProcessingState, datatype: &DataType, dirpath: &Path, filter_params : &FilterParams, 
+        nb_files_by_group : usize, file_task: &(dyn Fn(&PathBuf, &[u8], &FilterParams) -> Vec<IdSeq> + Sync), 
+        sender : &crossbeam_channel::Sender::<Vec<IdSeq>>) -> io::Result<usize> {
+        //
+    log::info!("dnasketch::sketchandstore_dir_compressedkmer : calling process_dir_parallel, nb_files in parallel : {}", nb_files_by_group);
+    //
+    let mut nb_sent_parallel;
+    let mut path_block = Vec::<PathBuf>::with_capacity(nb_files_by_group);
+    //
+    let res_nb_sent_parallel = process_dir_parallel_rec(state, datatype,  dirpath, filter_params, 
+                    nb_files_by_group,  &mut path_block, &file_task, &sender);
+    // we must treat residue in path_block if any
+    match res_nb_sent_parallel {
+        Ok(nb) => { nb_sent_parallel = nb;},
+        _             => {  log::error!("\n some error occurred in process_dir_parallel_rec");
+                            std::panic!("\n some error occurred in process_dir_parallel_rec");
+                        },
+    };
+    // now must treat residue in path_block
+    if path_block.len() > 0 {
+        log::info!("dnasketch::process_dir_parallel sending residue, size : {}", path_block.len());
+        let seqs = process_files_group(&DataType::DNA, filter_params, &path_block, &file_task);
+        for mut seqfile in seqs {
+            for i in 0..seqfile.len() {
+                seqfile[i].rank = state.nb_seq;
+                state.nb_seq += 1;
+            }                
+            state.nb_file += 1;
+            nb_sent_parallel += 1;
+            sender.send(seqfile).unwrap();
+            log::trace!("sketchandstore_dir_compressedkmer parallel io case nb msg sent : {}", nb_sent_parallel);
+        }
+        path_block.clear();
+        if log::log_enabled!(log::Level::Info) && state.nb_file % 1000 == 0 {
+            log::info!("nb file processed : {}, nb sequences processed : {}", state.nb_file, state.nb_seq);
+        }
+        if state.nb_file % 1000 == 0 {
+            println!("nb file processed : {}, nb sequences processed : {}", state.nb_file, state.nb_seq);
+        }
+    }
+    log::debug!("sketchandstore_dir_compressedkmer parallel io case : all messages sent");
+    let res_nb_sent = Ok(nb_sent_parallel);
+    //
+    return res_nb_sent;
+} // end of process_dir_parallel

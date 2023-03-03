@@ -23,7 +23,7 @@ use kmerutils::base::{kmergenerator::*, Kmer32bit, Kmer64bit, CompressedKmerT};
 use kmerutils::sketching::seqsketchjaccard::{SeqSketcherT, ProbHash3aSketch, SuperHashSketch};
 
 use crate::utils::{idsketch::*, reloadhnsw};
-use crate::utils::files::{process_dir,process_dir_parallel, process_files_group, ProcessingState, DataType};
+use crate::utils::files::{process_dir,process_dir_parallel, ProcessingState, DataType};
 
 use crate::dna::dnafiles::{process_file_in_one_block, process_buffer_in_one_block, process_file_concat_split};
 
@@ -53,8 +53,6 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT+KmerBuilder<Kmer>, Ske
     // a queue of signature waiting to be inserted , size must be sufficient to benefit from threaded probminhash and insert
     // and not too large to spare memory
     let insertion_block_size = 5000;
-    // set parallel_files to false for backward compatibility, nb_files_by_group possibly needs to be adjusted 
-    let nb_files_by_group = 4;
     let mut insertion_queue : Vec<IdSeq>= Vec::with_capacity(insertion_block_size);
     //
     let mut hnsw : Hnsw::< <Sketcher as SeqSketcherT<Kmer>>::Sig, DistHamming>;
@@ -103,7 +101,7 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT+KmerBuilder<Kmer>, Ske
         hashval
     };
     // to send IdSeq to sketch from reading thread to sketcher thread
-    let (send, receive) = crossbeam_channel::bounded::<Vec<IdSeq>>(insertion_block_size);
+    let (send, receive) = crossbeam_channel::bounded::<Vec<IdSeq>>(insertion_block_size+10);
     // launch process_dir in a thread or async
     crossbeam_utils::thread::scope(|scope| {
         // sequence sending, productor thread
@@ -114,42 +112,10 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT+KmerBuilder<Kmer>, Ske
             if block_processing {
                 log::info!("dnasketch::sketchandstore_dir_compressedkmer : block processing");
                 if other_params.get_parallel_io() {
-                    // TODO do we keep that?
-                    let mut nb_sent_parallel;
-                    log::info!("dnasketch::sketchandstore_dir_compressedkmer : calling process_dir_parallel");
-                    let mut path_block = Vec::<PathBuf>::with_capacity(nb_files_by_group);
-                    let res_nb_sent_parallel = process_dir_parallel(&mut state, &DataType::DNA,  dirpath, filter_params, 
-                                    nb_files_by_group,  &mut path_block, &process_buffer_in_one_block, &send);
-                    // we must treat residue in path_block if any
-                    match res_nb_sent_parallel {
-                        Ok(nb) => { nb_sent_parallel = nb;},
-                        _             => {  log::error!("\n some error occurred in process_dir_parallel");
-                                            std::panic!("\n some error occurred in process_dir_parallel");
-                                        },
-                    };
-                    if path_block.len() > 0 {
-                        log::info!("dnasketch::process_dir_parallel sending residue, size : {}", path_block.len());
-                        let seqs = process_files_group(&DataType::DNA, filter_params, &path_block, &process_buffer_in_one_block);
-                        for mut seqfile in seqs {
-                            for i in 0..seqfile.len() {
-                                seqfile[i].rank = state.nb_seq;
-                                state.nb_seq += 1;
-                            }                
-                            state.nb_file += 1;
-                            nb_sent_parallel += 1;
-                            send.send(seqfile).unwrap();
-                            log::trace!("sketchandstore_dir_compressedkmer parallel io case nb msg sent : {}", nb_sent_parallel);
-                        }
-                        path_block.clear();
-                        if log::log_enabled!(log::Level::Info) && state.nb_file % 1000 == 0 {
-                            log::info!("nb file processed : {}, nb sequences processed : {}", state.nb_file, state.nb_seq);
-                        }
-                        if state.nb_file % 1000 == 0 {
-                            println!("nb file processed : {}, nb sequences processed : {}", state.nb_file, state.nb_seq);
-                        }
-                    }
-                    log::debug!("sketchandstore_dir_compressedkmer parallel io case : all messages sent");
-                    res_nb_sent = Ok(nb_sent_parallel);
+                    let nb_files_by_group = other_params.get_nb_files_par();
+                    log::info!("dnasketch::sketchandstore_dir_compressedkmer : calling process_dir_parallel, nb_files in parallel : {}", nb_files_by_group);
+                    res_nb_sent = process_dir_parallel(&mut state, &DataType::DNA,  dirpath, filter_params, 
+                                    nb_files_by_group, &process_buffer_in_one_block, &send);
                 } // end case parallel io
                 else {
                     log::info!("dnasketch::sketchandstore_dir_compressedkmer : calling process_dir serial");
