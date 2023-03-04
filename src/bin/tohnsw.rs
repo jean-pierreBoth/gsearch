@@ -34,7 +34,8 @@
 //! 
 //! --add : This option is dedicated to adding new data to a hnsw structure.  
 //!         The program reloads a previous dump of the hnsw structures. tohnsw must (presently) be launched from the directory
-//!         containing the dump as the program looks for the files "hnswdump.hnsw.data" and "hnswdump.hnsw.graph" created previously.
+//!         containing the dump as the program looks for the files "hnswdump.hnsw.data" and "hnswdump.hnsw.graph" created previously.  
+//!         **In this case parameters are reloaded from fiel parameters.json**
 
 // must loop on sub directories , open gzipped files
 // extracts complete genomes possiby many in one file (get rid of capsid records if any)
@@ -249,7 +250,20 @@ fn main() {
         //
         // do not filter small seqs when running file in a whole block
         let filter_params = FilterParams::new(0);
-        let processing_parameters = ProcessingParams::new(hnswparams, sketch_params, block_processing);
+        let processing_parameters = match addseq {
+            true => {  
+                    log::info!("reloading parameters from previous runs, in the current directory"); 
+                    let cwd = std::env::current_dir().unwrap();
+                    let reload_res = ProcessingParams::reload_json(&cwd);
+                        if reload_res.is_ok()  {
+                            reload_res.unwrap()
+                        }
+                    else {
+                        std::panic!("cannot reload parameters (file parameters.json) from dir : {:?}", &cwd);
+                    }
+                },
+            _ => { ProcessingParams::new(hnswparams, sketch_params, block_processing)}
+        };
         //
         match data_type {
             DataType::DNA => dna_process_tohnsw(&dirpath, &filter_params, &processing_parameters, &other_params),
