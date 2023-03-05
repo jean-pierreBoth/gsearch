@@ -23,6 +23,9 @@ The Dictionary is dumped in a json file *seqdict.json*
 For requests  the module ***request*** is being used. It reloads the dumped files, hnsw and seqdict related
 takes a list of fasta files containing requests and for each fasta file dumps the asked number of nearest neighbours.
 
+## Schematic Overview of Sketching and Requests
+![alt text](https://github.com/jean-pierreBoth/gsearch/blob/master/GSearch_schematic_overview.jpg?raw=true)
+
 ## Usage
 ## Simple case for install:
 
