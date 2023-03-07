@@ -16,11 +16,10 @@
 //! 
 //! --pio : option to read compressed request files and then parallelize decompressing/fasta parsing. 
 //!         Useful, with many cores if io lags behind hashing, to speed up io.  
-//!         **The number of files or sequences simultanuously loaded in memory must be limites to fit in memory if files are very large (tens of Gb)**.  
-//!         Implemented only for dna files presently
+//!         **The number of files or sequences simultanuously loaded in memory must be limited to fit in memory if files are very large (tens of Gb)**.  
+//! 
 //! 
 //! --aa : set if data to process are Amino Acid sequences. Default is DNA
-
 //!
 //! \[ann\] is an optional subcommand asking for some statistics on distances between hnsw items or get an embedding of data
 //!     --stats gives statistics on distances between neighbours
@@ -226,7 +225,7 @@ fn main() {
             println!("-n nbng is mandatory");
             std::process::exit(1);
         }
-        // now we fill other parameters : parallel fasta parsing and adding mode in hnsw
+        // now we fill other parameters : parallel fasta parsing
         let nb_files_par : usize;
         if matches.is_present("pario") {
             nb_files_par = matches.value_of("pario").ok_or("").unwrap().parse::<usize>().unwrap();
@@ -252,26 +251,20 @@ fn main() {
         log::info!("ef_search : {:?}", ef_search);
         let filter_params = FilterParams::new(0);
         //
-        // Do all dump reload, first sketch params. We reload smaller files first 
-        // so that path errors are found early 
-        //
+        // Recall that ProcessingParams::reload_json implements and call display at reload
         let processing_params = ProcessingParams::reload_json(database_dirpath);
         let processing_params = match processing_params {
             Ok(processing_params) => processing_params,
             _ => {
+                log::info!("ProcessingParams reload from dump dir {} failed", database_dirpath.to_str().unwrap());
                 panic!("ProcessingParams reload from dump dir {} failed", database_dirpath.to_str().unwrap());
             }
         };
-        let sk_params = processing_params.get_sketching_params();
-        log::info!("sketch params reloaded kmer size : {}, sketch size {}", sk_params.get_kmer_size(), sk_params.get_sketch_size());
         // 
         let other_params = ComputingParams::new(nb_files_par, false);
-
         //
         // reload processing state
         //
-        let mut state_name = database_dir.clone();
-        state_name.push_str("/processing_state.json");
         let proc_state_res = ProcessingState::reload_json(database_dirpath);
         let proc_state;
         if let Ok(_) = proc_state_res {
@@ -309,7 +302,7 @@ fn main() {
             }  // end DNA case
             DataType::AA => {
                 if let Ok(mut seq_matcher) = aarequest::get_sequence_matcher(request_dirpath, database_dirpath, &processing_params, 
-                    &filter_params, &ann_params, &seqdict, nbng, ef_search) {
+                            &filter_params, &ann_params, &other_params, &seqdict, nbng, ef_search) {
                     if processing_params.get_block_flag() == false {
                         log::info!("sequence mode, trying to analyze..");
                         let _= seq_matcher.analyze();

@@ -41,15 +41,22 @@ pub(crate) fn process_aafile_in_one_block(pathb : &PathBuf, filter_params : &Fil
                           log::debug!("file length : {}", f_len);
                         }
         Err(_)       => {
-            println!("process_file_in_one_blprocess_dirock could not get length of file {} ", pathb.to_str().unwrap());
-            f_len = 1_000_000_000;
+            println!("process_aafile_in_one_block could not get length of file {} ", pathb.to_str().unwrap());
+            f_len = 100_000_000;
         }
     }
     log::trace!("processing file {}", pathb.to_str().unwrap());
     let mut reader = needletail::parse_fastx_file(&pathb).expect("expecting valid filename");
     // We allocate one large block tht will contain the whole filtered genome. 
     // TODO We should get the file length to optimize the length
-    let mut one_block_seq = Vec::<u8>::with_capacity(f_len as usize);
+    let mut one_block_seq : Vec::<u8>;
+    if pathb.ends_with(".gz") {
+        // The decompressed file  is larger than the compressed one
+        one_block_seq = Vec::<u8>::with_capacity(f_len * 2);
+    }
+    else {
+        one_block_seq = Vec::<u8>::with_capacity(f_len);
+    }    
     //
     while let Some(record) = reader.next() {
         if record.is_err() {
@@ -73,7 +80,7 @@ pub(crate) fn process_aafile_in_one_block(pathb : &PathBuf, filter_params : &Fil
         }
     }
     // we are at end of file, we have one large sequence for the whole file
-    // we have DNA seq for now
+    // we have AA seq for now
     let new_seq = kmeraa::SequenceAA::new(&one_block_seq);
     let seqwithid = IdSeq::new(pathb.to_str().unwrap().to_string(), String::from("total sequence"), SequenceType::SequenceAA(new_seq));
     to_sketch.push(seqwithid);
@@ -81,4 +88,53 @@ pub(crate) fn process_aafile_in_one_block(pathb : &PathBuf, filter_params : &Fil
     return to_sketch;
 } // end of process_aafile_in_one_block
 
+
+
+
+/// This function will parse with needletail (and do the decompressing) the whole bytes of file pathb contained in  bufread.
+/// In this way process_aabuffer_in_one_block do not have any IO to do and can b called // for fasta parsing without disk constraints.
+/// We nevertheless needs pathb to fill in IdSeq
+pub fn process_aabuffer_in_one_block(pathb : &PathBuf, bufread : &[u8], filter_params : &FilterParams)  -> Vec<IdSeq> {
+    //
+    let mut to_sketch = Vec::<IdSeq>::new();
+    //
+    let mut reader = needletail::parse_fastx_reader(bufread).expect("expecting valid filename");
+    // We allocate one large block tht will contain the whole filtered genome. 
+    let mut one_block_seq : Vec::<u8>;
+    if pathb.ends_with(".gz") {
+        // The decompressed file  is larger than the compressed one
+        one_block_seq = Vec::<u8>::with_capacity(bufread.len() * 2);
+    }
+    else {
+        one_block_seq = Vec::<u8>::with_capacity(bufread.len());
+    }
+    //
+    while let Some(record) = reader.next() {
+        if record.is_err() {
+            println!("process_buffer_in_one_block : got bd record in buffer");
+            std::process::exit(1);
+        }
+        // do we keep record ? we must get its id
+        let seqrec = record.expect("invalid record");
+        let id = seqrec.id();
+        let strid = String::from_utf8(Vec::from(id)).unwrap();
+        // process sequence if not capsid and not filtered out, in block mode we do not filter any at the moment
+        let _filter = filter_params.filter(&seqrec.seq());
+        if strid.find("capsid").is_none() {
+            one_block_seq.append(&mut filter_out_non_aa(&seqrec.seq()));
+            // recall rank is set in process_dir beccause we should a have struct gatheing the 2 functions process_dir and process_file
+            if log::log_enabled!(log::Level::Trace) {
+                log::trace!("process_file, nb_sketched {} ", to_sketch.len());
+            }
+        }
+    }
+    // we are at end of file, we have one large sequence for the whole file
+    log::debug!("decompressed seq for file : {:?}, len is : {}", pathb.file_name().unwrap_or_default(), one_block_seq.len());
+    // we have DNA seq for now
+    let new_seq = kmeraa::SequenceAA::new(&one_block_seq);
+    let seqwithid = IdSeq::new(pathb.to_str().unwrap().to_string(), String::from("total sequence"), SequenceType::SequenceAA(new_seq));
+    to_sketch.push(seqwithid);
+    // we must send to_sketch to some sketcher
+    to_sketch
+}  // end of process_buffer_in_one_block
 

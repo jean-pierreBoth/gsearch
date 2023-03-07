@@ -19,8 +19,9 @@ use kmerutils::aautils::kmeraa::*;
 use kmerutils::aautils::seqsketchjaccard::{SeqSketcherAAT, ProbHash3aSketch, SuperHashSketch};
 
 use crate::utils::{idsketch::*, reloadhnsw};
-use crate::utils::files::{process_dir,ProcessingState, DataType};
-use crate::aa::aafiles::{process_aafile_in_one_block};
+use crate::utils::files::{process_dir, process_dir_parallel, ProcessingState, DataType};
+use crate::aa::aafiles::{process_aafile_in_one_block, process_aabuffer_in_one_block};
+
 
 use crate::utils::parameters::*;
 
@@ -101,7 +102,16 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT + KmerBuilder<Kmer>, S
             let start_t_prod = SystemTime::now();
             let res_nb_sent;
             if block_processing {
-                res_nb_sent = process_dir(&mut state, &DataType::AA, dirpath, filter_params, &process_aafile_in_one_block, &send);
+                if other_params.get_parallel_io() {
+                    let nb_files_by_group = other_params.get_nb_files_par();
+                    log::info!("dnasketch::sketchandstore_dir_compressedkmer : calling process_dir_parallel, nb_files in parallel : {}", nb_files_by_group);
+                    res_nb_sent = process_dir_parallel(&mut state, &DataType::AA,  dirpath, filter_params, 
+                                    nb_files_by_group, &process_aabuffer_in_one_block, &send);
+                } // end case parallel io
+                else {
+                    res_nb_sent = process_dir(&mut state, &DataType::AA, dirpath, filter_params, 
+                            &process_aafile_in_one_block, &send);
+                }
             }
             else {
                 panic!("processing by concat and split not implemented for aa sequences");

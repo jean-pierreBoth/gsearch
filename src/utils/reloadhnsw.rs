@@ -20,9 +20,8 @@ use crate::utils::AnnParameters;
 /* 
     reload hnsw from dump directory
     We know filename : hnswdump.hnsw.data and hnswdump.hnsw.graph
-    The allow(unused_variables) is here to avoid a warning on ann_params when compiling without feature f_annembed
  */
-pub fn reload_hnsw<T>(dump_dirpath : &Path, ann_params: &AnnParameters) -> Result<Hnsw<T, DistHamming>, String>  
+pub(crate) fn reload_hnsw<T>(dump_dirpath : &Path, _ann_params: &AnnParameters) -> Result<Hnsw<T, DistHamming>, String>  
             where T : 'static + Clone + Send + Sync + Serialize + DeserializeOwned ,
                 DistHamming : Distance<T>  {
     // just concat dirpath to filenames and get pathbuf
@@ -58,8 +57,8 @@ pub fn reload_hnsw<T>(dump_dirpath : &Path, ann_params: &AnnParameters) -> Resul
     }
     // feature enabled (or not) in Cargo.toml, requires the crate annembed
     #[cfg(any(feature="annembed_openblas-system", feature="annembed_openblas-static" , feature="annembed_intel-mkl"))]
-    if ann_params.ask_stats() {
-        let _ = super::embed::get_graph_stats_embed(&hnsw, ann_params.embed());
+    if _ann_params.ask_stats() {
+        let _ = super::embed::get_graph_stats_embed(&hnsw, _ann_params.embed());
     }
     //
     return Ok(hnsw);

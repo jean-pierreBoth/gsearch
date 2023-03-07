@@ -171,6 +171,8 @@ impl Matcher{
         Matcher{_kmer_size, _sketch_size, genome_length, _database_size, seq_matches, nb_sequence_match : 0}
     }
 
+
+
     pub fn insert_sequence_match(&mut self, req_item : ItemDict, new_matches : Vec<SequenceMatch>) {
         //
         // find request genome, if new we have to add an entry into seq_matches

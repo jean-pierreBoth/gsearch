@@ -20,7 +20,7 @@
 //! --nbng [-n] gives the number of neihbours required in hnsw construction at each layer, in the range 24-64 is usual
 //!             it doest not means you cannot ask for more neighbours in request.
 //! 
-//!  -- ef optional integer value to optimize hnsw structure creation (default to 400)  
+//!  --ef optional integer value to optimize hnsw structure creation (default to 400)  
 //! 
 //!  --seq if we want a processing by sequences. Default is to concatenate all sequneces in a file
 //!             in a large sequence.
@@ -30,12 +30,12 @@
 //!  --pio : option to read compressed files and then parallelize decompressing/fasta parsing. 
 //!         Useful, with many cores if io lags behind hashing/hnsw insertion. to speed up io.  
 //!         **Necessary to limit/custom the number of files or sequences simultanuously loaded in memory if files are very large (tens of Gb)**.  
-//!         Implemented only for dna files presently
 //! 
 //! --add : This option is dedicated to adding new data to a hnsw structure.  
 //!         The program reloads a previous dump of the hnsw structures. tohnsw must (presently) be launched from the directory
 //!         containing the dump as the program looks for the files "hnswdump.hnsw.data" and "hnswdump.hnsw.graph" created previously.  
-//!         **In this case parameters are reloaded from fiel parameters.json**
+//!         **In this case parameters corresponding to options --kmer  --sketch --nbng --ef and --algo are reloaded from file parameters.json**.  
+//!         It is useless to pass them in command line.
 
 // must loop on sub directories , open gzipped files
 // extracts complete genomes possiby many in one file (get rid of capsid records if any)

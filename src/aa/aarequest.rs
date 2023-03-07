@@ -25,7 +25,7 @@ use crate::utils::files::{process_dir,ProcessingState};
 
 
 use crate::utils::*;
-use crate::aa::aafiles::{process_aafile_in_one_block};
+use crate::aa::aafiles::{process_aafile_in_one_block, process_aabuffer_in_one_block};
 use crate::{matcher::*, answer::ReqAnswer};
 
 
@@ -33,7 +33,7 @@ use crate::{matcher::*, answer::ReqAnswer};
 
 fn sketch_and_request_dir_compressedkmer<Kmer:CompressedKmerT + KmerBuilder<Kmer>, Sketcher : SeqSketcherAAT<Kmer> + Send + Sync>(request_dirpath : &Path, 
                     sketcher : Sketcher,
-                    filter_params: &FilterParams, seqdict : &SeqDict, processing_parameters : &ProcessingParams, 
+                    filter_params: &FilterParams, seqdict : &SeqDict, processing_parameters : &ProcessingParams, other_params : &ComputingParams, 
                     hnsw: &Hnsw< <Sketcher as SeqSketcherAAT<Kmer>>::Sig ,DistHamming>, 
                     knbn : usize, ef_search : usize) -> Matcher
 
@@ -77,6 +77,7 @@ fn sketch_and_request_dir_compressedkmer<Kmer:CompressedKmerT + KmerBuilder<Kmer
         hashval
     };
 
+    let mut nb_match = 0;  // number of answers dumped in asnwers (above filtering threshold)
 
     // create something for likelyhood computation
     let mut matcher = Matcher::new(processing_parameters.get_kmer_size(), sketcher_params.get_sketch_size(), seqdict);
@@ -91,11 +92,20 @@ fn sketch_and_request_dir_compressedkmer<Kmer:CompressedKmerT + KmerBuilder<Kmer
         let sender_handle = scope.spawn(move |_|   {
             let res_nb_sent;
             if block_processing {
-                res_nb_sent = process_dir(&mut state,&DataType::AA, request_dirpath, &filter_params, &process_aafile_in_one_block, &send);
+                if other_params.get_parallel_io() {
+                    let nb_files_by_group = other_params.get_nb_files_par();
+                    log::info!("dnasketch::sketchandstore_dir_compressedkmer : calling process_dir_parallel, nb_files in parallel : {}", nb_files_by_group);
+                    res_nb_sent = process_dir_parallel(&mut state, &DataType::AA,  request_dirpath, filter_params, 
+                                    nb_files_by_group, &process_aabuffer_in_one_block, &send);
+                } // end case parallel io
+                else {
+                    res_nb_sent = process_dir(&mut state,&DataType::AA, request_dirpath, &filter_params, 
+                                    &process_aafile_in_one_block, &send);
+                }
             }
             else {
                 log::info!("processing by concat and split");
-                panic!("no concat and split processing for RNA yet");
+                panic!("no concat and split processing for AA yet");
             }
             match res_nb_sent {
                 Ok(nb_really_sent) => {
@@ -135,9 +145,13 @@ fn sketch_and_request_dir_compressedkmer<Kmer:CompressedKmerT + KmerBuilder<Kmer
                             let knn_neighbours  = hnsw.parallel_search(&signatures, knbn, ef_search);
                             for i in 0..knn_neighbours.len() {
                                 let answer = ReqAnswer::new(nb_request+i, seq_item[i].clone(), &knn_neighbours[i]);
-                                if answer.dump(&seqdict, out_threshold, &mut outfile).is_err() {
-                                    log::info!("could not dump answer for request id {}", answer.get_request_id().get_id().get_fasta_id());
-                                }
+                                let dump_res = answer.dump(&seqdict, out_threshold, &mut outfile);
+                                match dump_res {
+                                    Ok(nb_dumped) => { nb_match += nb_dumped; },
+                                    _                    => { log::info!("could not dump answer for request id {}", 
+                                                                    answer.get_request_id().get_id().get_fasta_id());
+                                                            }
+                                };
                                 // store in matcher. remind that each i corresponds to a request
                                 let candidates = knn_neighbours[i].iter().map(|n| SequenceMatch::new(seqdict.0[n.d_id].clone(), n.get_distance())).collect();
                                 matcher.insert_sequence_match(seq_item[i].clone(), candidates);
@@ -162,9 +176,13 @@ fn sketch_and_request_dir_compressedkmer<Kmer:CompressedKmerT + KmerBuilder<Kmer
                             // construct and dump answers
                             for i in 0..knn_neighbours.len() {
                                 let answer = ReqAnswer::new(nb_request+i, seq_item[i].clone(), &knn_neighbours[i]);
-                                if answer.dump(&seqdict, out_threshold, &mut outfile).is_err() {
-                                    log::info!("could not dump answer for request id {}", answer.get_request_id().get_id().get_fasta_id());
-                                }
+                                let dump_res = answer.dump(&seqdict, out_threshold, &mut outfile);
+                                match dump_res {
+                                    Ok(nb_dumped) => { nb_match += nb_dumped; },
+                                    _                    => { log::info!("could not dump answer for request id {}", 
+                                                                    answer.get_request_id().get_id().get_fasta_id());
+                                                            }
+                                };
                                 // store in matcher. remind that each i corresponds to a request
                                 let candidates = knn_neighbours[i].iter().map(|n| SequenceMatch::new(seqdict.0[n.d_id].clone(), n.get_distance())).collect();
                                 matcher.insert_sequence_match(seq_item[i].clone(), candidates);
@@ -188,7 +206,7 @@ fn sketch_and_request_dir_compressedkmer<Kmer:CompressedKmerT + KmerBuilder<Kmer
     }  // end of closure in scope
     ).unwrap();  // end of scope
     //
-    log::info!("matcher collected {} answers", matcher.get_nb_sequence_match());
+    log::info!("matcher collected {} answers , kept with threshold : {}", matcher.get_nb_sequence_match(), nb_match);
     let cpu_time = cpu_start.elapsed().as_secs();
     log::info!("process_dir : cpu time(s) {}", cpu_time);
     let elapsed_t = start_t.elapsed().unwrap().as_secs() as f32;
@@ -202,7 +220,7 @@ fn sketch_and_request_dir_compressedkmer<Kmer:CompressedKmerT + KmerBuilder<Kmer
 
 // This function returns paired sequence by probminhash and hnsw 
 pub fn get_sequence_matcher(request_dirpath : &Path, database_dirpath : &Path, processing_params : &ProcessingParams,
-            filter_params : &FilterParams, ann_params: &AnnParameters, seqdict : &SeqDict, 
+            filter_params : &FilterParams, ann_params: &AnnParameters,  other_params : &ComputingParams, seqdict : &SeqDict, 
             nbng : u16, ef_search : usize) -> Result<Matcher, String> {
     //
     let sketch_params = processing_params.get_sketching_params();
@@ -217,14 +235,14 @@ pub fn get_sequence_matcher(request_dirpath : &Path, database_dirpath : &Path, p
                     let hnsw = reloadhnsw::reload_hnsw::< <KmerAA32bit as CompressedKmerT>::Val>(database_dirpath, ann_params)?;
                     let sketcher = ProbHash3aSketch::<KmerAA32bit>::new(sketch_params);
                     matcher = sketch_and_request_dir_compressedkmer::<KmerAA32bit, ProbHash3aSketch::<KmerAA32bit> >(&request_dirpath, sketcher, 
-                            &filter_params, &seqdict, &processing_params, 
+                            &filter_params, &seqdict, &processing_params, other_params,
                             &hnsw, nbng as usize, ef_search);
                 }
                 7..=12 => {
                     let hnsw = reloadhnsw::reload_hnsw::< <KmerAA64bit as CompressedKmerT>::Val>(database_dirpath, ann_params)?;
                     let sketcher = ProbHash3aSketch::<KmerAA64bit>::new(sketch_params);
                     matcher = sketch_and_request_dir_compressedkmer::<KmerAA64bit, ProbHash3aSketch::<KmerAA64bit> >(&request_dirpath, sketcher,
-                            &filter_params, &seqdict, &processing_params, 
+                            &filter_params, &seqdict, &processing_params, other_params, 
                             &hnsw, nbng as usize, ef_search);
                 }
                 _ => {
@@ -238,14 +256,14 @@ pub fn get_sequence_matcher(request_dirpath : &Path, database_dirpath : &Path, p
                     let hnsw = reloadhnsw::reload_hnsw::< <SuperHashSketch<KmerAA32bit> as SeqSketcherAAT<KmerAA32bit>>::Sig>(database_dirpath, ann_params)?;
                     let sketcher = SuperHashSketch::<KmerAA32bit>::new(sketch_params);
                     matcher = sketch_and_request_dir_compressedkmer::<KmerAA32bit, SuperHashSketch<KmerAA32bit> >(&request_dirpath, sketcher, 
-                            &filter_params, &seqdict, &processing_params, 
+                            &filter_params, &seqdict, &processing_params, other_params,
                             &hnsw, nbng as usize, ef_search);
                 }
                 7..=15 => {
                     let hnsw = reloadhnsw::reload_hnsw::< <SuperHashSketch<KmerAA32bit> as SeqSketcherAAT<KmerAA32bit>>::Sig >(database_dirpath, ann_params)?;
                     let sketcher = SuperHashSketch::<KmerAA64bit>::new(sketch_params);
                     matcher = sketch_and_request_dir_compressedkmer::<KmerAA64bit, SuperHashSketch::<KmerAA64bit> >(&request_dirpath, sketcher, 
-                            &filter_params, &seqdict, &processing_params, 
+                            &filter_params, &seqdict, &processing_params, other_params,
                             &hnsw, nbng as usize, ef_search);
                 }
                 _ => {
