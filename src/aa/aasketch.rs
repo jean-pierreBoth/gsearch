@@ -35,8 +35,7 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT + KmerBuilder<Kmer>, S
                 KmerGenerator<Kmer> :  KmerGenerationPattern<Kmer>, 
                 DistHamming : Distance<<Sketcher as SeqSketcherAAT<Kmer>>::Sig> {
     //
-    log::trace!("sketchandstore_dir_compressedkmerrna mode processing dir: {}", dirpath.to_str().unwrap());
-    log::info!("sketchandstore_dir_compressedkmer rna mode processing dir: {}", dirpath.to_str().unwrap());
+    log::info!("sketchandstore_dir_compressedkmer AA mode processing dir: {}", dirpath.to_str().unwrap());
     let start_t = SystemTime::now();
     let cpu_start = ProcessTime::now();
     //
@@ -104,7 +103,7 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT + KmerBuilder<Kmer>, S
             if block_processing {
                 if other_params.get_parallel_io() {
                     let nb_files_by_group = other_params.get_nb_files_par();
-                    log::info!("dnasketch::sketchandstore_dir_compressedkmer : calling process_dir_parallel, nb_files in parallel : {}", nb_files_by_group);
+                    log::info!("aasketch::sketchandstore_dir_compressedkmer : calling process_dir_parallel, nb_files in parallel : {}", nb_files_by_group);
                     res_nb_sent = process_dir_parallel(&mut state, &DataType::AA,  dirpath, filter_params, 
                                     nb_files_by_group, &process_aabuffer_in_one_block, &send);
                 } // end case parallel io

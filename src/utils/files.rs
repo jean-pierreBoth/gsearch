@@ -378,8 +378,8 @@ pub(crate) fn process_dir_parallel(state : &mut ProcessingState, datatype: &Data
     };
     // now must treat residue in path_block
     if path_block.len() > 0 {
-        log::info!("dnasketch::process_dir_parallel sending residue, size : {}", path_block.len());
-        let seqs = process_files_group(&DataType::DNA, filter_params, &path_block, &file_task);
+        log::info!("files::process_dir_parallel sending residue, size : {}", path_block.len());
+        let seqs = process_files_group(datatype, filter_params, &path_block, &file_task);
         for mut seqfile in seqs {
             for i in 0..seqfile.len() {
                 seqfile[i].rank = state.nb_seq;
