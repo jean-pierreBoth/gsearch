@@ -362,7 +362,7 @@ pub(crate) fn process_dir_parallel(state : &mut ProcessingState, datatype: &Data
         nb_files_by_group : usize, file_task: &(dyn Fn(&PathBuf, &[u8], &FilterParams) -> Vec<IdSeq> + Sync), 
         sender : &crossbeam_channel::Sender::<Vec<IdSeq>>) -> io::Result<usize> {
         //
-    log::info!("dnasketch::sketchandstore_dir_compressedkmer : calling process_dir_parallel, nb_files in parallel : {}", nb_files_by_group);
+    log::info!("files::process_dir_parallel : calling process_dir_parallel, nb_files in parallel : {}", nb_files_by_group);
     //
     let mut nb_sent_parallel;
     let mut path_block = Vec::<PathBuf>::with_capacity(nb_files_by_group);
