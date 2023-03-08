@@ -30,7 +30,7 @@ takes a list of fasta files containing requests and for each fasta file dumps th
 ) for linux system in this release page for convenience because the only dependency is GCC (Recent Linux version does not allow static compiling of GCC libraries like libc.so.6). For macOS, we recommend the universal binary (https://github.com/jean-pierreBoth/gsearch/releases/download/v0.0.12/GSearch_darwin_universal.zip) for any macOS platform (x86-64 or arm64).
 
 ## Or if you have conda installed:
-
+[![install with bioconda](https://img.shields.io/badge/install%20with-bioconda-brightgreen.svg?style=flat)](http://bioconda.github.io/recipes/gsearch/README.html)
 ```bash
 conda config --add channels bioconda
 conda install gsearch -c bioconda
