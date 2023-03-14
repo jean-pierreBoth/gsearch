@@ -253,16 +253,16 @@ pub fn get_sequence_matcher(request_dirpath : &Path, database_dirpath : &Path, p
         SketchAlgo::SUPER => {
             match kmer_size {
                 1..=6 => {
-                    let hnsw = reloadhnsw::reload_hnsw::< <SuperHashSketch<KmerAA32bit> as SeqSketcherAAT<KmerAA32bit>>::Sig>(database_dirpath, ann_params)?;
-                    let sketcher = SuperHashSketch::<KmerAA32bit>::new(sketch_params);
-                    matcher = sketch_and_request_dir_compressedkmer::<KmerAA32bit, SuperHashSketch<KmerAA32bit> >(&request_dirpath, sketcher, 
+                    let hnsw = reloadhnsw::reload_hnsw::< <SuperHashSketch<KmerAA32bit,f32> as SeqSketcherAAT<KmerAA32bit>>::Sig>(database_dirpath, ann_params)?;
+                    let sketcher = SuperHashSketch::<KmerAA32bit, f32>::new(sketch_params);
+                    matcher = sketch_and_request_dir_compressedkmer::<KmerAA32bit, SuperHashSketch<KmerAA32bit,f32> >(&request_dirpath, sketcher, 
                             &filter_params, &seqdict, &processing_params, other_params,
                             &hnsw, nbng as usize, ef_search);
                 }
                 7..=15 => {
-                    let hnsw = reloadhnsw::reload_hnsw::< <SuperHashSketch<KmerAA32bit> as SeqSketcherAAT<KmerAA32bit>>::Sig >(database_dirpath, ann_params)?;
-                    let sketcher = SuperHashSketch::<KmerAA64bit>::new(sketch_params);
-                    matcher = sketch_and_request_dir_compressedkmer::<KmerAA64bit, SuperHashSketch::<KmerAA64bit> >(&request_dirpath, sketcher, 
+                    let hnsw = reloadhnsw::reload_hnsw::< <SuperHashSketch<KmerAA32bit, f32> as SeqSketcherAAT<KmerAA32bit>>::Sig >(database_dirpath, ann_params)?;
+                    let sketcher = SuperHashSketch::<KmerAA64bit, f32>::new(sketch_params);
+                    matcher = sketch_and_request_dir_compressedkmer::<KmerAA64bit, SuperHashSketch::<KmerAA64bit, f32> >(&request_dirpath, sketcher, 
                             &filter_params, &seqdict, &processing_params, other_params,
                             &hnsw, nbng as usize, ef_search);
                 }
@@ -270,6 +270,9 @@ pub fn get_sequence_matcher(request_dirpath : &Path, database_dirpath : &Path, p
                     return Err(String::from("bad value for kmer size"));                   
                 }
             }
+        }
+        SketchAlgo::SUPER2 => {
+            return Err(String::from(" SuperMinhash2 not yet in AA sketching")); 
         }
     }; // end global match on algo
     //

@@ -51,17 +51,17 @@ clap = {version = "3.2"}
 
 ##
 
-# probminhash = {version = "0.1.6"}
-probminhash = {git = "https://github.com/jean-pierreBoth/probminhash"}
-# probminhash = {path = "../probminhash"}
+# probminhash = {version = "0.1.8"}
+# probminhash = {git = "https://github.com/jean-pierreBoth/probminhash"}
+probminhash = {path = "../probminhash"}
 
-hnsw_rs =  {version = "0.1.18"}
+# hnsw_rs =  {version = "0.1.19"}
 # hnsw_rs =  {git = "https://github.com/jean-pierreBoth/hnswlib-rs"}
 # nsw_rs = {git = "https://gitlab.com/jpboth/hnswlib-rs.git"}
-#hnsw_rs = {path = "../hnswlib-rs"}
+hnsw_rs = {path = "../hnswlib-rs"}
 
-# kmerutils = {path = "../kmerutils"}
-kmerutils = {git = "https://github.com/jean-pierreBoth/kmerutils"}
+kmerutils = {path = "../kmerutils"}
+# kmerutils = {git = "https://github.com/jean-pierreBoth/kmerutils"}
 # kmerutils = {git = "https://gitlab.com/jpboth/kmerutils.git"}
 #kmerutils = {version = "0.0.8"}
 
@@ -85,11 +85,12 @@ csv = {version = "1.1"}
 [features]
 
 default = []
-#default = ["annembed_openblas-system" ]
 
 annembed_openblas-static = [ "annembed/openblas-static"]
 annembed_openblas-system = [ "annembed/openblas-system"]
 annembed_intel-mkl = [ "annembed/intel-mkl-static"]
 
 withzmq = ["kmerutils/withzmq"]
+simdeez_f = ["hnsw_rs/simdeez_f", "kmerutils/simdeez_f"]
+
 

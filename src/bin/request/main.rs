@@ -196,6 +196,9 @@ fn main() {
             if algo == String::from("super") {
                 sketch_algo = SketchAlgo::SUPER;
             }
+            else if algo == String::from("super2") {
+                sketch_algo = SketchAlgo::SUPER2;
+            }
             else if algo == String::from("prob") {
                 sketch_algo = SketchAlgo::PROB3A;
             }

@@ -129,7 +129,7 @@ pub fn process_aabuffer_in_one_block(pathb : &PathBuf, bufread : &[u8], filter_p
         }
     }
     // we are at end of file, we have one large sequence for the whole file
-    log::debug!("decompressed seq for file : {:?}, len is : {}", pathb.file_name().unwrap_or_default(), one_block_seq.len());
+    log::debug!("decompressed seq for file : {:?}, seq len is : {}, file length : {}", pathb.file_name().unwrap_or_default(), one_block_seq.len(), bufread.len());
     // we have DNA seq for now
     let new_seq = kmeraa::SequenceAA::new(&one_block_seq);
     let seqwithid = IdSeq::new(pathb.to_str().unwrap().to_string(), String::from("total sequence"), SequenceType::SequenceAA(new_seq));

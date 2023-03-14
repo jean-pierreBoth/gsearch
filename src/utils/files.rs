@@ -195,10 +195,9 @@ fn file_to_buffer(pathb : &PathBuf) -> Vec<u8> {
     let f_len : usize;
     match metadata {
         Ok(metadata) => { f_len = metadata.len() as usize;
-                            log::debug!("file_to_buffer got file {:?}, length : {}",pathb.file_name().unwrap_or_default(),  f_len);
                         }
         Err(_)       => {
-                            println!("file_to_buffer could not get length of file {} ", pathb.to_str().unwrap());
+                            log::error!("file_to_buffer could not get length of file {} ", pathb.to_str().unwrap());
                             f_len = 10_000_000;
         }
     }
@@ -312,7 +311,7 @@ pub(crate) fn process_dir_parallel_rec(state : &mut ProcessingState, datatype: &
             match pathb.metadata() {
                 Ok(meta) => {
                     let f_len = meta.len();
-                    log::debug!(" filename : {:?}, length = {}", pathb.file_name().unwrap_or_default(), f_len);
+                    log::trace!(" filename : {:?}, length = {}", pathb.file_name().unwrap_or_default(), f_len);
                 }
                 Err(_) => {},
             }

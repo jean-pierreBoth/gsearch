@@ -30,7 +30,7 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT + KmerBuilder<Kmer>, S
                         filter_params: &FilterParams, 
                         processing_params : &ProcessingParams, 
                         other_params : &ComputingParams) 
-
+        //
         where   <Sketcher as SeqSketcherAAT<Kmer>>::Sig : 'static + Clone + Copy + Send + Sync + Serialize + DeserializeOwned + Debug,
                 KmerGenerator<Kmer> :  KmerGenerationPattern<Kmer>, 
                 DistHamming : Distance<<Sketcher as SeqSketcherAAT<Kmer>>::Sig> {
@@ -41,8 +41,12 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT + KmerBuilder<Kmer>, S
     //
     let block_processing = processing_params.get_block_flag();
     // a queue of signature waiting to be inserted , size must be sufficient to benefit from threaded probminhash and insert
-    // and not too large to spare memory
-    let insertion_block_size = 5000;
+    // and not too large to spare memory.  If parallel_io is set dimension message queue to size of group
+    // for files of size more than Gb we must use pario to limit memory, but leave enough msg in queue to get // sketch and insertion 
+    let insertion_block_size = match other_params.get_parallel_io() {
+        true => { 5000.min(2 * other_params.get_nb_files_par()) },
+        _    => { 5000 },
+    };
     let mut insertion_queue : Vec<IdSeq>= Vec::with_capacity(insertion_block_size);
     // TODO must get ef_search from clap via hnswparams
     let mut hnsw : Hnsw::< <Sketcher as SeqSketcherAAT<Kmer>>::Sig, DistHamming>;
@@ -92,7 +96,7 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT + KmerBuilder<Kmer>, S
     };
 
     // to send IdSeq to sketch from reading thread to sketcher thread
-    let (send, receive) = crossbeam_channel::bounded::<Vec<IdSeq>>(insertion_block_size+10);
+    let (send, receive) = crossbeam_channel::bounded::<Vec<IdSeq>>(insertion_block_size+1);
     // launch process_dir in a thread or async
     crossbeam_utils::thread::scope(|scope| {
         // sequence sending, productor thread
@@ -176,6 +180,7 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT + KmerBuilder<Kmer>, S
                                 data_for_hnsw.push((&signatures[i], seq_rank[i]));
                             }
                             // parallel insertion
+                            log::debug!("inserting  residue in hnsw");
                             hnsw.parallel_insert(&data_for_hnsw);
                         }
                     }
@@ -197,6 +202,7 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT + KmerBuilder<Kmer>, S
                                 data_for_hnsw.push((&signatures[i], seq_rank[i]));
                             }
                             // parallel insertion
+                            log::debug!("inserting block in hnsw");
                             hnsw.parallel_insert(&data_for_hnsw);
                             // we reset insertion_queue
                             insertion_queue.clear();
@@ -282,16 +288,19 @@ pub fn aa_process_tohnsw(dirpath : &Path, filter_params : &FilterParams, process
         }
         SketchAlgo::SUPER => {
             if kmer_size <= 6 {
-                let sketcher = SuperHashSketch::<KmerAA32bit>::new(sketch_params);
-                sketchandstore_dir_compressedkmer::<KmerAA32bit, SuperHashSketch::<KmerAA32bit>>(&dirpath, sketcher, &filter_params, &processing_parameters, others_params);
+                let sketcher = SuperHashSketch::<KmerAA32bit, f32>::new(sketch_params);
+                sketchandstore_dir_compressedkmer::<KmerAA32bit, SuperHashSketch::<KmerAA32bit, f32>>(&dirpath, sketcher, &filter_params, &processing_parameters, others_params);
             }
             else if kmer_size <= 12 {
-                let sketcher = SuperHashSketch::<KmerAA64bit>::new(sketch_params);
-                sketchandstore_dir_compressedkmer::<KmerAA64bit, SuperHashSketch::<KmerAA64bit>>(&dirpath, sketcher, &filter_params, &processing_parameters, others_params);                
+                let sketcher = SuperHashSketch::<KmerAA64bit, f32>::new(sketch_params);
+                sketchandstore_dir_compressedkmer::<KmerAA64bit, SuperHashSketch::<KmerAA64bit, f32>>(&dirpath, sketcher, &filter_params, &processing_parameters, others_params);                
             }
             else {
                 panic!("kmer for Amino Acids must be less or equal to 12");
             }
         }
+        SketchAlgo::SUPER2 => {
+            panic!("SUPER2 not yet implemented over AA sketching");
+        }
     }
-} // end of dna_process
+} // end of aa_process_tohnsw

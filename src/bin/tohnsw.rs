@@ -12,7 +12,7 @@
 //!   
 //! --sketch gives the size of probminhash sketch (integer value). Mandatory value.  
 //! 
-//! --algo specifiy the sketching algorithm to be used. Default is ProbMinhash. SuperMinHash can specified by --algo super.
+//! --algo specifiy the sketching algorithm to be used. Default is ProbMinhash. SuperMinHash or SuperMinHash2 can specified by --algo super or --algo super2.
 //!         passing --algo prob   for asking ProbMinhash is possible
 //! 
 //! --kmer [-k] gives the size of kmer to use for generating probminhash (integer value). Mandatory argument. 
@@ -169,6 +169,9 @@ fn main() {
             println!("sketching algo {}", algo);
             if algo == String::from("super") {
                 sketch_algo = SketchAlgo::SUPER;
+            }
+            else if algo == String::from("super2") {
+                sketch_algo = SketchAlgo::SUPER2;
             }
             else if algo == String::from("prob") {
                 sketch_algo = SketchAlgo::PROB3A;
