@@ -12,6 +12,8 @@ This package is developped by Jean-Pierre Both (https://github.com/jean-pierreBo
 
 The sketching and database is done by the module ***tohnsw***.
 
+The sketching-based method is to estimate probability Jaccard index ($J_{P}=\sum_{d\in D} \frac{1}{\sum_{d'\in D} \max (\frac{\omega_{A}(d')}{\omega_{A}(d)},\frac{\omega_{B}(d')}{\omega_{B}(d)})}$) or just simple Jaccard index ($Jaccard(A,B)=\frac{A \cap B}{A \cup B}$) via MinHash-like algorithm (ProbMinHash and SuperMinHash, respectively), as an accurate proxy of mutation rate or Average Nucleitide Identity(ANI), as implemented in crate probminhash (https://github.com/jean-pierreBoth/probminhash) and then use the estimated Jaccard index to build HNSW graph database, which is implemented in crate hnswlib-rs (https://github.com/jean-pierreBoth/hnswlib-rs).
+
 The sketching of reference genomes can take some time (one or 2 hours for ~65,000 bacterial genomes of NCBI for parameters giving a correct quality of sketching). Result is stored in 2 structures:
 - A Hnsw structure storing rank of data processed and corresponding sketches.
 - A Dictionary associating each rank to a fasta id and fasta filename.
