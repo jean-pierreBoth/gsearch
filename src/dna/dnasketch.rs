@@ -20,7 +20,8 @@ use hnsw_rs::prelude::*;
 
 
 use kmerutils::base::{kmergenerator::*, Kmer32bit, Kmer64bit, CompressedKmerT};
-use kmerutils::sketching::seqsketchjaccard::{SeqSketcherT, ProbHash3aSketch, SuperHashSketch, SuperHash2Sketch};
+use kmerutils::sketching::seqsketchjaccard::{SeqSketcherT, ProbHash3aSketch, SuperHashSketch, HyperLogLogSketch, SuperHash2Sketch};
+use probminhash::{setsketcher::SetSketchParams};
 
 use crate::utils::{idsketch::*, reloadhnsw};
 use crate::utils::files::{process_dir,process_dir_parallel, ProcessingState, DataType};
@@ -353,21 +354,52 @@ pub fn dna_process_tohnsw(dirpath : &Path, filter_params : &FilterParams, proces
                 panic!("kmers cannot be greater than 32");
             }
         }
-        SketchAlgo::SUPER2 => {
+        SketchAlgo::HLL => {
+            // TODO !! adjust hll parameters to 
+            let mut hll_params = SetSketchParams::default();
+            if hll_params.get_m() < sketchparams.get_sketch_size() as u64 {
+                log::warn!("!!!!!!!!!!!!!!!!!!!  need to adjust hll parameters!");
+            }
+            hll_params.set_m(sketchparams.get_sketch_size());
             if kmer_size <= 14 {
                 // allocated the correct sketcher
-                let sketcher = SuperHash2Sketch::<Kmer32bit, u32>::new(sketchparams);
-                sketchandstore_dir_compressedkmer::<Kmer32bit, SuperHash2Sketch::<Kmer32bit, u32> >(&dirpath, sketcher, 
+                let sketcher = HyperLogLogSketch::<Kmer32bit, u16>::new(sketchparams, hll_params);
+                sketchandstore_dir_compressedkmer::<Kmer32bit, HyperLogLogSketch::<Kmer32bit, u16> >(&dirpath, sketcher, 
                             &filter_params, &processing_parameters, others_params);
             }
             else if kmer_size == 16 {
-                let sketcher = SuperHash2Sketch::<Kmer16b32bit, u32>::new(sketchparams);
-                sketchandstore_dir_compressedkmer::<Kmer16b32bit, SuperHash2Sketch::<Kmer16b32bit, u32>>(&dirpath, sketcher, 
+                let sketcher = HyperLogLogSketch::<Kmer16b32bit, u16>::new(sketchparams, hll_params);
+                sketchandstore_dir_compressedkmer::<Kmer16b32bit, HyperLogLogSketch::<Kmer16b32bit, u16>>(&dirpath, sketcher, 
                             &filter_params, &processing_parameters, others_params);
             }
             else if  kmer_size <= 32 {
-                let sketcher = SuperHash2Sketch::<Kmer64bit, u64>::new(sketchparams);
-                sketchandstore_dir_compressedkmer::<Kmer64bit, SuperHash2Sketch::<Kmer64bit, u64>>(&dirpath, sketcher, 
+                let sketcher = HyperLogLogSketch::<Kmer64bit, u16>::new(sketchparams, hll_params);
+                sketchandstore_dir_compressedkmer::<Kmer64bit, HyperLogLogSketch::<Kmer64bit, u16>>(&dirpath, sketcher, 
+                            &filter_params, &processing_parameters, others_params);
+            }
+            else {
+                panic!("kmers cannot be greater than 32");
+            }
+        } // end match HLL
+        SketchAlgo::SUPER2 => {
+            if kmer_size <= 14 {
+                // allocated the correct sketcher. SuperHash2Sketch should enable BuildHasher choice to sketch to u32.
+                // we used just in tests
+                let bh = std::hash::BuildHasherDefault::<fxhash::FxHasher32>::default();
+                let sketcher = SuperHash2Sketch::<Kmer32bit, u32, fxhash::FxHasher32>::new(sketchparams, bh);
+                sketchandstore_dir_compressedkmer::<Kmer32bit, SuperHash2Sketch::<Kmer32bit, u32, fxhash::FxHasher32> >(&dirpath, sketcher, 
+                            &filter_params, &processing_parameters, others_params);
+            }
+            else if kmer_size == 16 {
+                let bh = std::hash::BuildHasherDefault::<fxhash::FxHasher32>::default();
+                let sketcher = SuperHash2Sketch::<Kmer16b32bit, u32, fxhash::FxHasher32>::new(sketchparams, bh);
+                sketchandstore_dir_compressedkmer::<Kmer16b32bit, SuperHash2Sketch::<Kmer16b32bit, u32, fxhash::FxHasher32>>(&dirpath, sketcher, 
+                            &filter_params, &processing_parameters, others_params);
+            }
+            else if  kmer_size <= 32 {
+                let bh = std::hash::BuildHasherDefault::<fxhash::FxHasher64>::default();
+                let sketcher = SuperHash2Sketch::<Kmer64bit, u64, fxhash::FxHasher64>::new(sketchparams, bh);
+                sketchandstore_dir_compressedkmer::<Kmer64bit, SuperHash2Sketch::<Kmer64bit, u64, fxhash::FxHasher64>>(&dirpath, sketcher, 
                             &filter_params, &processing_parameters, others_params);
             }
             else {
