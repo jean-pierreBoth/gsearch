@@ -151,7 +151,7 @@ pub fn process_buffer_in_one_block(pathb : &PathBuf, bufread : &[u8], filter_par
     //
     while let Some(record) = reader.next() {
         if record.is_err() {
-            println!("process_buffer_in_one_block : got bd record in buffer");
+            println!("process_buffer_in_one_block : got bad record in buffer : {:?}", pathb);
             std::process::exit(1);
         }
         // do we keep record ? we must get its id
@@ -228,12 +228,15 @@ pub fn process_file_concat_split(pathb : &PathBuf, filter_params : &FilterParams
             }
         }
     }
-    // we are at end of file, we have one large sequence and now we split it in 10 // TODO to parametrize
-    let nb_split = 10;
-    let block_size = one_block_seq.len() / nb_split;
+    // we are at end of file, we have one large sequence and now we split it in 10M
+    let seq_len =  one_block_seq.len();
+    let max_size = 10_000_000;
+    let nb_split = if seq_len % max_size == 0 { seq_len / max_size} else { 1 + seq_len / max_size};
+    log::debug!("split seq length : {:#} in nb blocks : {:#}", seq_len, nb_split);
+    let block_size = seq_len / nb_split;
     for i in 0..nb_split {
         let block_begin = i * block_size;
-        let block_end = one_block_seq.len().min((i+1) * block_size) - 1;
+        let block_end = seq_len.min((i+1) * block_size) - 1;
         // generate an id
         let id = format!("total seq split {}", i);
         let new_seq = Sequence::new(&one_block_seq[block_begin..block_end],2);

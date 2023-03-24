@@ -299,6 +299,9 @@ pub fn aa_process_tohnsw(dirpath : &Path, filter_params : &FilterParams, process
                 panic!("kmer for Amino Acids must be less or equal to 12");
             }
         }
+        SketchAlgo::HLL => {
+            panic!("HLL not yet implemented over AA sketching");
+        }
         SketchAlgo::SUPER2 => {
             panic!("SUPER2 not yet implemented over AA sketching");
         }

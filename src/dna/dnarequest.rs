@@ -21,6 +21,8 @@ use hnsw_rs::prelude::*;
 use kmerutils::base::{kmergenerator::*, Kmer32bit, Kmer64bit, CompressedKmerT};
 use kmerutils::sketching::seqsketchjaccard::*;
 
+use probminhash::{setsketcher::SetSketchParams};
+
 use crate::utils::*;
 use crate::dna::dnafiles::{process_file_concat_split, process_buffer_in_one_block, process_file_in_one_block};
 use crate::{matcher::*, answer::ReqAnswer};
@@ -279,7 +281,40 @@ pub fn get_sequence_matcher(request_dirpath : &Path, database_dirpath : &Path, p
             }
         }  // end match SUPER
         SketchAlgo::HLL => {
-            std::panic!("not yet");
+            // 16 bits is sufficient up to kmer of size 30!
+            let mut hll_params = SetSketchParams::default();
+            if hll_params.get_m() < sketch_params.get_sketch_size() as u64 {
+                log::warn!("!!!!!!!!!!!!!!!!!!!  need to adjust hll parameters!");
+            }
+            hll_params.set_m(sketch_params.get_sketch_size());
+            //
+            match sketch_params.get_kmer_size() {
+                0..=14 => {
+                    let hnsw = reloadhnsw::reload_hnsw::< <HyperLogLogSketch<Kmer32bit, u16> as SeqSketcherT<Kmer32bit> >::Sig >(database_dirpath, ann_params)?;
+                    let sketcher = HyperLogLogSketch::<Kmer32bit, u16>::new(sketch_params, hll_params);
+                    matcher = sketch_and_request_dir_compressedkmer::<Kmer32bit, HyperLogLogSketch::<Kmer32bit, u16> >(&request_dirpath, sketcher, 
+                        &filter_params, &seqdict, &processing_params, &other_params,
+                        &hnsw, nbng as usize, ef_search);
+                }
+                17..=32 => {
+                    let hnsw = reloadhnsw::reload_hnsw::< <HyperLogLogSketch<Kmer64bit, u16> as SeqSketcherT<Kmer64bit> >::Sig >(database_dirpath, ann_params)?;
+                    let sketcher = HyperLogLogSketch::<Kmer64bit, u16>::new(sketch_params, hll_params);
+                    matcher = sketch_and_request_dir_compressedkmer::<Kmer64bit, HyperLogLogSketch::<Kmer64bit, u16> >(&request_dirpath, sketcher, 
+                        &filter_params, &seqdict, &processing_params, &other_params,
+                        &hnsw, nbng as usize, ef_search);
+                }
+                16 => {
+                    let hnsw = reloadhnsw::reload_hnsw::< <HyperLogLogSketch<Kmer16b32bit, u16> as SeqSketcherT<Kmer16b32bit> >::Sig >(database_dirpath, ann_params)?;
+                    let sketcher = HyperLogLogSketch::<Kmer16b32bit, u16>::new(sketch_params, hll_params);
+                    matcher = sketch_and_request_dir_compressedkmer::<Kmer16b32bit, HyperLogLogSketch::<Kmer16b32bit, u16> >(&request_dirpath, sketcher, 
+                        &filter_params, &seqdict, &processing_params, &other_params,
+                        &hnsw, nbng as usize, ef_search); 
+                } 
+                _ => {
+                    log::error!("bad value for kmer size. 15 is not allowed");
+                    return Err(String::from("bad value for kmer size"));                   
+                }          
+            }
         } // end match HLL
         SketchAlgo::SUPER2 => {
             match sketch_params.get_kmer_size() {

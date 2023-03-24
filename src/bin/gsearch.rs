@@ -107,7 +107,7 @@ pub fn init_log() -> u64 {
 
 
 #[doc(hidden)]
-fn parse_tohnsw(matches : &ArgMatches) -> Result<(), anyhow::Error> {
+fn parse_tohnsw(matches : &ArgMatches) -> Result<(SeqSketcherParams, HnswParams), anyhow::Error> {
     log::debug!("in parse_tohnsw");
     //
     let datadir;
@@ -195,8 +195,65 @@ fn parse_tohnsw(matches : &ArgMatches) -> Result<(), anyhow::Error> {
     let max_nb_conn : u8 = 255.min(nbng as u8);
     let hnswparams = HnswParams::new(1_500_000, ef_construction, max_nb_conn);
     //
-    std::panic!("not yet");
+    return Ok((sketch_params, hnswparams));
 } // end of parse_tohnsw
+
+
+//============================================================================================================
+
+// Parsing request need hnsw database directory and data request dir. 
+// All others args should be extracted from json reloads.
+// The function returns (hnsw_dir, request_dir)
+
+#[doc(hidden)]
+fn parse_request(matches : &ArgMatches) -> Result<(String, String), anyhow::Error> {
+    log::debug!("in parse_request");
+    //
+    let request_dir;
+    if matches.is_present("request_dir") {
+        println!("decoding argument dir");
+        request_dir = matches.value_of("request_dir").ok_or("").unwrap().parse::<String>().unwrap();
+        if request_dir == "" {
+            println!("parsing of request_dir failed");
+            std::process::exit(1);
+        }
+    }
+    else {
+        println!("-r request_dir is mandatory");
+        std::process::exit(1);
+    }
+    let to_check = request_dir.clone();
+    let request_dirpath = Path::new(&to_check);
+    if !request_dirpath.is_dir() {
+        println!("error not a directory : {:?}", &request_dirpath);
+        std::process::exit(1);
+    }
+
+    // parse database dir
+    let database_dir;
+    if matches.is_present("database_dir") {
+        println!("decoding argument dir");
+        database_dir = matches.value_of("database_dir").ok_or("").unwrap().parse::<String>().unwrap();
+        if database_dir == "" {
+            println!("parsing of database_dir failed");
+            std::process::exit(1);
+        }
+    }
+    else {
+        println!("-r database_dir is mandatory");
+        std::process::exit(1);
+    }
+
+    let to_check = database_dir.clone();
+    let database_dirpath = Path::new(&to_check);
+    if !database_dirpath.is_dir() {
+        println!("error not a directory : {:?}", &to_check);
+        std::process::exit(1);
+    }
+    //
+    return Ok((database_dir, request_dir));
+}  // end of parse_request
+
 
 
 //============================================================================================

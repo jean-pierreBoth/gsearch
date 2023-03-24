@@ -271,6 +271,10 @@ pub fn get_sequence_matcher(request_dirpath : &Path, database_dirpath : &Path, p
                 }
             }
         }
+        SketchAlgo::HLL => {
+            return Err(String::from(" HLL not yet in AA sketching")); 
+
+        } // end match HLL
         SketchAlgo::SUPER2 => {
             return Err(String::from(" SuperMinhash2 not yet in AA sketching")); 
         }

@@ -176,9 +176,12 @@ fn main() {
             else if algo == String::from("prob") {
                 sketch_algo = SketchAlgo::PROB3A;
             }
+            else if algo == String::from("hll") {
+                sketch_algo = SketchAlgo::HLL;
+            }
             else {
                 println!("unknown asketching algo");
-                std::panic!("unknown asketching algo");
+                std::panic!("unknown sketching algo");
             }
         }
         // kmer size
@@ -212,7 +215,7 @@ fn main() {
         }
         // do we use block processing, recall that default is yes
         if matches.is_present("seq") {
-            println!("seq option , will process every sequence independantly ");
+            println!("seq option , will process by concatenating and splitting ");
             block_processing = false;
         }
         //
