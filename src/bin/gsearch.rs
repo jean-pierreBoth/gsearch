@@ -199,7 +199,52 @@ fn parse_tohnsw(matches : &ArgMatches) -> Result<(SeqSketcherParams, HnswParams)
 } // end of parse_tohnsw
 
 
+//===========================================================================================================
+
+// parsing add command
+// we need hnsw dir and directory containing new data, returns the 2-uple (dhnsw_dir, newdata_dir)
+
+#[doc(hidden)]
+fn add_tohnsw(matches : &ArgMatches) -> Result<(String, String), anyhow::Error> {
+    log::debug!("in add_tohnsw");
+    //
+    // parse database dir
+    let database_dir;
+    if matches.is_present("database_dir") {
+        println!("decoding argument dir");
+        database_dir = matches.value_of("database_dir").ok_or("").unwrap().parse::<String>().unwrap();
+        if database_dir == "" {
+            println!("parsing of database_dir failed");
+            std::process::exit(1);
+        }
+    }
+    else {
+        println!("-r database_dir is mandatory");
+        std::process::exit(1);
+    }
+    //
+    // parse new data directory
+    //
+    let newdata_dir;
+    if matches.is_present("new_dir") {
+        println!("decoding argument dir");
+        newdata_dir = matches.value_of("newdata_dir").ok_or("").unwrap().parse::<String>().unwrap();
+        if newdata_dir == "" {
+            println!("parsing of newdata_dir failed");
+            std::process::exit(1);
+        }
+    }
+    else {
+        println!("-a newdata_dir is mandatory");
+        std::process::exit(1);
+    }    
+    //
+    std::panic!("not yet");
+} // end of add_tohnsw
+
 //============================================================================================================
+
+
 
 // Parsing request need hnsw database directory and data request dir. 
 // All others args should be extracted from json reloads.
@@ -330,6 +375,7 @@ fn main() {
         )
         .arg(Arg::with_name("add_dir")
             .required(true)
+            .help("set directory containing new data")
             .takes_value(true)
         );
 
@@ -387,6 +433,7 @@ fn main() {
                     .takes_value(true),
             )
             .subcommand(tohnsw_cmd)
+            .subcommand(add_cmd)
             .subcommand(request_cmd)
     .get_matches();
 
