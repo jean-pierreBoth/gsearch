@@ -46,7 +46,7 @@ rayon = {version = "1.5"}
 num_cpus = {version = "1.13.0"}
 
 cpu-time = {version = "1.0"}
-needletail = {version = "0.4"}
+needletail = {version = "0.5.1"}
 clap = {version = "3.2"}
 
 ##
