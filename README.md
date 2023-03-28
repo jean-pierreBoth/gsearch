@@ -1,6 +1,7 @@
+[alt text](https://github.com/jean-pierreBoth/gsearch/blob/master/GSearch-logo.jpg?raw=true)
+
 # Gsearch A rust classifier based on probminhash and HNSW for microbial genomes
 
-[alt text](https://github.com/jean-pierreBoth/gsearch/blob/master/GSearch-logo.jpg?raw=true)
 
 gsearch is the new name of the crate archaea.  It stands for **genomic search**.  
 
