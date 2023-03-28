@@ -98,6 +98,31 @@ impl AnnParameters {
 //=========================================================================================
 
 
+/// Parameters defining a Request in a Hnsw database
+pub struct RequestParams {
+    /// directory containing the Hnsw previous dmps
+    hnsw_dir : String,
+    /// directory containing the request files
+    req_dir : String,
+    /// the number of answers by request
+    nb_answers : usize,
+} // end of RequestParams
+
+impl RequestParams {
+
+    pub fn new(hnsw_dir : String, req_dir : String, nb_answers : usize) -> Self {
+        RequestParams{hnsw_dir, req_dir, nb_answers}
+    }
+
+    /// get 
+    pub fn get_hnsw_dir(&self) -> &String { &self.hnsw_dir}
+
+    pub fn get_req_dir(&self) -> &String { &self.req_dir}
+
+    pub fn get_nb_answers(&self) -> usize { self.nb_answers}
+}
+
+
 
 //==========================================================================================
 
@@ -196,19 +221,21 @@ pub struct ComputingParams {
     nb_files_par : usize,
     /// set to true when we increase a hnsw database
     adding_mode : bool,
+    ///
+    add_dir : String,
 }
 
 
 impl Default for ComputingParams {
     fn default() -> Self {
-        ComputingParams{nb_files_par: 0 , adding_mode: false}
+        ComputingParams{nb_files_par: 0 , adding_mode: false, add_dir : String::from("")}
     }
 }
 
 
 impl ComputingParams {
-    pub fn new(nb_files_par : usize, adding_mode : bool) -> Self {
-        ComputingParams{nb_files_par, adding_mode}
+    pub fn new(nb_files_par : usize, adding_mode : bool, add_dir : String) -> Self {
+        ComputingParams{nb_files_par, adding_mode, add_dir}
     }
 
     pub fn get_parallel_io(&self) -> bool {
@@ -230,5 +257,9 @@ impl ComputingParams {
 
     pub fn get_adding_mode(&self) -> bool {
         self.adding_mode
+    }
+
+    pub fn get_add_dir(&self) -> &String {
+        &self.add_dir
     }
 } // end of ComputingParams

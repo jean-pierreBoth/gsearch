@@ -12,12 +12,10 @@ description = "genome classification, probminhash hnsw, genome search"
 
 [[bin]]
 
-name= "tohnsw"
-path= "src/bin/tohnsw.rs"
+name= "gsearchbin"
+path = "src/bin/gsearch.rs"
 
-[[bin]]
-name= "request"
-path= "src/bin/request/main.rs"
+
 
 
 [lib]
@@ -47,21 +45,21 @@ num_cpus = {version = "1.13.0"}
 
 cpu-time = {version = "1.0"}
 needletail = {version = "0.5"}
-clap = {version = "3.2"}
+clap = {version = "4.1"}
 fxhash = {version = "0.2"}
 ##
 
 # probminhash = {version = "0.1.8"}
-# probminhash = {git = "https://github.com/jean-pierreBoth/probminhash"}
-probminhash = {path = "../probminhash"}
+probminhash = {git = "https://github.com/jean-pierreBoth/probminhash"}
+# probminhash = {path = "../probminhash"}
 
-# hnsw_rs =  {version = "0.1.19"}
+hnsw_rs =  {version = "0.1.19"}
 # hnsw_rs =  {git = "https://github.com/jean-pierreBoth/hnswlib-rs"}
 # nsw_rs = {git = "https://gitlab.com/jpboth/hnswlib-rs.git"}
-hnsw_rs = {path = "../hnswlib-rs"}
+#hnsw_rs = {path = "../hnswlib-rs"}
 
-kmerutils = {path = "../kmerutils"}
-# kmerutils = {git = "https://github.com/jean-pierreBoth/kmerutils"}
+#kmerutils = {path = "../kmerutils"}
+kmerutils = {git = "https://github.com/jean-pierreBoth/kmerutils"}
 # kmerutils = {git = "https://gitlab.com/jpboth/kmerutils.git"}
 #kmerutils = {version = "0.0.8"}
 
@@ -74,7 +72,8 @@ log = { version = "0.4"}
 env_logger = { version = "0.9"}
 
 # optional dependency to embed hnsw graph
-annembed = {version = "0.0.9", optional = true}
+#annembed = {version = "0.0.10", optional = true}
+annembed = {git = "https://github.com/jean-pierreBoth/annembed", optional=true}
 #annembed = {path = "../annembed", optional = true}
 
 

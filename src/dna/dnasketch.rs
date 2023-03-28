@@ -21,10 +21,12 @@ use hnsw_rs::prelude::*;
 
 use kmerutils::base::{kmergenerator::*, Kmer32bit, Kmer64bit, CompressedKmerT};
 use kmerutils::sketching::seqsketchjaccard::{SeqSketcherT, ProbHash3aSketch, SuperHashSketch, HyperLogLogSketch, SuperHash2Sketch};
+use kmerutils::sketcharg::DataType;
+
 use probminhash::{setsketcher::SetSketchParams};
 
 use crate::utils::{idsketch::*, reloadhnsw};
-use crate::utils::files::{process_dir,process_dir_parallel, ProcessingState, DataType};
+use crate::utils::files::{process_dir,process_dir_parallel, ProcessingState};
 
 use crate::dna::dnafiles::{process_file_in_one_block, process_buffer_in_one_block, process_file_concat_split};
 

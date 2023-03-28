@@ -86,12 +86,6 @@ impl ProcessingState {
 
 
 
-///
-/// enum to store if we are doing DNA or AA sequence processing mode
-pub enum DataType {
-    DNA,
-    AA,
-}
 
 //==================================================================================
 

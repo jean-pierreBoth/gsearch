@@ -5,37 +5,67 @@
 // This file may not be copied, modified, or distributed except according to those terms.
 
 
-//! Module tohnsw 
-//! gsearch tohnsw --dir [-d] dir --sketch [-s] size --nbng [-n] nb --ef m [--seq]
-//! 
-//! --dir : the name of directory containing tree of DNA files or Amino Acid files. 
-//!   
-//! --sketch gives the size of probminhash sketch (integer value). Mandatory value.  
-//! 
-//! --algo specifiy the sketching algorithm to be used. Default is ProbMinhash. SuperMinHash can specified by --algo super.
-//!         passing --algo prob   for asking ProbMinhash is possible
-//! 
-//! --kmer [-k] gives the size of kmer to use for generating probminhash (integer value). Mandatory argument. 
+//! Module gsearch
 //!  
-//! --nbng [-n] gives the number of neihbours required in hnsw construction at each layer, in the range 24-64 is usual
+//! The commands admits 2 flags and 4 subcommands
+//! 
+//! The flags:
+//! 
+//!     --aa : set if data to process are Amino Acid sequences. Default is DNA.
+//! 
+//!     --pio : option to read compressed files and then parallelize decompressing/fasta parsing. 
+//!         Useful, with many cores if io lags behind hashing/hnsw insertion. to speed up io.  
+//!         **Necessary to limit/custom the number of files or sequences simultanuously loaded in memory if files are very large (tens of Gb)**.
+//! 
+//! 
+//! The 4 subcommands possible are to :
+//! 
+//!     - construct a hnsw database,  
+//!  
+//!     - adding elements in a already constructed hnsw database
+//! 
+//!     - search in hnsw database
+//! 
+//!     - ask neighbourhood statistics in the database and possibly ask for an embedding.
+//!  
+//! 1. ## subcommand tohnsw --dir [-d] dir --sketch [-s] size --nbng [-n] nb --ef m [--seq]
+//! 
+//!     * \--dir : the name of directory containing tree of DNA files or Amino Acid files. 
+//!   
+//!     * \--sketch gives the size of probminhash sketch (integer value). Mandatory value.  
+//! 
+//!     * \--algo specifiy the sketching algorithm to be used. 
+//! 
+//!         SuperMinHash can specified by --algo super, --algo prob for asking ProbMinhash or --algo hll for hyperloglog sketching. 
+//! 
+//! 
+//!     * \--kmer [-k] gives the size of kmer to use for generating probminhash (integer value). Mandatory argument. 
+//!  
+//!     * \--nbng [-n] gives the number of neihbours required in hnsw construction at each layer, in the range 24-64 is usual
 //!             it doest not means you cannot ask for more neighbours in request.
 //! 
-//!  --ef optional integer value to optimize hnsw structure creation (default to 400)  
+//!     * \--ef optional integer value to optimize hnsw structure creation (default to 400)  
 //! 
-//!  --seq if we want a processing by sequences. Default is to concatenate all sequneces in a file
+//!     * \--seq if we want a processing by sequences. Default is to concatenate all sequneces in a file
 //!             in a large sequence.
+//!  
 //! 
-//!  --aa : set if data to process are Amino Acid sequences. Default is DNA
+//! 2. **sub command add : This command dedicated to adding new data to a hnsw structure.**.  
+//!      The program reloads a previous dump of the hnsw structures.  
+//!      tohnsw must (presently) be launched from the directory
+//!      containing the dump as the program looks for the files "hnswdump.hnsw.data" and "hnswdump.hnsw.graph" created previously.  
+//!      *In this case parameters corresponding to options --kmer  --sketch --nbng --ef and --algo are reloaded from file parameters.json*  .
+//!      It is useless to pass them in command line.  
+//!
+//!
+//! 3. **sub command request** 
 //! 
-//!  --pio : option to read compressed files and then parallelize decompressing/fasta parsing. 
-//!         Useful, with many cores if io lags behind hashing/hnsw insertion. to speed up io.  
-//!         **Necessary to limit/custom the number of files or sequences simultanuously loaded in memory if files are very large (tens of Gb)**.  
-//! 
-//! --add : This option is dedicated to adding new data to a hnsw structure.  
-//!         The program reloads a previous dump of the hnsw structures. tohnsw must (presently) be launched from the directory
-//!         containing the dump as the program looks for the files "hnswdump.hnsw.data" and "hnswdump.hnsw.graph" created previously.  
-//!         **In this case parameters corresponding to options --kmer  --sketch --nbng --ef and --algo are reloaded from file parameters.json**.  
-//!         It is useless to pass them in command line.
+//!  request --database [-b] basedirname --query [-r]  requestdir -n neighbours
+//!     * \--database is the name of directory containing hnsw dump files and seqdict dump
+//!     * \--requestdir is a directory containing list of fasta file containing sequence to search for
+//!     * -n number of neighbours asked for. number of neighbours used in possible ann directive
+
+//! 4. sub command ann
 
 // must loop on sub directories , open gzipped files
 // extracts complete genomes possiby many in one file (get rid of capsid records if any)
@@ -47,30 +77,8 @@
 // hnsw should also run in a query server mode after insertion.
 
 
-
-//! Module request
-//! try to match fasta sequence with repsect to database
-//! 
-//! gsearch request --database [-b] basedirname --query [-r]  requestdir -n neighbours \[ann\]
-//! 
-//! - database is the name of directory containing hnsw dump files and seqdict dump
-//! - requestdir is a directory containing list of fasta file containing sequence to search for
-//!  
-//! -n number of neighbours asked for. number of neighbours used in possible ann directive
-//! 
-//! --pio : option to read compressed request files and then parallelize decompressing/fasta parsing. 
-//!         Useful, with many cores if io lags behind hashing, to speed up io.  
-//!         **The number of files or sequences simultanuously loaded in memory must be limited to fit in memory if files are very large (tens of Gb)**.  
-//! 
-//! 
-//! --aa : set if data to process are Amino Acid sequences. Default is DNA
-//!
-//! \[ann\] is an optional subcommand asking for some statistics on distances between hnsw items or get an embedding of data
-//!     --stats gives statistics on distances between neighbours
-//!     --embed does a 2 dimensional embedding using the crate [annembed](https://crates.io/crates/annembed).
-//! 
-//! In fact as in basedirname there must be a file (processingparams.json) specifying sketch size and kmer size, these
-//! 2 options are useless in standard mode.
+//In fact as in basedirname there must be a file (processingparams.json) specifying sketch size and kmer size, these
+// 2 options are useless in standard mode.
 
 // We can use the same structure as the tohnsw module
 // We parse a directory and send to a thread that do sketching and query
@@ -79,7 +87,7 @@
 
 
 
-use clap::{Arg, ArgMatches, Command, ArgAction, arg};
+use clap::{Arg, ArgMatches, Command, ArgAction};
 
 use std::path::Path;
 
@@ -94,9 +102,31 @@ use gsearch::utils::*;
 use kmerutils::sketcharg::{SketchAlgo, SeqSketcherParams};
 
 //mod files;
-use gsearch::utils::*;
 use gsearch::dna::dnarequest;
 use gsearch::aa::aarequest;
+
+// parsing add command
+// we need hnsw dir and directory containing new data, returns the 2-uple (hnsw_dir, newdata_dir)
+
+#[derive(Clone, Debug)]
+pub struct AddParams {
+    pub(crate) hnsw_dir : String,
+    //
+    pub(crate) newdata_dir : String,
+} // end of AddParams
+
+
+impl AddParams {
+
+    pub fn get_hnsw_dir(&self) -> &String { &self.hnsw_dir}
+
+    pub fn get_newdata_dir(&self) -> &String { &self.newdata_dir}
+
+}
+
+
+
+//=======================================================================================
 
 
 // install a logger facility
@@ -178,7 +208,6 @@ fn parse_tohnsw_cmd(matches : &ArgMatches) -> Result<(String, ProcessingParams),
     else {
         panic!(" kmer size is mandatory");
     }
-    let sketch_params =  SeqSketcherParams::new(*kmer_size as usize, *sketch_size as usize, sketch_algo);  
     //
     let nbng: &usize;
     if matches.contains_id("neighbours") {
@@ -202,6 +231,18 @@ fn parse_tohnsw_cmd(matches : &ArgMatches) -> Result<(String, ProcessingParams),
         println!("seq option , will process by concatenating");
         true
     };
+
+    let data_t = if matches.contains_id("aa") {
+        println!("aa option , processing of AA sequences");
+        DataType::AA
+    }
+    else {
+        println!("processing of DNA sequences");
+        DataType::DNA
+    };
+
+    let sketch_params =  SeqSketcherParams::new(*kmer_size as usize, *sketch_size as usize, sketch_algo, data_t);  
+
     // max_nb_conn must be adapted to the number of neighbours we will want in searches.  
     // Maximum allowed nbng for hnswlib-rs is 256. Larger nbng will not work and default to 256.
     let max_nb_conn : u8 = 255.min(*nbng as u8);
@@ -214,15 +255,6 @@ fn parse_tohnsw_cmd(matches : &ArgMatches) -> Result<(String, ProcessingParams),
 
 //===========================================================================================================
 
-// parsing add command
-// we need hnsw dir and directory containing new data, returns the 2-uple (hnsw_dir, newdata_dir)
-
-#[derive(Clone, Debug)]
-struct AddParams {
-    pub(crate) hnsw_dir : String,
-    //
-    pub(crate) newdata_dir : String,
-} // end of AddParams
 
 
 #[doc(hidden)]
@@ -267,14 +299,6 @@ fn parse_add_cmd(matches : &ArgMatches) -> Result<AddParams, anyhow::Error> {
 
 //============================================================================================================
 
-struct RequestParams {
-    pub(crate) hnsw_dir : String,
-    //
-    pub(crate) req_dir : String,
-    //
-    pub(crate) nb_answers : usize,
-} // end of RequestParams
-
 
 // Parsing request need hnsw database directory and data request dir. 
 // All others args should be extracted from json reloads.
@@ -284,13 +308,9 @@ struct RequestParams {
 fn parse_request_cmd(matches : &ArgMatches) -> Result<RequestParams, anyhow::Error> {
     log::debug!("in parse_request");
     //
-    let request_dir : &String;
-    if matches.contains_id("request_dir") {
-        println!("decoding argument dir");
-        request_dir = matches.get_one("request_dir").unwrap();  // as arg is required, we unwrap() !
-    }
+    let to_check: &String = matches.get_one("request_dir").unwrap();  // as arg is required, we unwrap() !
     //
-    let to_check = request_dir.clone();
+    let  request_dir = to_check.clone();
     let request_dirpath = Path::new(&to_check);
     if !request_dirpath.is_dir() {
         println!("error not a directory : {:?}", &request_dirpath);
@@ -298,30 +318,46 @@ fn parse_request_cmd(matches : &ArgMatches) -> Result<RequestParams, anyhow::Err
     }
 
     // parse database dir
-    let database_dir : &String;
-    if matches.contains_id("database_dir") {
-        println!("decoding argument dir");
-        database_dir = matches.get_one("database_dir").unwrap();
-    }
-    let to_check = database_dir.clone();
-    let database_dirpath = Path::new(&to_check);
+    let to_check : &String = matches.get_one("database_dir").unwrap();
+    let database_dir = to_check.clone();
+    let database_dirpath = Path::new(&database_dir);
     if !database_dirpath.is_dir() {
-        println!("error not a directory : {:?}", &to_check);
+        println!("error not a directory : {:?}", &database_dir);
         std::process::exit(1);
     }
     // decode nb_answers
-    let nb_answers : usize;
-    if matches.contains_id("nb_answers") {
-        nb_answers = *matches.get_one("nb_answers").unwrap();
-        println!("nb answers {}", nb_answers);
-    }    
+    let nb_answers = *matches.get_one("nb_answers").unwrap();
+    println!("nb answers {}", nb_answers);   
     //
-    let req_params = RequestParams{hnsw_dir: database_dir.clone(), req_dir :  request_dir.clone(), nb_answers};
+    let req_params = RequestParams::new(database_dir.clone(), request_dir.clone(), nb_answers);
     return Ok(req_params);
 }  // end of parse_request_cmd
 
+//==========================================================================================
 
+    // parse ann command
 
+pub fn parse_ann_cmd( matches : &ArgMatches) -> Result<AnnParameters, anyhow::Error> {
+    log::debug!("in parse_ann_cmd");
+    let ask_stats = matches.get_flag("stats");
+    let embed = matches.get_flag("embed");
+    if ask_stats {
+        log::info!("ann cmd with stats flag")
+    }
+    //
+    if embed {
+        log::info!("ann cmd with embed flag")
+    }
+    if !ask_stats && !embed {
+        log::error!("ann cmd without flag");
+        std::panic!("ann cmd without flag");
+    }
+    //
+    let ann_params = AnnParameters::new(ask_stats, embed);
+    //
+    return Ok(ann_params);
+} // end of parse_ann_cmd
+ 
 //============================================================================================
 
 // we 
@@ -385,14 +421,14 @@ fn main() {
             .help("specifiy the algorithm to use for sketching: prob, super or hll")
             .value_parser(clap::value_parser!(String))
         )
+        .arg(Arg::new("aa")                   // do we process amino acid file
+            .long("aa")
+            .value_name("AA")
+            .help("Specificy amino acid processing")
+        )
         .arg(Arg::new("seq")
             .long("seq")
-            .help("--seq to get a processing by sequence"))
-        .arg(Arg::new("add")
-            .long("add")
-            .help("add to an existing HNSW index/database")
-            .required(false)
-            .value_name("add")
+            .help("--seq to get a processing by sequence")
     );
 
 
@@ -410,7 +446,7 @@ fn main() {
             .required(true)
             .help("set directory containing new data")
             .value_parser(clap::value_parser!(String))
-        );
+    );
 
 
     let request_cmd =  Command::new("request")
@@ -442,8 +478,19 @@ fn main() {
             .value_parser(clap::value_parser!(String))
             .required(true)
     );
-
-
+    // ann command
+    let ann_cmd = Command::new("ann")
+        .about("annembed usage")
+        .arg(Arg::new("stats")
+            .long("stats")
+            .short('s')
+            .action(ArgAction::SetTrue)
+            .help("to get stats on nb neighbours"))
+        .arg(Arg::new("embed")
+            .long("embed")
+            .action(ArgAction::SetTrue)
+            .help("--embed to do an embedding")
+    );
     //
     // the global command
     //
@@ -451,12 +498,6 @@ fn main() {
         .version("0.1.1")
         .about("Approximate nearest neighbour search for microbial genomes based on minhash metric")
             .arg_required_else_help(true)
-            .arg(Arg::new("aa")                   // do we process amino acid file
-                .long("aa")
-                .value_name("AA")
-                .help("Specificy amino acid processing")
-                .required(false)
-            )
             .arg(Arg::new("pario")                // do we use parallel io
                 .long("pio")
                 .value_name("pio")
@@ -466,46 +507,32 @@ fn main() {
         .subcommand(tohnsw_cmd)
         .subcommand(add_cmd)
         .subcommand(request_cmd)
+        .subcommand(ann_cmd)
     .get_matches();
 
-    // decode -aa and --pio options
-    let data_type;
-    if matches.contains_id("aa") {
-        println!("data to processs are AA data ");
-        data_type = DataType::AA;
-    }
-    else {
-        println!("data to processs are DNA data ");
-        data_type = DataType::DNA;            
-    }
     // now we fill other parameters : parallel fasta parsing and adding mode in hnsw
-    let nb_files_par : usize;
-    if matches.contains_id("pario") {
-        let nb_files_par: usize = *matches.get_one("pario").unwrap_or(&0usize);
-        println!("parallel io, nb_files_par : {}", nb_files_par);
-    }
-    else {
-        nb_files_par = 0;
-    }
+    let nb_files_par: usize = *matches.get_one("pario").unwrap_or(&0usize);
+    println!("parallel io, nb_files_par : {}", nb_files_par);
     //
     let hnsw_dir : String;
-    let processing_params;
-    let hnsw_params : HnswParams;
-    let seqsketch_params : SeqSketcherParams;
+    let mut processing_params: Option<ProcessingParams> = None;
     //
     // treat tohnsw command
     //
-    let mut nb_cmd = 0;
     let cmd : CmdType;
-
+    let mut add_params_opt : Option<AddParams> = None;
+    let mut req_params_opt : Option<RequestParams> = None;
+    let mut addseq = false;
+    //
+    // which command do we have
+    //
     if let Some(tohnsw_match) = matches.subcommand_matches("tohnsw") {
-        nb_cmd += 1;
         log::debug!("subcommand_matches got tohnsw command");
         let res = parse_tohnsw_cmd(tohnsw_match); 
         cmd = CmdType::TOHNSW;   
         match res {
             Ok(params) => { hnsw_dir = params.0;
-                                                        processing_params = params.1; },
+                                                        processing_params = Some(params.1); },
             _          => { 
                             log::error!("parsing tohnsw command failed");
                             println!("exiting with error {}", res.as_ref().err().as_ref().unwrap());
@@ -514,20 +541,11 @@ fn main() {
                         },
         }
     } // end of tohnsw
-
-    let mut addseq = false;
-    let add_params_opt : Option<AddParams> = None;
-    if let Some(add_match) = matches.subcommand_matches("add") {
+    else if let Some(add_match) = matches.subcommand_matches("add") {
+        // parsing add command
         log::debug!("subcommand_matches got add command"); 
-        if nb_cmd >= 1 {
-            log::error!("only one main subcommand is possible, tohnsw, add or request");
-            std::panic!("only one main subcommand is possible, tohnsw, add or request");
-        }
-        else {
-            cmd = CmdType::ADD;
-            addseq = true;
-        }
-        nb_cmd += 1;
+        cmd = CmdType::ADD;
+        addseq = true;
         let res = parse_add_cmd(add_match);
         match res {
             Ok(params) => {
@@ -540,21 +558,12 @@ fn main() {
                             std::process::exit(1);                  
                         }
         }  
+        hnsw_dir = add_params_opt.as_ref().unwrap().get_hnsw_dir().clone();
     }  // end of parsing add parameters
-
-    // parsing request parameters
-
-    let req_params_opt : Option<RequestParams> = None;
-    if let Some(req_match) = matches.subcommand_matches("request") {
+    else if let Some(req_match) = matches.subcommand_matches("request") {
+        // parsing request parameters
         log::debug!("subcommand_matches got request command"); 
-        if nb_cmd >= 1 {
-            log::error!("only one main subcommand is possible, tohnsw, add or request");
-            std::panic!("only one main subcommand is possible, tohnsw, add or request");
-        }
-        else {
-            cmd = CmdType::REQUEST;
-        }
-        nb_cmd += 1;
+        cmd = CmdType::REQUEST;
         let res = parse_request_cmd(req_match);
         match res {
             Ok(params) => { 
@@ -567,13 +576,26 @@ fn main() {
                             std::process::exit(1);                  
                         }
         }
+        hnsw_dir = req_params_opt.as_ref().unwrap().get_hnsw_dir().clone();
     } // end of request
+    else {
+        log::error!("at least one command  tohnnsw, add or request must be given");
+        std::panic!("at least one command  tohnnsw, add or request must be given");
+    }
 
+    let ann_params : AnnParameters;
+    if let Some(ann_match) = matches.subcommand_matches("ann") {
+        log::debug!("subcommand_matches got ann command"); 
+        ann_params = parse_ann_cmd(ann_match).unwrap();
+    }
+    else {
+        ann_params = AnnParameters::new(false, false)
+    }
     //
     // Now we have parsed commands
     //
-    let computing_params = ComputingParams::new(nb_files_par, addseq);
-
+    let add_dir = if addseq { add_params_opt.as_ref().unwrap().get_hnsw_dir().clone() } else { String::from("")};
+    let computing_params = ComputingParams::new(nb_files_par, addseq, add_dir);
 
     match cmd {
         CmdType::TOHNSW => {  // nothing to do we must have parsed before
@@ -582,64 +604,102 @@ fn main() {
                            log::info!("reloading parameters from previous runs, in the current directory"); 
                             let cwd = std::env::current_dir().unwrap();
                             let reload_res = ProcessingParams::reload_json(&cwd);
-                                if reload_res.is_ok()  {
-                                    processing_params = reload_res.unwrap()
-                                }
+                            if reload_res.is_ok()  {
+                                processing_params = Some(reload_res.unwrap());
+                            }
                             else {
                                 std::panic!("cannot reload parameters (file parameters.json) from dir : {:?}", &cwd);
                             }
             },  // end of cae not TOHNSW
     };  // end of match
 
+    let filter_params = FilterParams::new(0);
+    if processing_params.is_none() {
+        log::error!("error in processing command line, could not initilize ProcessingParams");
+        std::panic!("error in processing command line, could not initilize ProcessingParams");
+    }
+
+    let processing_params = processing_params.unwrap();
 
     match cmd {
-        CmdType::TOHNSW     => { treat_into_hnsw(); }
-        CmdType::ADD        => { treat_into_hnsw(); }
-        CmdType::REQUEST    => { treat_from_hnsw(); }
+        CmdType::TOHNSW     => { treat_into_hnsw(&hnsw_dir, &filter_params, &processing_params, &computing_params); }
+
+        CmdType::ADD        => { treat_into_hnsw(&hnsw_dir, &filter_params, &processing_params, &computing_params); }
+
+        CmdType::REQUEST    => { 
+                                    if req_params_opt.is_none() {
+                                        log::error!("could not initialize request parameters");
+                                        std::panic!("could not initialize request parameters");
+                                    }
+                                    treat_from_hnsw(req_params_opt.as_ref().unwrap(), &filter_params, 
+                                                                &processing_params,
+                                                                &computing_params,
+                                                                &ann_params); }
     }
-/* 
-    let matches = App::new("gsearch")
-        .version("0.1.1")
-        .author("Jean Pierre-Both <jeanpierre.both@gmail.com> and Jianshu Zhao <jianshu.zhao@gatech.edu>")
-        .about("Approximate nearest neighbour search for microbial genomes based on minhash metric")
-        .subcommand(
-                    SubCommand::with_name("ann")
-                        .about("An approximate nearest neighbor embedding with annembed")
-                        .arg(
-                            Arg::new("embed")
-                                .long("embed")
-                                .value_name("EMBEDDING")
-                                .help("perform embedding")
-                                .required(false),
-                        )
-                        .arg(
-                            Arg::new("stats")
-                                .long("stats")
-                                .value_name("STATS")
-                                .required(false)
-                                .help("Displays stats for the ANN/HNSW graph")
-                        ),
-                ) // end ann subcommand
-            )
-        )
-    ).get_matches();
-    */
 }  // end of main
 
 
 //====================================================================
 
 // function to create or add data into a hnsw database
-fn treat_into_hnsw(hnswdir : &String, filter_params : &FilterParams, processing_parameters : &ProcessingParams, other_params : ComputingParams) {
-    // do not filter small seqs when running file in a whole block
-     let filter_params = FilterParams::new(0);
+fn treat_into_hnsw(hnswdir : &String, filter_params : &FilterParams, processing_params : &ProcessingParams, computing_parameters : &ComputingParams) {
      //
+     let dirpath = Path::new(hnswdir);
+     let data_type =  processing_params.get_sketching_params().get_data_t();
      match data_type {
-         DataType::DNA => dna_process_tohnsw(&dirpath, &filter_params, &processing_parameters, &other_params),
-         DataType::AA => aa_process_tohnsw(&dirpath, &filter_params, &processing_parameters, &other_params),
+         DataType::DNA => dna_process_tohnsw(&dirpath, &filter_params, &processing_params, &computing_parameters),
+         DataType::AA => aa_process_tohnsw(&dirpath, &filter_params, &processing_params, &computing_parameters),
      }
 } // end of treat_into_hnsw
 
 
+
+
 // function to answer request from a hnsw database 
-fn treat_from_hnsw() {}
+fn treat_from_hnsw(request_params : &RequestParams, filter_params : &FilterParams, processing_params : &ProcessingParams, 
+        computing_params : &ComputingParams, ann_params : &AnnParameters) {
+
+    let database_dir = request_params.get_hnsw_dir();
+    let data_type =  processing_params.get_sketching_params().get_data_t();
+    let ef_search = 5000;   // TODO ...
+    // reload SeqDict
+    let database_dirpath = Path::new(&database_dir);
+    let seqname = database_dirpath.join("seqdict.json");
+    log::info!("\n reloading sequence dictionary from {}", &seqname.display());
+    let seqdict = SeqDict::reload_json(&seqname);
+    let seqdict = match seqdict {
+        Ok(seqdict ) => seqdict ,
+        _ => {
+            panic!("SeqDict reload from dump file  {} failed", seqname.display());
+        }            
+    };
+    log::info!("reloading sequence dictionary from {} done", &seqname.display());
+    // we have everything we want...
+    match data_type {
+        DataType::DNA => {
+            if let Ok(mut seq_matcher) = dnarequest::get_sequence_matcher(request_params, &processing_params, 
+                        &filter_params, &ann_params, &computing_params, &seqdict, ef_search) {
+                if processing_params.get_block_flag() == false {
+                    log::info!("sequence mode, trying to analyze..");
+                    let _= seq_matcher.analyze();
+                }
+            }
+            else {
+                panic!("Error occurred in dnarequest::get_sequence_matcher");
+            }
+        }  // end DNA case
+        DataType::AA => {
+            if let Ok(mut seq_matcher) = aarequest::get_sequence_matcher(request_params, &processing_params, 
+                        &filter_params, &ann_params, &computing_params, &seqdict,ef_search) {
+                if processing_params.get_block_flag() == false {
+                    log::info!("sequence mode, trying to analyze..");
+                    let _= seq_matcher.analyze();
+                }
+            }
+            else {
+                panic!("Error occurred in aarequest::get_sequence_matcher");
+            } 
+        } // end of AA case
+    }  // end of match on sequence type
+    // 
+} // end of treat_from_hnsw

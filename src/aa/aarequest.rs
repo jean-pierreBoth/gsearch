@@ -21,7 +21,7 @@ use kmerutils::aautils::seqsketchjaccard::*;
 
 use crate::utils::{idsketch::*};
 use crate::utils::files::{process_dir,ProcessingState};
-
+use crate::utils::parameters::{RequestParams};
 
 
 use crate::utils::*;
@@ -219,11 +219,15 @@ fn sketch_and_request_dir_compressedkmer<Kmer:CompressedKmerT + KmerBuilder<Kmer
 
 
 // This function returns paired sequence by probminhash and hnsw 
-pub fn get_sequence_matcher(request_dirpath : &Path, database_dirpath : &Path, processing_params : &ProcessingParams,
+pub fn get_sequence_matcher(request_params : &RequestParams, processing_params : &ProcessingParams,
             filter_params : &FilterParams, ann_params: &AnnParameters,  other_params : &ComputingParams, seqdict : &SeqDict, 
-            nbng : u16, ef_search : usize) -> Result<Matcher, String> {
+            ef_search : usize) -> Result<Matcher, String> {
     //
     let sketch_params = processing_params.get_sketching_params();
+    let database_dirpath = Path::new(request_params.get_hnsw_dir());
+    let request_dirpath = Path::new(request_params.get_req_dir());
+    let nbng = request_params.get_nb_answers();
+    //
     let kmer_size = sketch_params.get_kmer_size();
     log::info!("sketch params reloaded kmer size : {}, sketch size {}", kmer_size, sketch_params.get_sketch_size());
     let matcher : Matcher;

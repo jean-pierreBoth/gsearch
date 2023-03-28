@@ -17,9 +17,10 @@ use hnsw_rs::prelude::*;
 use kmerutils::base::kmertraits::*;
 use kmerutils::aautils::kmeraa::*;
 use kmerutils::aautils::seqsketchjaccard::{SeqSketcherAAT, ProbHash3aSketch, SuperHashSketch};
+use kmerutils::sketcharg::DataType;
 
 use crate::utils::{idsketch::*, reloadhnsw};
-use crate::utils::files::{process_dir, process_dir_parallel, ProcessingState, DataType};
+use crate::utils::files::{process_dir, process_dir_parallel, ProcessingState};
 use crate::aa::aafiles::{process_aafile_in_one_block, process_aabuffer_in_one_block};
 
 
