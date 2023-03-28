@@ -35,10 +35,8 @@ The Dictionary is dumped in a json file *seqdict.json*
 
 ## Requests
 
-For requests  the module ***request*** is being used. It reloads the dumped files, hnsw and seqdict related
+For requests  the subcommand ***request*** is being used. It reloads the dumped files, hnsw and seqdict related
 takes a list of fasta files containing requests and for each fasta file dumps the asked number of nearest neighbours.
-
-## Usage
 
 ## Simple case for install
 
@@ -88,10 +86,16 @@ sudo spctl --master-disable
 
 ### and then
 
-tohnsw -h
-request -h
+gsearchbin -h
 
-### request neighbours for each genomes (fna, fasta, faa et.al. are supported) in query_dir_nt or aa using pre-built database
+```
+
+## usage
+
+We give here an example of utilization with prebuilt databases.
+
+```bash
+### download neighbours for each genomes (fna, fasta, faa et.al. are supported) in query_dir_nt or aa using pre-built database
 
 wget <http://enve-omics.ce.gatech.edu/data/public_gsearch/GTDB_r207_hnsw_graph.tar.gz>
 tar xzvf ./GTDB_r207_hnsw_graph.tar.gz
@@ -105,24 +109,24 @@ cd ./GTDB_r207_hnsw_graph/nucl
 
 ### request neighbors for nt genomes (here -n is how many neighbors you want to return for each of your query genome)
 
-request -b ./ -r ../../test_data/query_dir_nt -n 50
+gsearchbin request -b ./ -r ../../test_data/query_dir_nt -n 50
 
 ### or request neighbors for aa genomes (predicted by Prodigal or FragGeneScanRs)
 
 cd ./GTDB_r207_hnsw_graph/prot
-request -b ./ -r ../../test_data/query_dir_aa -n 50 --aa
+gsearchbin request -b ./ -r ../../test_data/query_dir_aa -n 50 --aa
 
 ### or request neighbors for aa universal gene (extracted by hmmer according to hmm files from gtdb, we also provide one in release page)
 
 cd ./GTDB_r207_hnsw_graph/universal
-request -b ./ -r ../../test_data/query_dir_universal_aa -n 50 --aa
+gsearchbin request -b ./ -r ../../test_data/query_dir_universal_aa -n 50 --aa
 
 ### Building database. database is huge in size, users are welcome to download gtdb database here: (<https://data.ace.uq.edu.au/public/gtdb/data/releases/release207/207.0/genomic_files_reps/gtdb_genomes_reps_r207.tar.gz>) and here (<https://data.ace.uq.edu.au/public/gtdb/data/releases/release207/207.0/genomic_files_reps/gtdb_proteins_aa_reps_r207.tar.gz>)
 
 ### build database given genome file directory, fna.gz was expected. L for nt and .faa or .faa.gz for --aa. Limit for k is 32 (15 not work due to compression), for s is 65535 (u16) and for n is 255 (u8)
 
-tohnsw -d db_dir_nt -s 12000 -k 16 --ef 1600 -n 128
-tohnsw -d db_dir_aa -s 12000 -k 7 --ef 1600 -n 128 --aa
+gsearchbin tohnsw -d db_dir_nt -s 12000 -k 16 --ef 1600 -n 128
+gsearchbin tohnsw -d db_dir_aa -s 12000 -k 7 --ef 1600 -n 128 --aa
 
 ### When there are new genomes  after comparing with the current database (GTDB v207, e.g. ANI < 95% with any genome after searcing, corresponding to >0.875 ProbMinHash distance), those genomes can be added to the database
 
@@ -132,12 +136,12 @@ cd ./GTDB_r207_hnsw_graph/nucl
 
 ### old .graph,.data and all .json files will be updated to the new one. Then the new one can be used for requesting as an updated database
 
-tohnsw -d db_dir_nt (new genomes directory) -s 12000 -k 16 --ef 1600 -n 128 --add
+gsearchbin tohnsw -d db_dir_nt (new genomes directory) -s 12000 -k 16 --ef 1600 -n 128 --add
 
 ### or add at the amino acid level
 
 cd ./GTDB_r207_hnsw_graph/prot
-tohnsw -d db_dir_nt (new genomes directory in AA format predicted by prodigal/FragGeneScanRs) -s 12000 -k 16 --ef 1600 -n 128 --aa --add
+gsearchbin tohnsw -d db_dir_nt (new genomes directory in AA format predicted by prodigal/FragGeneScanRs) -s 12000 -k 16 --ef 1600 -n 128 --aa --add
 
 ```
 
