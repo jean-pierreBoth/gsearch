@@ -103,8 +103,9 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT+KmerBuilder<Kmer>, Ske
     // Sketcher allocation, we do not need reverse complement hashing as we sketch assembled genomes. (Jianshu Zhao)
     //
     let kmer_hash_fn = | kmer : &Kmer | -> Kmer::Val {
+        let canonical =  kmer.reverse_complement().min(*kmer);
         let mask : Kmer::Val = num::NumCast::from::<u64>((0b1 << 2*kmer.get_nb_base()) - 1).unwrap();
-        let hashval = kmer.get_compressed_value() & mask;
+        let hashval = canonical.get_compressed_value() & mask;
         hashval
     };
     // to send IdSeq to sketch from reading thread to sketcher thread
