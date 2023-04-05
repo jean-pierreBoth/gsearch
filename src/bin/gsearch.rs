@@ -13,7 +13,7 @@
 //! 
 //!     --aa : set if data to process are Amino Acid sequences. Default is DNA.
 //! 
-//!     --pio : option to read compressed files and then parallelize decompressing/fasta parsing. 
+//!     --pio nbfile : option to read compressed filesby blocks of n files then parallelize decompressing/fasta parsing. 
 //!         Useful, with many cores if io lags behind hashing/hnsw insertion. to speed up io.  
 //!         **Necessary to limit/custom the number of files or sequences simultanuously loaded in memory if files are very large (tens of Gb)**.
 //! 
@@ -28,7 +28,7 @@
 //! 
 //!     - ask neighbourhood statistics in the database and possibly ask for an embedding.
 //!  
-//! 1. ## subcommand tohnsw --dir [-d] dir --sketch [-s] size --nbng [-n] nb --ef m [--seq]
+//! 1. ## subcommand  [--pio number] tohnsw --dir [-d] dir --sketch [-s] size --nbng [-n] nb --ef m [--seq]
 //! 
 //!     * \--dir : the name of directory containing tree of DNA files or Amino Acid files. 
 //!   
@@ -197,6 +197,7 @@ fn parse_tohnsw_cmd(matches : &ArgMatches) -> Result<(String, ProcessingParams),
         }
     }
     else {
+        log::error!("option --algo  super | prob | hll required");
         std::panic!("sketching algo required");
     }
     // kmer size
@@ -249,6 +250,9 @@ fn parse_tohnsw_cmd(matches : &ArgMatches) -> Result<(String, ProcessingParams),
     let hnswparams = HnswParams::new(1_500_000, *ef_construction, max_nb_conn);
     //
     let processing_params = ProcessingParams::new(hnswparams, sketch_params, block_processing);
+    //
+    log::debug!("subcommand parse_tohnsw : ok");
+    //
     return Ok((datadir.clone(), processing_params));
 } // end of parse_tohnsw
 
@@ -372,14 +376,13 @@ fn main() {
 
     let tohnsw_cmd  = Command::new("tohnsw")
         .about("Build HNSW graph database from a collection of database genomes based on minhash metric")
-        .arg(Arg::new("hnswdir")
+        .arg(Arg::new("hnsw_dir")
             .short('d')
             .long("dir")
             .help("directory for storing database genomes")
             .required(true)
             .value_parser(clap::value_parser!(String))
             .action(ArgAction::Set)
-            .value_name("hnswdir")
             )
         .arg(Arg::new("kmer_size")
             .short('k')
@@ -388,7 +391,7 @@ fn main() {
             .required(true)
             .value_name("kmer_size")
             .action(ArgAction::Set)
-            .value_parser(clap::value_parser!(u16))
+            .value_parser(clap::value_parser!(usize))
         )
         .arg(Arg::new("sketch_size")
             .short('s')
@@ -399,25 +402,24 @@ fn main() {
             .action(ArgAction::Set)
             .value_parser(clap::value_parser!(usize))
         )
-        .arg(Arg::new("nbng")
+        .arg(Arg::new("neighbours")
             .short('n')
             .long("nbng")
             .help("Maximum allowed number of neighbors (M) in HNSW")
             .required(true)
-            .value_name("nbng")
             .action(ArgAction::Set)
             .value_parser(clap::value_parser!(usize))
         )
         .arg(Arg::new("ef_construct")
             .long("ef")
             .help("ef_construct in HNSW")
-            .required(true)
             .value_name("ef")
             .action(ArgAction::Set)
             .value_parser(clap::value_parser!(usize))
         )
-        .arg(Arg::new("sketch algo")
+        .arg(Arg::new("sketch_algo")
             .required(true)
+            .long("algo")
             .help("specifiy the algorithm to use for sketching: prob, super or hll")
             .value_parser(clap::value_parser!(String))
         )

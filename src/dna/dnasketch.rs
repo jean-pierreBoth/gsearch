@@ -100,7 +100,7 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT+KmerBuilder<Kmer>, Ske
     hnsw.set_extend_candidates(true);
     hnsw.set_keeping_pruned(false);
     //
-    // Sketcher allocation, we do not need reverse complement hashing as we sketch assembled genomes. (Jianshu Zhao)
+    // Sketcher allocation, we  need reverse complement
     //
     let kmer_hash_fn = | kmer : &Kmer | -> Kmer::Val {
         let canonical =  kmer.reverse_complement().min(*kmer);
