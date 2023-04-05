@@ -425,8 +425,9 @@ fn main() {
         )
         .arg(Arg::new("aa")                   // do we process amino acid file
             .long("aa")
-            .value_name("AA")
-            .help("Specificy amino acid processing")
+            .num_args(0)
+            .default_value("true")
+            .help("Specificy amino acid processing, require no value")
         )
         .arg(Arg::new("seq")
             .long("seq")

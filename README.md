@@ -1,4 +1,4 @@
-# Gsearch A rust classifier based on probminhash and HNSW for microbial genomes
+# Gsearch: A rust classifier based on probminhash and HNSW for microbial genomes
 
 ![Alt!](https://github.com/jean-pierreBoth/gsearch/blob/master/GSearch-logo.jpg?raw=true)
 
@@ -16,8 +16,9 @@ We generate kmers along sequences and sketch the kmer distribution encountered i
 The sketching and database is done by the subcommand ***tohnsw***.
 
 The Jaccard index come in 2 flavours:  
-    1. The probability Jaccard inde that takes into account th Kmer multiplicity. It is defined by :
-    $$J_{P}=\sum_{d\in D} \frac{1}{\sum_{d'\in D} \max (\frac{\omega_{A}(d')}{\omega_{A}(d)},\frac{\omega_{B}(d')}{\omega_{B}(d)})}$$
+    1. The probability Jaccard index that takes into account the Kmer multiplicity. It is defined by :
+    $$J_{P(A,B)}=\sum_{d\in D} \frac{1}{\sum_{d'\in D} \max (\frac{\omega_{A}(d')}{\omega_{A}(d)},\frac{\omega_{B}(d')}{\omega_{B}(d)})}$$
+    where $\omega_{A}(d)$ is the multiplicity of $d$ in A
     (see [Moulton-Jiang-arxiv](https://arxiv.org/abs/1809.04052)).
     In this case we use the probminhash algorithm as implemented in [probminhash](https://github.com/jean-pierreBoth/probminhash)  
     2. The unweighted (simple) Jaccard index defined by :
