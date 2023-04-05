@@ -1,4 +1,4 @@
-# Gsearch: A rust classifier based on probminhash and HNSW for microbial genomes
+# Gsearch: A rust classifier based on MinHash metric and HNSW for microbial genomes
 
 ![Alt!](https://github.com/jean-pierreBoth/gsearch/blob/master/GSearch-logo.jpg?raw=true)
 
