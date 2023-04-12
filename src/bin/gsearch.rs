@@ -5,8 +5,10 @@
 // This file may not be copied, modified, or distributed except according to those terms.
 
 
-//! Module gsearch
+//! # Module gsearch
 //!  
+//! ## Command and sub commands
+//! 
 //! The commands admits 2 flags and 4 subcommands
 //! 
 //! The flag:
@@ -26,7 +28,7 @@
 //! 
 //!     * ask neighbourhood statistics in the database and possibly ask for an embedding.
 //!  
-//! 1. ## subcommand  [--pio number] **tohnsw** [--aa]  --dir [-d] dir   --sketch [-s] size   --nbng [-n] nb   --ef m [--seq]
+//! 1. ### subcommand  [--pio number] **tohnsw** [--aa]  --dir [-d] dir   --sketch [-s] size   --nbng [-n] nb   --ef m [--seq]
 //! 
 //!     * \[--aa\] : set if data to process are Amino Acid sequences. Default is DNA.
 
@@ -35,8 +37,7 @@
 //!     * \--sketch gives the size of probminhash sketch (integer value). Mandatory value.  
 //! 
 //!     * \--algo specifiy the sketching algorithm to be used.   
-//!         Use --algo super for superminhash , --algo prob for asking ProbMinhash or --algo hll for hyperloglog sketching.   
-//! 
+//!         Use --algo super for superminhash , --algo prob for asking ProbMinhash or --algo hll for hyperloglog sketching.//! 
 //! 
 //!     * \--kmer [-k] gives the size of kmer to use for generating probminhash (integer value). Mandatory argument. 
 //!  
@@ -49,7 +50,7 @@
 //!             in a large sequence.
 //!  
 //! 
-//! 2. ## sub command **add**  --hnsw \[-b\] hnsw_dir --new \[-n\] directory
+//! 2. ### sub command **add**  --hnsw \[-b\] hnsw_dir --new \[-n\] directory
 //! 
 //!     * \--hnsw expects  the name of directory containing hnsw dump files and seqdict dump
 //!     * \--new expects the name of the directory containing new data to add to the database.
@@ -61,13 +62,24 @@
 //!      It is useless to pass them in command line.  
 //!
 //!
-//! 3. ## sub command **request**  --hnsw \[-b\] databasedir --query [-r]  requestdir -n neighbours
+//! 3. ### sub command **request**  --hnsw \[-b\] databasedir --query [-r]  requestdir -n neighbours
 //! 
 //!     * \--hnsw expects the name of directory containing hnsw dump files and seqdict dump
 //!     * \--requestdir expects a directory containing list of fasta file containing sequence to search for
 //!     * -n number of neighbours asked for, i.e number of neighbours asked for
-
-//! 4. sub command ann
+//!
+//! 4. ### sub command ann
+//!
+//! ## Some hints on skething to use
+//! 
+//!  The Probminhash algorithm takes multiplicity of kmers of kmers into account, so it is useful for cases where kmer multiplicity is important.
+//!  It comes at a cost: if you have large files associated to large kmer the (hash) structure to store the count of billions of kmers needs much memory.  
+//!  In this case consider using SuperMinHash or HyperLogLog which just record presence of kmers.  
+//!  SuperMinHash in its present form sketch into f32 vectors but is quite fast. HyperLogLog is slower but sketch into u16 vector and can store billions
+//!  of kmers. See the crate [probminhash](https://crates.io/crates/hnsw_rs)
+//!      
+//! 
+//! 
 
 // must loop on sub directories , open gzipped files
 // extracts complete genomes possiby many in one file (get rid of capsid records if any)
