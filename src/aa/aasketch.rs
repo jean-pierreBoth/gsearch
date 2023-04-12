@@ -14,9 +14,11 @@ use std::path::{Path, PathBuf};
 // our crate
 use hnsw_rs::prelude::*;
 
+use probminhash::{setsketcher::SetSketchParams};
+
 use kmerutils::base::kmertraits::*;
 use kmerutils::aautils::kmeraa::*;
-use kmerutils::aautils::seqsketchjaccard::{SeqSketcherAAT, ProbHash3aSketch, SuperHashSketch};
+use kmerutils::aautils::seqsketchjaccard::{SeqSketcherAAT, ProbHash3aSketch, SuperHashSketch, HyperLogLogSketch};
 use kmerutils::sketcharg::DataType;
 
 use crate::utils::{idsketch::*, reloadhnsw};
@@ -301,7 +303,23 @@ pub fn aa_process_tohnsw(dirpath : &Path, filter_params : &FilterParams, process
             }
         }
         SketchAlgo::HLL => {
-            panic!("HLL not yet implemented over AA sketching");
+            let mut hll_params = SetSketchParams::default();
+            if hll_params.get_m() < sketch_params.get_sketch_size() as u64 {
+                log::warn!("!!!!!!!!!!!!!!!!!!!  need to adjust hll parameters!");
+            }
+            hll_params.set_m(sketch_params.get_sketch_size());
+            //
+            if kmer_size <= 6 {
+                let sketcher = HyperLogLogSketch::<KmerAA32bit, u16>::new(sketch_params, hll_params);
+                sketchandstore_dir_compressedkmer::<KmerAA32bit, HyperLogLogSketch::<KmerAA32bit, u16>>(&dirpath, sketcher, &filter_params, &processing_parameters, others_params);
+            }
+            else if kmer_size <= 12 {
+                let sketcher =  HyperLogLogSketch::<KmerAA64bit, u16>::new(sketch_params, hll_params);
+                sketchandstore_dir_compressedkmer::<KmerAA64bit, HyperLogLogSketch::<KmerAA64bit, u16>>(&dirpath, sketcher, &filter_params, &processing_parameters, others_params);                
+            }
+            else {
+                panic!("kmer for Amino Acids must be less or equal to 12");
+            }
         }
         SketchAlgo::SUPER2 => {
             panic!("SUPER2 not yet implemented over AA sketching");

@@ -9,34 +9,33 @@
 //!  
 //! The commands admits 2 flags and 4 subcommands
 //! 
-//! The flags:
+//! The flag:
 //! 
-//!     --aa : set if data to process are Amino Acid sequences. Default is DNA.
-//! 
-//!     --pio nbfile : option to read compressed filesby blocks of n files then parallelize decompressing/fasta parsing. 
+//!    * \--pio nbfile : option to read compressed filesby blocks of n files then parallelize decompressing/fasta parsing.   
 //!         Useful, with many cores if io lags behind hashing/hnsw insertion. to speed up io.  
 //!         **Necessary to limit/custom the number of files or sequences simultanuously loaded in memory if files are very large (tens of Gb)**.
-//! 
+
 //! 
 //! The 4 subcommands possible are to :
 //! 
-//!     - construct a hnsw database,  
+//!     * construct a hnsw database,  
 //!  
-//!     - adding elements in a already constructed hnsw database
+//!     * add elements in a already constructed hnsw database
 //! 
-//!     - search in hnsw database
+//!     * search in hnsw database
 //! 
-//!     - ask neighbourhood statistics in the database and possibly ask for an embedding.
+//!     * ask neighbourhood statistics in the database and possibly ask for an embedding.
 //!  
-//! 1. ## subcommand  [--pio number] tohnsw --dir [-d] dir --sketch [-s] size --nbng [-n] nb --ef m [--seq]
+//! 1. ## subcommand  [--pio number] **tohnsw** [--aa]  --dir [-d] dir   --sketch [-s] size   --nbng [-n] nb   --ef m [--seq]
 //! 
-//!     * \--dir : the name of directory containing tree of DNA files or Amino Acid files. 
+//!     * \[--aa\] : set if data to process are Amino Acid sequences. Default is DNA.
+
+//!     * \--dir  \[-d\]: the name of directory containing tree of DNA files or Amino Acid files. 
 //!   
 //!     * \--sketch gives the size of probminhash sketch (integer value). Mandatory value.  
 //! 
-//!     * \--algo specifiy the sketching algorithm to be used. 
-//! 
-//!         SuperMinHash can specified by --algo super, --algo prob for asking ProbMinhash or --algo hll for hyperloglog sketching. 
+//!     * \--algo specifiy the sketching algorithm to be used.   
+//!         Use --algo super for superminhash , --algo prob for asking ProbMinhash or --algo hll for hyperloglog sketching.   
 //! 
 //! 
 //!     * \--kmer [-k] gives the size of kmer to use for generating probminhash (integer value). Mandatory argument. 
@@ -50,20 +49,23 @@
 //!             in a large sequence.
 //!  
 //! 
-//! 2. **sub command add : This command dedicated to adding new data to a hnsw structure.**.  
-//!      The program reloads a previous dump of the hnsw structures.  
+//! 2. ## sub command **add**  --hnsw \[-b\] hnsw_dir --new \[-n\] directory
+//! 
+//!     * \--hnsw expects  the name of directory containing hnsw dump files and seqdict dump
+//!     * \--new expects the name of the directory containing new data to add to the database.
+//! 
+//!      The command reloads a previous dump of the hnsw structures located in hnsw_dir   and adds new data in it from directory
 //!      tohnsw must (presently) be launched from the directory
 //!      containing the dump as the program looks for the files "hnswdump.hnsw.data" and "hnswdump.hnsw.graph" created previously.  
-//!      *In this case parameters corresponding to options --kmer  --sketch --nbng --ef and --algo are reloaded from file parameters.json*  .
+//!      *In this case parameters corresponding to options --aa --kmer  --sketch --nbng --ef and --algo are reloaded from file parameters.json*  .
 //!      It is useless to pass them in command line.  
 //!
 //!
-//! 3. **sub command request** 
+//! 3. ## sub command **request**  --hnsw \[-b\] databasedir --query [-r]  requestdir -n neighbours
 //! 
-//!  request --database [-b] basedirname --query [-r]  requestdir -n neighbours
-//!     * \--database is the name of directory containing hnsw dump files and seqdict dump
-//!     * \--requestdir is a directory containing list of fasta file containing sequence to search for
-//!     * -n number of neighbours asked for. number of neighbours used in possible ann directive
+//!     * \--hnsw expects the name of directory containing hnsw dump files and seqdict dump
+//!     * \--requestdir expects a directory containing list of fasta file containing sequence to search for
+//!     * -n number of neighbours asked for, i.e number of neighbours asked for
 
 //! 4. sub command ann
 
@@ -233,7 +235,7 @@ fn parse_tohnsw_cmd(matches : &ArgMatches) -> Result<(String, ProcessingParams),
         true
     };
 
-    let data_t = if matches.contains_id("aa") {
+    let data_t = if matches.contains_id("aa_opt") {
         println!("aa option , processing of AA sequences");
         DataType::AA
     }
@@ -267,7 +269,7 @@ fn parse_add_cmd(matches : &ArgMatches) -> Result<AddParams, anyhow::Error> {
     //
     // parse database dir
     let database_dir : &String;
-    if matches.contains_id("database_dir") {
+    if matches.contains_id("hnsw_dir") {
         println!("decoding argument dir");
         database_dir = matches.get_one("hnsw_dir").expect("");
         if database_dir == "" {
@@ -276,7 +278,7 @@ fn parse_add_cmd(matches : &ArgMatches) -> Result<AddParams, anyhow::Error> {
         }
     }
     else {
-        println!("-r database_dir is mandatory");
+        println!("-b database_dir is mandatory");
         std::process::exit(1);
     }
     //
@@ -423,10 +425,10 @@ fn main() {
             .help("specifiy the algorithm to use for sketching: prob, super or hll")
             .value_parser(clap::value_parser!(String))
         )
-        .arg(Arg::new("aa")                   // do we process amino acid file
+        .arg(Arg::new("aa_opt")                   // do we process amino acid file
             .long("aa")
-            .num_args(0)
-            .default_value("true")
+            .num_args(0..=1)
+            .default_missing_value("true")
             .help("Specificy amino acid processing, require no value")
         )
         .arg(Arg::new("seq")
@@ -442,11 +444,15 @@ fn main() {
         .about("add file to a hnsw database")
         .arg(Arg::new("hnsw_dir")
             .required(true)
+            .long("hnsw")
+            .short('b')
             .value_parser(clap::value_parser!(String))
             .help("set the name of directory containing already constructed hnsw data")
         )
-        .arg(Arg::new("add_dir")
+        .arg(Arg::new("newdata_dir")
             .required(true)
+            .long("new")
+            .short('n')
             .help("set directory containing new data")
             .value_parser(clap::value_parser!(String))
     );
@@ -457,7 +463,7 @@ fn main() {
         .arg(
             Arg::new("database_path")
             .short('b')
-            .long("datadir")
+            .long("hnsw")
             .value_name("DATADIR")
             .help("directory contains pre-built database files")
             .required(true)
@@ -466,7 +472,7 @@ fn main() {
         .arg(
             Arg::new("nb_answers")
             .short('n')
-            .long("nbanswer")
+            .long("nbanswers")
             .value_name("nb_answers")
             .help("Sets the number of neighbors for the query")
             .action(ArgAction::Set)
@@ -475,7 +481,7 @@ fn main() {
         )
         .arg(Arg::new("request_dir")
             .short('r')
-            .long("request_directory")
+            .long("request_dir")
             .value_name("request_dir")
             .help("Sets the directory of request genomes")
             .value_parser(clap::value_parser!(String))

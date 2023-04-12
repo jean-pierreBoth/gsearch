@@ -15,6 +15,8 @@ use std::fmt::{Debug};
 
 use hnsw_rs::prelude::*;
 
+use probminhash::{setsketcher::SetSketchParams};
+
 use kmerutils::base::kmertraits::*;
 use kmerutils::aautils::kmeraa::*;
 use kmerutils::aautils::seqsketchjaccard::*;
@@ -263,7 +265,7 @@ pub fn get_sequence_matcher(request_params : &RequestParams, processing_params :
                             &filter_params, &seqdict, &processing_params, other_params,
                             &hnsw, nbng as usize, ef_search);
                 }
-                7..=15 => {
+                7..=12 => {
                     let hnsw = reloadhnsw::reload_hnsw::< <SuperHashSketch<KmerAA32bit, f32> as SeqSketcherAAT<KmerAA32bit>>::Sig >(database_dirpath, ann_params)?;
                     let sketcher = SuperHashSketch::<KmerAA64bit, f32>::new(sketch_params);
                     matcher = sketch_and_request_dir_compressedkmer::<KmerAA64bit, SuperHashSketch::<KmerAA64bit, f32> >(&request_dirpath, sketcher, 
@@ -276,8 +278,30 @@ pub fn get_sequence_matcher(request_params : &RequestParams, processing_params :
             }
         }
         SketchAlgo::HLL => {
-            return Err(String::from(" HLL not yet in AA sketching")); 
-
+            let mut hll_params = SetSketchParams::default();
+            if hll_params.get_m() < sketch_params.get_sketch_size() as u64 {
+                log::warn!("!!!!!!!!!!!!!!!!!!!  need to adjust hll parameters!");
+            }
+            hll_params.set_m(sketch_params.get_sketch_size());
+            match kmer_size {
+                1..=6 => {
+                    let hnsw = reloadhnsw::reload_hnsw::< <HyperLogLogSketch<KmerAA32bit,u16> as SeqSketcherAAT<KmerAA32bit>>::Sig>(database_dirpath, ann_params)?;
+                    let sketcher = HyperLogLogSketch::<KmerAA32bit, u16>::new(sketch_params, hll_params);
+                    matcher = sketch_and_request_dir_compressedkmer::<KmerAA32bit, HyperLogLogSketch<KmerAA32bit,u16> >(&request_dirpath, sketcher, 
+                            &filter_params, &seqdict, &processing_params, other_params,
+                            &hnsw, nbng as usize, ef_search);
+                }
+                7..=12 => {
+                    let hnsw = reloadhnsw::reload_hnsw::< <HyperLogLogSketch<KmerAA64bit, u16> as SeqSketcherAAT<KmerAA64bit>>::Sig >(database_dirpath, ann_params)?;
+                    let sketcher = HyperLogLogSketch::<KmerAA64bit, u16>::new(sketch_params, hll_params);
+                    matcher = sketch_and_request_dir_compressedkmer::<KmerAA64bit, HyperLogLogSketch::<KmerAA64bit, u16> >(&request_dirpath, sketcher, 
+                            &filter_params, &seqdict, &processing_params, other_params,
+                            &hnsw, nbng as usize, ef_search);
+                }
+                _ => {
+                    return Err(String::from("bad value for kmer size"));                   
+                }
+            }            
         } // end match HLL
         SketchAlgo::SUPER2 => {
             return Err(String::from(" SuperMinhash2 not yet in AA sketching")); 
