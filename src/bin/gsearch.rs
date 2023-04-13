@@ -336,7 +336,7 @@ fn parse_request_cmd(matches : &ArgMatches) -> Result<RequestParams, anyhow::Err
     }
 
     // parse database dir
-    let to_check : &String = matches.get_one("database_dir").unwrap();
+    let to_check : &String = matches.get_one("database_path").unwrap();
     let database_dir = to_check.clone();
     let database_dirpath = Path::new(&database_dir);
     if !database_dirpath.is_dir() {
