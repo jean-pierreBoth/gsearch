@@ -235,7 +235,7 @@ fn parse_tohnsw_cmd(matches : &ArgMatches) -> Result<(String, ProcessingParams),
     }
     //
     let ef_construction_default = 400usize;
-    let ef_construction = matches.get_one("ef").unwrap_or(&ef_construction_default);      
+    let ef_construction = matches.get_one("ef_construct").unwrap_or(&ef_construction_default);      
     println!("ef construction parameters in hnsw construction {}", ef_construction);
     
     let block_processing = if matches.contains_id("seq") {
