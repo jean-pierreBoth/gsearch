@@ -615,7 +615,7 @@ fn main() {
     //
     // Now we have parsed commands
     //
-    let add_dir = if addseq { add_params_opt.as_ref().unwrap().get_hnsw_dir().clone() } else { String::from("")};
+    let add_dir = if addseq { add_params_opt.as_ref().unwrap().get_newdata_dir().clone() } else { String::from("")};
     let computing_params = ComputingParams::new(nb_files_par, addseq, add_dir);
 
     match cmd {
