@@ -13,20 +13,18 @@
 //! 
 //! The flag:
 //! 
-//!    * \--pio nbfile : option to read compressed filesby blocks of n files then parallelize decompressing/fasta parsing.   
+//! * \--pio nbfile : option to read compressed filesby blocks of n files then parallelize decompressing/fasta parsing.   
 //!         Useful, with many cores if io lags behind hashing/hnsw insertion. to speed up io.  
 //!         **Necessary to limit/custom the number of files or sequences simultanuously loaded in memory if files are very large (tens of Gb)**.
-
 //! 
-//! The 4 subcommands possible are to :
+//! The 4 subcommands possible are to :  
+//! * construct a hnsw database,   
 //! 
-//!     * construct a hnsw database,  
-//!  
-//!     * add elements in a already constructed hnsw database
+//! * add elements in a already constructed hnsw database  
 //! 
-//!     * search in hnsw database
+//! * search in hnsw database  
 //! 
-//!     * ask neighbourhood statistics in the database and possibly ask for an embedding.
+//! * ask neighbourhood statistics in the database and possibly ask for an embedding.  
 //!  
 //! 1. ### subcommand  [--pio number] **tohnsw** [--aa]  --dir [-d] dir   --sketch [-s] size   --nbng [-n] nb   --ef m [--seq]
 //! 
@@ -46,7 +44,7 @@
 //! 
 //!     * \--ef optional integer value to optimize hnsw structure creation (default to 400)  
 //! 
-//!     * \--seq if we want a processing by sequences. Default is to concatenate all sequneces in a file
+//!     * \--seq if we want a processing by sequences. Default is to concatenate all sequences in a file
 //!             in a large sequence.
 //!  
 //! 
@@ -55,8 +53,8 @@
 //!     * \--hnsw expects  the name of directory containing hnsw dump files and seqdict dump
 //!     * \--new expects the name of the directory containing new data to add to the database.
 //! 
-//!      The command reloads a previous dump of the hnsw structures located in hnsw_dir   and adds new data in it from directory
-//!      tohnsw must (presently) be launched from the directory
+//!      The command reloads a previous dump of the hnsw structures located in hnsw_dir and adds new data in it from directory
+//!      sub-command add must (presently) be launched from the directory
 //!      containing the dump as the program looks for the files "hnswdump.hnsw.data" and "hnswdump.hnsw.graph" created previously.  
 //!      *In this case parameters corresponding to options --aa --kmer  --sketch --nbng --ef and --algo are reloaded from file parameters.json*  .
 //!      It is useless to pass them in command line.  
@@ -70,13 +68,13 @@
 //!
 //! 4. ### sub command ann
 //!
-//! ## Some hints on skething to use
+//! ## Some hints on sketching to use
 //! 
 //!  The Probminhash algorithm takes multiplicity of kmers of kmers into account, so it is useful for cases where kmer multiplicity is important.
 //!  It comes at a cost: if you have large files associated to large kmer the (hash) structure to store the count of billions of kmers needs much memory.  
 //!  In this case consider using SuperMinHash or HyperLogLog which just record presence of kmers.  
 //!  SuperMinHash in its present form sketch into f32 vectors but is quite fast. HyperLogLog is slower but sketch into u16 vector and can store billions
-//!  of kmers. See the crate [probminhash](https://crates.io/crates/hnsw_rs)
+//!  of kmers. See the crate [probminhash](https://crates.io/crates/probminhash)
 //!      
 //! 
 //! 
