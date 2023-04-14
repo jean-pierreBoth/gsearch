@@ -233,7 +233,7 @@ fn parse_tohnsw_cmd(matches : &ArgMatches) -> Result<(String, ProcessingParams),
     }
     //
     let ef_construction_default = 400usize;
-    let ef_construction = matches.get_one("ef").unwrap_or(&ef_construction_default);      
+    let ef_construction = matches.get_one("ef_construct").unwrap_or(&ef_construction_default);      
     println!("ef construction parameters in hnsw construction {}", ef_construction);
     
     let block_processing = if matches.contains_id("seq") {
@@ -334,7 +334,7 @@ fn parse_request_cmd(matches : &ArgMatches) -> Result<RequestParams, anyhow::Err
     }
 
     // parse database dir
-    let to_check : &String = matches.get_one("database_dir").unwrap();
+    let to_check : &String = matches.get_one("database_path").unwrap();
     let database_dir = to_check.clone();
     let database_dirpath = Path::new(&database_dir);
     if !database_dirpath.is_dir() {
@@ -613,7 +613,7 @@ fn main() {
     //
     // Now we have parsed commands
     //
-    let add_dir = if addseq { add_params_opt.as_ref().unwrap().get_hnsw_dir().clone() } else { String::from("")};
+    let add_dir = if addseq { add_params_opt.as_ref().unwrap().get_newdata_dir().clone() } else { String::from("")};
     let computing_params = ComputingParams::new(nb_files_par, addseq, add_dir);
 
     match cmd {
