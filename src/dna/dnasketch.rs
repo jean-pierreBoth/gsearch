@@ -7,7 +7,7 @@ use std::time::{SystemTime};
 use cpu_time::{ProcessTime,ThreadTime};
 
 
-use std::path::{Path, PathBuf};
+use std::path::{PathBuf};
 
 // for multithreading
 use crossbeam_channel::*;
@@ -36,7 +36,10 @@ use crate::utils::parameters::*;
 // Sig is basic item of a signature , VecSig is a vector of such items
 type VecSig<Sketcher, Kmer>  = Vec< <Sketcher as SeqSketcherT<Kmer>>::Sig>;
 
-fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT+KmerBuilder<Kmer>, Sketcher : SeqSketcherT<Kmer> + Send + Sync>(dirpath : &Path, sketcher : Sketcher ,
+// hnsw_pb  must contains directory of hnsw database.
+// In creation mode it is the directory containings file to proceess. In add mode it is where hnsw database reside,
+// and the directory containing new data are taken from computingParams if in add mode
+fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT+KmerBuilder<Kmer>, Sketcher : SeqSketcherT<Kmer> + Send + Sync>(hnsw_pb : &PathBuf, sketcher : Sketcher ,
                     filter_params: &FilterParams, 
                     processing_params : &ProcessingParams, 
                     other_params : &ComputingParams) 
@@ -47,8 +50,7 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT+KmerBuilder<Kmer>, Ske
                 {
     //
     //
-    log::trace!("sketchandstore_dir processing dir {}", dirpath.to_str().unwrap());
-    log::info!("sketchandstore_dir {}", dirpath.to_str().unwrap());
+    log::info!("sketchandstore_dir {}", hnsw_pb.to_str().unwrap());
     let start_t = SystemTime::now();
     let cpu_start = ProcessTime::now();
     //
@@ -65,34 +67,33 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT+KmerBuilder<Kmer>, Ske
     let mut hnsw : Hnsw::< <Sketcher as SeqSketcherT<Kmer>>::Sig, DistHamming>;
     let mut state :ProcessingState;
     //
+    let toprocess_path : PathBuf;
+    //
     if other_params.get_adding_mode() {
+        let toprocess_str = other_params.get_add_dir();
+        toprocess_path = PathBuf::from(toprocess_str);
         // in this case we must reload
-        let dirpath = std::env::current_dir();
-        if dirpath.is_err() {
-            log::error!("dnasketch::sketchandstore_dir_compressedkmer cannot get current directory");
-            std::panic!("dnasketch::sketchandstore_dir_compressedkmer cannot get current directory");
-        }
-        let dirpath = dirpath.unwrap();
-        log::info!("dnasketch::sketchandstore_dir_compressedkmer will reload hnsw data from director {:?}", dirpath);
-        let hnsw_opt = reloadhnsw::reload_hnsw(&dirpath, &AnnParameters::default());
+        log::info!("dnasketch::sketchandstore_dir_compressedkmer will add new data from from directory {:?} to hnsw dir {:?}", hnsw_pb, toprocess_path);
+       let hnsw_opt = reloadhnsw::reload_hnsw(&hnsw_pb, &AnnParameters::default());
         if hnsw_opt.is_err() {
-            log::error!("cannot reload hnsw from directory : {:?}", &dirpath);
+            log::error!("cannot reload hnsw from directory : {:?}", &hnsw_pb);
             std::process::exit(1);
         }
         else { 
             hnsw = hnsw_opt.unwrap();
         }
-        let reload_res = ProcessingState::reload_json(&dirpath);
+        let reload_res = ProcessingState::reload_json(&hnsw_pb);
         if reload_res.is_ok() {
             state = reload_res.unwrap();
         }
         else {
-            log::error!("dnasketch::cannot reload processing state (file 'processing_state.json' from directory : {:?}", &dirpath);
+            log::error!("dnasketch::cannot reload processing state (file 'processing_state.json' from directory : {:?}", &hnsw_pb);
             std::process::exit(1);           
         }
     } 
     else {
         // creation mode
+        toprocess_path = hnsw_pb.clone();
         let hnsw_params = processing_params.get_hnsw_params();
         hnsw = Hnsw::< <Sketcher as SeqSketcherT<Kmer>>::Sig, DistHamming>::new(hnsw_params.get_max_nb_connection() as usize , hnsw_params.capacity , 16, hnsw_params.get_ef(), DistHamming{});
         state = ProcessingState::new();
@@ -122,18 +123,18 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT+KmerBuilder<Kmer>, Ske
                 if other_params.get_parallel_io() {
                     let nb_files_by_group = other_params.get_nb_files_par();
                     log::info!("dnasketch::sketchandstore_dir_compressedkmer : calling process_dir_parallel, nb_files in parallel : {}", nb_files_by_group);
-                    res_nb_sent = process_dir_parallel(&mut state, &DataType::DNA,  dirpath, filter_params, 
+                    res_nb_sent = process_dir_parallel(&mut state, &DataType::DNA,  &toprocess_path, filter_params, 
                                     nb_files_by_group, &process_buffer_in_one_block, &send);
                 } // end case parallel io
                 else {
                     log::info!("dnasketch::sketchandstore_dir_compressedkmer : calling process_dir serial");
-                    res_nb_sent = process_dir(&mut state, &DataType::DNA,  dirpath, filter_params, 
+                    res_nb_sent = process_dir(&mut state, &DataType::DNA, &toprocess_path, filter_params, 
                                     &process_file_in_one_block, &send);
                 }
             }
             else {
                 log::info!("processing by concat and split");
-                res_nb_sent = process_dir(&mut state, &DataType::DNA, dirpath, filter_params, &process_file_concat_split, &send);
+                res_nb_sent = process_dir(&mut state, &DataType::DNA, &toprocess_path, filter_params, &process_file_concat_split, &send);
             }
             match res_nb_sent {
                 Ok(nb_really_sent) => {
@@ -150,7 +151,7 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT+KmerBuilder<Kmer>, Ske
             state.elapsed_t =  start_t_prod.elapsed().unwrap().as_secs() as f32;
             log::info!("sender processed in  system time(s) : {}", state.elapsed_t);
             // dump processing state in the current directory
-            let _ = state.dump_json(&Path::new("./"));
+            let _ = state.dump_json(hnsw_pb);
             Box::new(nb_sent)
         });
         //
@@ -161,7 +162,7 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT+KmerBuilder<Kmer>, Ske
             let mut seqdict : SeqDict;
             if other_params.get_adding_mode() {
                 // must reload seqdict
-                let mut filepath = PathBuf::new();
+                let mut filepath = PathBuf::from(hnsw_pb.clone());
                 filepath.push("seqdict.json");
                 let res_reload = SeqDict::reload_json(&filepath);
                 if res_reload.is_err() {
@@ -239,8 +240,10 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT+KmerBuilder<Kmer>, Ske
             // We must dump hnsw to save "database" if not empty
             //
             if  hnsw.get_nb_point() > 0 {
-                let hnswdumpname = String::from("hnswdump");
-                log::info!("going to dump hnsw");
+                let mut hnsw_dump = hnsw_pb.to_path_buf().clone();
+                hnsw_dump.push("hnswdump");
+                let hnswdumpname = String::from(hnsw_dump.to_str().unwrap());
+                log::info!("going to dump hnsw with prefix : {:?}", hnswdumpname);
                 let resdump = hnsw.file_dump(&hnswdumpname);
                 match resdump {
                     Err(msg) => {
@@ -251,7 +254,10 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT+KmerBuilder<Kmer>, Ske
                 // dump some info on layer structure
                 hnsw.dump_layer_info();
                 // dumping dictionary
-                let resdump = seqdict.dump(String::from("seqdict.json"));
+                let mut seq_pb = hnsw_pb.clone();
+                seq_pb.push("seqdict.json");
+                let seqdict_name = String::from(seq_pb.to_str().unwrap());
+                let resdump = seqdict.dump(seqdict_name);
                 match resdump {
                     Err(msg) => {
                         println!("seqdict dump failed error msg : {}", msg);
@@ -263,7 +269,7 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT+KmerBuilder<Kmer>, Ske
                 log::info!("no dumping hnsw, no data points");
             }
             // and finally dump processing parameters in file name "parameters.json"
-            let _ = processing_params.dump_json(&Path::new("./"));
+            let _ = processing_params.dump_json(hnsw_pb);
             // get time for io and fasta parsing
             if sender_cpu.is_ok() {
                 let cpu_time = sender_cpu.unwrap().try_elapsed();
@@ -309,7 +315,8 @@ pub (crate) fn kmer_hash<Kmer>( kmer : &Kmer) -> Kmer::Val
 
 
 /// This drives sequence sketching and sending to hnsw
-pub fn dna_process_tohnsw(dirpath : &Path, filter_params : &FilterParams, processing_parameters : &ProcessingParams, others_params : &ComputingParams) {
+/// dirpath is where hnsw base will be
+pub fn dna_process_tohnsw(dirpath : &PathBuf, filter_params : &FilterParams, processing_parameters : &ProcessingParams, others_params : &ComputingParams) {
     // dispatch according to kmer_size
     let kmer_size = processing_parameters.get_sketching_params().get_kmer_size();
     //
@@ -319,17 +326,17 @@ pub fn dna_process_tohnsw(dirpath : &Path, filter_params : &FilterParams, proces
             if kmer_size <= 14 {
                 // allocated the correct sketcher
                 let sketcher = ProbHash3aSketch::<Kmer32bit>::new(sketchparams);
-                sketchandstore_dir_compressedkmer::<Kmer32bit, ProbHash3aSketch::<Kmer32bit> >(&dirpath, sketcher, 
+                sketchandstore_dir_compressedkmer::<Kmer32bit, ProbHash3aSketch::<Kmer32bit> >(dirpath, sketcher, 
                             &filter_params, &processing_parameters, others_params);
             }
             else if kmer_size == 16 {
                 let sketcher = ProbHash3aSketch::<Kmer16b32bit>::new(sketchparams);
-                sketchandstore_dir_compressedkmer::<Kmer16b32bit, ProbHash3aSketch::<Kmer16b32bit>>(&dirpath, sketcher, 
+                sketchandstore_dir_compressedkmer::<Kmer16b32bit, ProbHash3aSketch::<Kmer16b32bit>>(dirpath, sketcher, 
                             &filter_params, &processing_parameters, others_params);
             }
             else if  kmer_size <= 32 {
                 let sketcher = ProbHash3aSketch::<Kmer64bit>::new(sketchparams);
-                sketchandstore_dir_compressedkmer::<Kmer64bit, ProbHash3aSketch::<Kmer64bit>>(&dirpath, sketcher, 
+                sketchandstore_dir_compressedkmer::<Kmer64bit, ProbHash3aSketch::<Kmer64bit>>(dirpath, sketcher, 
                             &filter_params, &processing_parameters, others_params);
             }
             else {

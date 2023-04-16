@@ -221,7 +221,7 @@ pub struct ComputingParams {
     nb_files_par : usize,
     /// set to true when we increase a hnsw database
     adding_mode : bool,
-    ///
+    /// directory containing files to add
     add_dir : String,
 }
 
@@ -254,11 +254,12 @@ impl ComputingParams {
         self.nb_files_par
     }
 
-
+    /// returns true if we are in adding mode
     pub fn get_adding_mode(&self) -> bool {
         self.adding_mode
     }
 
+    /// returns directory containing new files to add
     pub fn get_add_dir(&self) -> &String {
         &self.add_dir
     }

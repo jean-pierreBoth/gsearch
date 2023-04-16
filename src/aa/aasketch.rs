@@ -28,7 +28,10 @@ use crate::aa::aafiles::{process_aafile_in_one_block, process_aabuffer_in_one_bl
 
 use crate::utils::parameters::*;
 
-fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT + KmerBuilder<Kmer>, Sketcher : SeqSketcherAAT<Kmer> + Send + Sync >(dirpath : &Path, 
+// hnsw_pb  must contains directory of hnsw database.
+// In creation mode it is the directory containings file to proceess. In add mode it is where hnsw database reside,
+// and the directory containing new data are taken from computingParams if in add mode
+fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT + KmerBuilder<Kmer>, Sketcher : SeqSketcherAAT<Kmer> + Send + Sync >(hnsw_pb : &PathBuf, 
                         sketcher : Sketcher,
                         filter_params: &FilterParams, 
                         processing_params : &ProcessingParams, 
@@ -38,7 +41,7 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT + KmerBuilder<Kmer>, S
                 KmerGenerator<Kmer> :  KmerGenerationPattern<Kmer>, 
                 DistHamming : Distance<<Sketcher as SeqSketcherAAT<Kmer>>::Sig> {
     //
-    log::info!("sketchandstore_dir_compressedkmer AA mode processing dir: {}", dirpath.to_str().unwrap());
+    log::info!("sketchandstore_dir_compressedkmer AA mode hnsw dir: {}", hnsw_pb.to_str().unwrap());
     let start_t = SystemTime::now();
     let cpu_start = ProcessTime::now();
     //
@@ -51,37 +54,37 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT + KmerBuilder<Kmer>, S
         _    => { 5000 },
     };
     let mut insertion_queue : Vec<IdSeq>= Vec::with_capacity(insertion_block_size);
-    // TODO must get ef_search from clap via hnswparams
+    //
     let mut hnsw : Hnsw::< <Sketcher as SeqSketcherAAT<Kmer>>::Sig, DistHamming>;
     let mut state : ProcessingState;
+    // contains dir of seq to process
+    let toprocess_path : PathBuf;
+    //
     if other_params.get_adding_mode() {
-         // in this case we must reload
-        let dirpath = std::env::current_dir();
-        if dirpath.is_err() {
-            log::error!("aasketch::sketchandstore_dir_compressedkmer cannot get current directory");
-            std::panic!("aasketch::sketchandstore_dir_compressedkmer cannot get current directory");
-        }
-        let dirpath = dirpath.unwrap();
-        log::info!("aasketch::sketchandstore_dir_compressedkmer will reload hnsw data from director {:?}", dirpath);
-        let hnsw_opt = reloadhnsw::reload_hnsw(&dirpath, &AnnParameters::default());
+        // in this case we must reload
+        let toprocess_str = other_params.get_add_dir();
+        toprocess_path = PathBuf::from(toprocess_str);
+        log::info!("aasketch::sketchandstore_dir_compressedkmer will add new data from from directory {:?} to {:?}", hnsw_pb, toprocess_path);
+        let hnsw_opt = reloadhnsw::reload_hnsw(&hnsw_pb, &AnnParameters::default());
         if hnsw_opt.is_err() {
-            log::error!("cannot reload hnsw from directory : {:?}", &dirpath);
+            log::error!("cannot reload hnsw from directory : {:?}", &hnsw_pb);
             std::process::exit(1);
         }
         else { 
             hnsw = hnsw_opt.unwrap();
         }
-        let reload_res = ProcessingState::reload_json(&dirpath);
+        let reload_res = ProcessingState::reload_json(&hnsw_pb);
         if reload_res.is_ok() {
             state = reload_res.unwrap();
         }
         else {
-            log::error!("aasketch::cannot reload processing state (file 'processing_state.json' from directory : {:?}", &dirpath);
+            log::error!("aasketch::cannot reload processing state (file 'processing_state.json' from directory : {:?}", &hnsw_pb);
             std::process::exit(1);           
         }
     } 
     else {
         // creation mode
+        toprocess_path = hnsw_pb.clone();
         let hnsw_params = processing_params.get_hnsw_params();
         hnsw = Hnsw::< <Sketcher as SeqSketcherAAT<Kmer>>::Sig, DistHamming>::new(hnsw_params.get_max_nb_connection() as usize , hnsw_params.capacity , 16, hnsw_params.get_ef(), DistHamming{});
         state = ProcessingState::new();
@@ -111,11 +114,11 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT + KmerBuilder<Kmer>, S
                 if other_params.get_parallel_io() {
                     let nb_files_by_group = other_params.get_nb_files_par();
                     log::info!("aasketch::sketchandstore_dir_compressedkmer : calling process_dir_parallel, nb_files in parallel : {}", nb_files_by_group);
-                    res_nb_sent = process_dir_parallel(&mut state, &DataType::AA,  dirpath, filter_params, 
+                    res_nb_sent = process_dir_parallel(&mut state, &DataType::AA,  &toprocess_path, filter_params, 
                                     nb_files_by_group, &process_aabuffer_in_one_block, &send);
                 } // end case parallel io
                 else {
-                    res_nb_sent = process_dir(&mut state, &DataType::AA, dirpath, filter_params, 
+                    res_nb_sent = process_dir(&mut state, &DataType::AA, &toprocess_path, filter_params, 
                             &process_aafile_in_one_block, &send);
                 }
             }
@@ -217,8 +220,10 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT + KmerBuilder<Kmer>, S
             // We must dump hnsw to save "database" if not empty
             //
             if  hnsw.get_nb_point() > 0 {
-                let hnswdumpname = String::from("hnswdump");
-                log::info!("going to dump hnsw");
+                let mut hnsw_dump = hnsw_pb.to_path_buf().clone();
+                hnsw_dump.push("hnswdump");
+                let hnswdumpname = String::from(hnsw_dump.to_str().unwrap());
+                log::info!("going to dump hnsw with prefix : {:?}", hnswdumpname);
                 let resdump = hnsw.file_dump(&hnswdumpname);
                 match resdump {
                     Err(msg) => {
@@ -241,7 +246,7 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT + KmerBuilder<Kmer>, S
                 log::info!("no dumping hnsw, no data points");
             }
             // and finally dump processing parameters in file name "parameters.json"
-            let _ = processing_params.dump_json(&Path::new("./"));
+            let _ = processing_params.dump_json(&hnsw_pb);
             //
             Box::new(seqdict.0.len())
         }); // end of receptor thread
@@ -270,7 +275,7 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT + KmerBuilder<Kmer>, S
 
 
 
-pub fn aa_process_tohnsw(dirpath : &Path, filter_params : &FilterParams, processing_parameters : &ProcessingParams, others_params : &ComputingParams) {
+pub fn aa_process_tohnsw(dirpath : &PathBuf, filter_params : &FilterParams, processing_parameters : &ProcessingParams, others_params : &ComputingParams) {
     //
     let sketch_params = processing_parameters.get_sketching_params();
     let kmer_size = sketch_params.get_kmer_size();

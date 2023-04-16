@@ -64,9 +64,10 @@ impl ProcessingState {
 
     /// reload from a json dump
     pub fn reload_json(dirpath : &Path) -> Result<Self, String> {
-        log::info!("in reload_json");
         //
         let filepath = dirpath.join("processing_state.json");
+        log::info!("reloading processing state from : {:?}", filepath);
+        //
         let fileres = OpenOptions::new().read(true).open(&filepath);
         if fileres.is_err() {
             log::error!("ProcessingState reload_json : reload could not open file {:?}", filepath.as_os_str());

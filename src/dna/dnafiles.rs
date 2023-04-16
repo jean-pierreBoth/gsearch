@@ -122,7 +122,7 @@ pub fn process_file_in_one_block(pathb : &PathBuf, filter_params : &FilterParams
         // process sequence if not capsid and not filtered out, in block mode we do not filter any at the moment
         let _filter = filter_params.filter(&seqrec.seq());
         if strid.find("capsid").is_none() {
-            new_seq.encode_and_add(id, &alphabet2b);
+            new_seq.encode_and_add(&seqrec.seq(), &alphabet2b);
             // recall rank is set in process_dir beccause we should a have struct gatheing the 2 functions process_dir and process_file
             if log::log_enabled!(log::Level::Trace) {
                 log::trace!("process_file, nb_sketched {} ", to_sketch.len());
@@ -161,6 +161,7 @@ pub fn process_buffer_in_one_block(pathb : &PathBuf, bufread : &[u8], filter_par
     else {
         nb_bases = bufread.len();
     }
+    log::debug!("allocating seq for {:?}, estimated nb bases : {}", pathb, nb_bases);
     // We allocate one large block tht will contain the whole filtered genome and we know the sequence size it will produce
     // if file is not compressed f_len is a majorant (as N and capsid are excluded), if file is compressed a compression of 2 can be expected
     let mut new_seq = Sequence::with_capacity(2, nb_bases);
@@ -173,20 +174,20 @@ pub fn process_buffer_in_one_block(pathb : &PathBuf, bufread : &[u8], filter_par
         }
         // do we keep record ? we must get its id
         let seqrec = record.expect("invalid record");
-        let to_add = seqrec.id();
-        let strid = String::from_utf8(Vec::from(to_add)).unwrap();
+        let id = seqrec.id();
+        let strid = String::from_utf8(Vec::from(id)).unwrap();
         // process sequence if not capsid and not filtered out, in block mode we do not filter any at the moment
         let _filter = filter_params.filter(&seqrec.seq());
         if strid.find("capsid").is_none() {
             // Our Kmers are 2bits encoded so we need to be able to encode sequence in 2 bits, so there is 
             // this hack,  causing reallocation. seqrec.seq is Cow so drain does not seem an option.
-            new_seq.encode_and_add(to_add, &alphabet2b);
-            // recall rank is set in process_dir beccause we should a have struct gatheing the 2 functions process_dir and process_file
+            new_seq.encode_and_add(&seqrec.seq(), &alphabet2b);
             if log::log_enabled!(log::Level::Trace) {
                 log::trace!("process_file, nb_sketched {} ", to_sketch.len());
             }
         }
     }
+    new_seq.shrink_to_fit();
     // we are at end of file, we have one large sequence for the whole file
     log::debug!("decompressed seq for file : {:?}, nb bases : {}", pathb.file_name().unwrap_or_default(), new_seq.size());
     // we have DNA seq for now

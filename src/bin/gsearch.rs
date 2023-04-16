@@ -26,7 +26,7 @@
 //! 
 //! * ask neighbourhood statistics in the database and possibly ask for an embedding.  
 //!  
-//! 1. ### subcommand  [--pio number] **tohnsw** [--aa]  --dir [-d] dir   --sketch [-s] size   --nbng [-n] nb   --ef m [--seq]
+//! 1. ### subcommand  [--pio number] **tohnsw** [--aa]  --dir [-d] dir  --sketch [-s] size  --kmer kmersize  --algo name --nbng [-n] nb   --ef m [--seq]
 //! 
 //!     * \[--aa\] : set if data to process are Amino Acid sequences. Default is DNA.
 
@@ -54,7 +54,6 @@
 //!     * \--new expects the name of the directory containing new data to add to the database.
 //! 
 //!      The command reloads a previous dump of the hnsw structures located in hnsw_dir and adds new data in it from directory
-//!      sub-command add must (presently) be launched from the directory
 //!      containing the dump as the program looks for the files "hnswdump.hnsw.data" and "hnswdump.hnsw.graph" created previously.  
 //!      *In this case parameters corresponding to options --aa --kmer  --sketch --nbng --ef and --algo are reloaded from file parameters.json*  .
 //!      It is useless to pass them in command line.  
@@ -101,7 +100,7 @@
 
 use clap::{Arg, ArgMatches, Command, ArgAction};
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 // for logging (debug mostly, switched at compile time in cargo.toml)
 use env_logger::{Builder};
@@ -130,8 +129,10 @@ pub struct AddParams {
 
 impl AddParams {
 
+    /// returns directory containing hnsw structiry containing present state of database
     pub fn get_hnsw_dir(&self) -> &String { &self.hnsw_dir}
 
+    /// returns the directory containinf new data
     pub fn get_newdata_dir(&self) -> &String { &self.newdata_dir}
 
 }
@@ -614,20 +615,24 @@ fn main() {
     // Now we have parsed commands
     //
     let add_dir = if addseq { add_params_opt.as_ref().unwrap().get_newdata_dir().clone() } else { String::from("")};
+    if  addseq {
+        log::info!("adding data from directory : {:?}", add_dir);
+    }
     let computing_params = ComputingParams::new(nb_files_par, addseq, add_dir);
 
     match cmd {
         CmdType::TOHNSW => {  // nothing to do we must have parsed before
                         }, 
              _          => {      // for case ADD or REQUEST we must reload
-                           log::info!("reloading parameters from previous runs, in the current directory"); 
-                            let cwd = std::env::current_dir().unwrap();
-                            let reload_res = ProcessingParams::reload_json(&cwd);
+                            log::info!("reloading parameters from previous runs, from directory : {:?}", &hnsw_dir); 
+                            let hnsw_path = std::path::PathBuf::from(hnsw_dir.clone());
+                            let reload_res = ProcessingParams::reload_json(&hnsw_path);
                             if reload_res.is_ok()  {
                                 processing_params = Some(reload_res.unwrap());
+                                log::info!("sketching parameters : {:?}", processing_params.as_ref().unwrap().get_sketching_params());
                             }
                             else {
-                                std::panic!("cannot reload parameters (file parameters.json) from dir : {:?}", &cwd);
+                                std::panic!("cannot reload parameters (file parameters.json) from dir : {:?}", &hnsw_path);
                             }
             },  // end of cae not TOHNSW
     };  // end of match
@@ -663,7 +668,7 @@ fn main() {
 // function to create or add data into a hnsw database
 fn treat_into_hnsw(hnswdir : &String, filter_params : &FilterParams, processing_params : &ProcessingParams, computing_parameters : &ComputingParams) {
      //
-     let dirpath = Path::new(hnswdir);
+     let dirpath = PathBuf::from(hnswdir);
      let data_type =  processing_params.get_sketching_params().get_data_t();
      match data_type {
          DataType::DNA => dna_process_tohnsw(&dirpath, &filter_params, &processing_params, &computing_parameters),
