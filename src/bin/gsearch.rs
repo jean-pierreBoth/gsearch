@@ -47,6 +47,8 @@
 //!     * \--seq if we want a processing by sequences. Default is to concatenate all sequences in a file
 //!             in a large sequence.
 //!  
+//!     The hnsw base and json files describing parameters, files processed is dump in current directory.
+//!     This directory is used as argument to add and query sub commands.
 //! 
 //! 2. ### sub command **add**  --hnsw \[-b\] hnsw_dir --new \[-n\] directory
 //! 
@@ -325,7 +327,12 @@ fn parse_add_cmd(matches : &ArgMatches) -> Result<AddParams, anyhow::Error> {
 fn parse_request_cmd(matches : &ArgMatches) -> Result<RequestParams, anyhow::Error> {
     log::debug!("in parse_request");
     //
-    let to_check: &String = matches.get_one("request_dir").unwrap();  // as arg is required, we unwrap() !
+    let to_check : Option<&String> = matches.get_one("request_dir");
+    if to_check.is_none() {
+        log::error!("no --query option passed");
+        std::panic!("no --query option passed");
+    }
+    let to_check = to_check.unwrap();
     //
     let  request_dir = to_check.clone();
     let request_dirpath = Path::new(&to_check);
@@ -492,7 +499,7 @@ fn main() {
         )
         .arg(Arg::new("request_dir")
             .short('r')
-            .long("request_dir")
+            .long("query")
             .value_name("request_dir")
             .help("Sets the directory of request genomes")
             .value_parser(clap::value_parser!(String))

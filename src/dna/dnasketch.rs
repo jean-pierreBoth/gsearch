@@ -98,6 +98,18 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT+KmerBuilder<Kmer>, Ske
         hnsw = Hnsw::< <Sketcher as SeqSketcherT<Kmer>>::Sig, DistHamming>::new(hnsw_params.get_max_nb_connection() as usize , hnsw_params.capacity , 16, hnsw_params.get_ef(), DistHamming{});
         state = ProcessingState::new();
     }
+    //
+    // where do we dump hnsw* seqdict and so on
+    // If in add mode we dump where is already an hnsw database
+    // If creation mode we dump in .
+    //
+    let dump_path= if other_params.get_adding_mode() {
+        hnsw_pb.clone()
+    } else {
+        PathBuf::from(".")
+    };
+    let dump_path_ref = &dump_path;
+    //
     hnsw.set_extend_candidates(true);
     hnsw.set_keeping_pruned(false);
     //
@@ -151,7 +163,7 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT+KmerBuilder<Kmer>, Ske
             state.elapsed_t =  start_t_prod.elapsed().unwrap().as_secs() as f32;
             log::info!("sender processed in  system time(s) : {}", state.elapsed_t);
             // dump processing state in the current directory
-            let _ = state.dump_json(hnsw_pb);
+            let _ = state.dump_json(dump_path_ref);
             Box::new(nb_sent)
         });
         //
@@ -162,7 +174,7 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT+KmerBuilder<Kmer>, Ske
             let mut seqdict : SeqDict;
             if other_params.get_adding_mode() {
                 // must reload seqdict
-                let mut filepath = PathBuf::from(hnsw_pb.clone());
+                let mut filepath = PathBuf::from(dump_path_ref.clone());
                 filepath.push("seqdict.json");
                 let res_reload = SeqDict::reload_json(&filepath);
                 if res_reload.is_err() {
@@ -240,7 +252,7 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT+KmerBuilder<Kmer>, Ske
             // We must dump hnsw to save "database" if not empty
             //
             if  hnsw.get_nb_point() > 0 {
-                let mut hnsw_dump = hnsw_pb.to_path_buf().clone();
+                let mut hnsw_dump = dump_path_ref.to_path_buf().clone();
                 hnsw_dump.push("hnswdump");
                 let hnswdumpname = String::from(hnsw_dump.to_str().unwrap());
                 log::info!("going to dump hnsw with prefix : {:?}", hnswdumpname);
@@ -254,7 +266,7 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT+KmerBuilder<Kmer>, Ske
                 // dump some info on layer structure
                 hnsw.dump_layer_info();
                 // dumping dictionary
-                let mut seq_pb = hnsw_pb.clone();
+                let mut seq_pb = dump_path_ref.clone();
                 seq_pb.push("seqdict.json");
                 let seqdict_name = String::from(seq_pb.to_str().unwrap());
                 let resdump = seqdict.dump(seqdict_name);
@@ -269,7 +281,7 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT+KmerBuilder<Kmer>, Ske
                 log::info!("no dumping hnsw, no data points");
             }
             // and finally dump processing parameters in file name "parameters.json"
-            let _ = processing_params.dump_json(hnsw_pb);
+            let _ = processing_params.dump_json(dump_path_ref);
             // get time for io and fasta parsing
             if sender_cpu.is_ok() {
                 let cpu_time = sender_cpu.unwrap().try_elapsed();
