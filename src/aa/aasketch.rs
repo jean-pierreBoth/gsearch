@@ -8,7 +8,7 @@ use crossbeam_channel::*;
 use serde::{de::DeserializeOwned, Serialize};
 
 use std::fmt::{Debug};
-use std::path::{Path, PathBuf};
+use std::path::{PathBuf};
 
 
 // our crate
@@ -88,7 +88,19 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT + KmerBuilder<Kmer>, S
         let hnsw_params = processing_params.get_hnsw_params();
         hnsw = Hnsw::< <Sketcher as SeqSketcherAAT<Kmer>>::Sig, DistHamming>::new(hnsw_params.get_max_nb_connection() as usize , hnsw_params.capacity , 16, hnsw_params.get_ef(), DistHamming{});
         state = ProcessingState::new();
-     }
+    }
+    //
+    // where do we dump hnsw* seqdict and so on
+    // If in add mode we dump where is already an hnsw database
+    // If creation mode we dump in .
+    //
+    let dump_path= if other_params.get_adding_mode() {
+        hnsw_pb.clone()
+    } else {
+        PathBuf::from(".")
+    };
+    let dump_path_ref = &dump_path;
+    //
     hnsw.set_extend_candidates(true);
     hnsw.set_keeping_pruned(false);
     //
@@ -137,8 +149,8 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT + KmerBuilder<Kmer>, S
             drop(send);
             state.elapsed_t =  start_t_prod.elapsed().unwrap().as_secs() as f32;
             log::info!("sender processed in  system time(s) : {}", state.elapsed_t);
-            // dump processing state in the current directory
-            let _ = state.dump_json(&Path::new("./"));
+            // dump processing state 
+            let _ = state.dump_json(&dump_path_ref);
             Box::new(nb_sent)
         });
         // sequence reception, consumer thread
@@ -146,15 +158,11 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT + KmerBuilder<Kmer>, S
             let mut seqdict : SeqDict;
             if other_params.get_adding_mode() {
                 // must reload seqdict
-                let mut filepath = PathBuf::new();
+                let mut filepath = PathBuf::from(dump_path_ref.clone());
                 filepath.push("seqdict.json");
                 let res_reload = SeqDict::reload_json(&filepath);
                 if res_reload.is_err() {
-                    let cwd = std::env::current_dir();
-                    if cwd.is_ok() {
-                        log::info!("current directory : {:?}", cwd.unwrap());
-                    }
-                    log::error!("cannot reload SeqDict (file 'seq.json' from current directory");
+                    log::error!("cannot reload SeqDict (file 'seq.json' from {:?}", filepath);
                     std::process::exit(1);   
                 }
                 else {
@@ -220,7 +228,7 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT + KmerBuilder<Kmer>, S
             // We must dump hnsw to save "database" if not empty
             //
             if  hnsw.get_nb_point() > 0 {
-                let mut hnsw_dump = hnsw_pb.to_path_buf().clone();
+                let mut hnsw_dump = dump_path_ref.to_path_buf().clone();
                 hnsw_dump.push("hnswdump");
                 let hnswdumpname = String::from(hnsw_dump.to_str().unwrap());
                 log::info!("going to dump hnsw with prefix : {:?}", hnswdumpname);
