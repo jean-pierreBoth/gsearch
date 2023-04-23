@@ -178,7 +178,11 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT+KmerBuilder<Kmer>, Ske
                 filepath.push("seqdict.json");
                 let res_reload = SeqDict::reload_json(&filepath);
                 if res_reload.is_err() {
-                    log::error!("cannot reload SeqDict (file 'seq.json' from {:?}", filepath);
+                    let cwd = std::env::current_dir();
+                    if cwd.is_ok() {
+                        log::info!("current directory : {:?}", cwd.unwrap());
+                    }
+                    log::error!("cannot reload SeqDict (file 'seq.json' from current directory");
                     std::process::exit(1);   
                 }
                 else {

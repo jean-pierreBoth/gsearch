@@ -47,8 +47,6 @@
 //!     * \--seq if we want a processing by sequences. Default is to concatenate all sequences in a file
 //!             in a large sequence.
 //!  
-//!     The hnsw base and json files describing parameters, files processed is dump in current directory.
-//!     This directory is used as argument to add and query sub commands.
 //! 
 //! 2. ### sub command **add**  --hnsw \[-b\] hnsw_dir --new \[-n\] directory
 //! 
@@ -327,12 +325,7 @@ fn parse_add_cmd(matches : &ArgMatches) -> Result<AddParams, anyhow::Error> {
 fn parse_request_cmd(matches : &ArgMatches) -> Result<RequestParams, anyhow::Error> {
     log::debug!("in parse_request");
     //
-    let to_check : Option<&String> = matches.get_one("request_dir");
-    if to_check.is_none() {
-        log::error!("no --query option passed");
-        std::panic!("no --query option passed");
-    }
-    let to_check = to_check.unwrap();
+    let to_check: &String = matches.get_one("request_dir").unwrap();  // as arg is required, we unwrap() !
     //
     let  request_dir = to_check.clone();
     let request_dirpath = Path::new(&to_check);
@@ -342,7 +335,12 @@ fn parse_request_cmd(matches : &ArgMatches) -> Result<RequestParams, anyhow::Err
     }
 
     // parse database dir
-    let to_check : &String = matches.get_one("database_path").unwrap();
+    let to_check : Option<&String> = matches.get_one("database_path");
+    if to_check.is_none() {
+        log::error!("no --query option passed");
+        std::panic!("no --query option passed");
+    }
+    let to_check = to_check.unwrap();
     let database_dir = to_check.clone();
     let database_dirpath = Path::new(&database_dir);
     if !database_dirpath.is_dir() {
@@ -395,7 +393,7 @@ fn main() {
     let _ = init_log();
 
     let tohnsw_cmd  = Command::new("tohnsw")
-        .about("Build HNSW graph database from a collection of database genomes based on minhash metric")
+        .about("Build HNSW graph database from a collection of database genomes based on MinHash-like metric")
         .arg(Arg::new("hnsw_dir")
             .short('d')
             .long("dir")
@@ -459,7 +457,7 @@ fn main() {
     // all others parameters are reloaded for json dumps.
 
     let add_cmd =  Command::new("add")
-        .about("add file to a hnsw database")
+        .about("Add new genome files to a pre-built HNSW graph database")
         .arg(Arg::new("hnsw_dir")
             .required(true)
             .long("hnsw")
@@ -477,7 +475,7 @@ fn main() {
 
 
     let request_cmd =  Command::new("request")
-        .about("Request nearest neighbors of query genomes against a pre-built HNSW database/HNSW index")
+        .about("Request nearest neighbors of query genomes against a pre-built HNSW graph database/index")
         .arg(
             Arg::new("database_path")
             .short('b')
@@ -499,7 +497,7 @@ fn main() {
         )
         .arg(Arg::new("request_dir")
             .short('r')
-            .long("query")
+            .long("request_dir")
             .value_name("request_dir")
             .help("Sets the directory of request genomes")
             .value_parser(clap::value_parser!(String))
@@ -507,7 +505,7 @@ fn main() {
     );
     // ann command
     let ann_cmd = Command::new("ann")
-        .about("annembed usage")
+        .about("Approximate Nearest Neighbor Embedding using UMAP-like algorithm")
         .arg(Arg::new("stats")
             .long("stats")
             .short('s')

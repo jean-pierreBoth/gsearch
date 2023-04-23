@@ -199,7 +199,12 @@ fn sketch_and_request_dir_compressedkmer<Kmer:CompressedKmerT + KmerBuilder<Kmer
             Box::new(nb_request)
         }); // end of receptor thread
         // now we must join handles
-        let nb_sent = sender_handle.join().unwrap();
+        let join_opt = sender_handle.join();
+        if join_opt.is_err() {
+            log::error!("sketch_and_request_dir_compressedkmer : error occurred in thread join");
+            std::panic!("sketch_and_request_dir_compressedkmer : error occurred in thread join");
+        }
+        let nb_sent = join_opt.unwrap();
         let nb_received = receptor_handle.join().unwrap();
         log::debug!("sketch_and_request_dir, nb_sent = {}, nb_received = {}", nb_sent, nb_received);
         if nb_sent != nb_received {

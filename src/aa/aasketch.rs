@@ -9,7 +9,7 @@ use serde::{de::DeserializeOwned, Serialize};
 
 use std::fmt::{Debug};
 use std::path::{PathBuf};
-
+use cpu_time::ThreadTime;
 
 // our crate
 use hnsw_rs::prelude::*;
@@ -149,12 +149,13 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT + KmerBuilder<Kmer>, S
             drop(send);
             state.elapsed_t =  start_t_prod.elapsed().unwrap().as_secs() as f32;
             log::info!("sender processed in  system time(s) : {}", state.elapsed_t);
-            // dump processing state 
-            let _ = state.dump_json(&dump_path_ref);
+            // dump processing state in the current directory
+            let _ = state.dump_json(dump_path_ref);
             Box::new(nb_sent)
         });
         // sequence reception, consumer thread
         let receptor_handle = scope.spawn(move |_| {
+            let sender_cpu = ThreadTime::try_now();
             let mut seqdict : SeqDict;
             if other_params.get_adding_mode() {
                 // must reload seqdict
@@ -162,7 +163,11 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT + KmerBuilder<Kmer>, S
                 filepath.push("seqdict.json");
                 let res_reload = SeqDict::reload_json(&filepath);
                 if res_reload.is_err() {
-                    log::error!("cannot reload SeqDict (file 'seq.json' from {:?}", filepath);
+                    let cwd = std::env::current_dir();
+                    if cwd.is_ok() {
+                        log::info!("current directory : {:?}", cwd.unwrap());
+                    }
+                    log::error!("cannot reload SeqDict (file 'seq.json' from current directory");
                     std::process::exit(1);   
                 }
                 else {
@@ -242,7 +247,10 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT + KmerBuilder<Kmer>, S
                 // dump some info on layer structure
                 hnsw.dump_layer_info();
                 // dumping dictionary
-                let resdump = seqdict.dump(String::from("seqdict.json"));
+                let mut seq_pb = dump_path_ref.clone();
+                seq_pb.push("seqdict.json");
+                let seqdict_name = String::from(seq_pb.to_str().unwrap());
+                let resdump = seqdict.dump(seqdict_name);
                 match resdump {
                     Err(msg) => {
                         println!("seqdict dump failed error msg : {}", msg);
@@ -254,8 +262,14 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT + KmerBuilder<Kmer>, S
                 log::info!("no dumping hnsw, no data points");
             }
             // and finally dump processing parameters in file name "parameters.json"
-            let _ = processing_params.dump_json(&hnsw_pb);
-            //
+            let _ = processing_params.dump_json(dump_path_ref);
+            // get time for io and fasta parsing
+            if sender_cpu.is_ok() {
+                let cpu_time = sender_cpu.unwrap().try_elapsed();
+                if cpu_time.is_ok() {
+                    log::info!("sender needed : {}", cpu_time.unwrap().as_secs());
+                }
+            }
             Box::new(seqdict.0.len())
         }); // end of receptor thread
         // now we must join handles
