@@ -1,4 +1,4 @@
-# Gsearch: A rust classifier based on various minhash metric and HNSW for microbial genomes
+# GSearch: A Rust Classifier based on Various MinHash-like Metric and HNSW for Microbial Genomes
 
 ![Alt!](https://github.com/jean-pierreBoth/gsearch/blob/master/GSearch-logo.jpg?raw=true)
 
@@ -20,13 +20,13 @@ The Jaccard index come in 2 flavours:
     $$J_{P(A,B)}=\sum_{d\in D} \frac{1}{\sum_{d'\in D} \max (\frac{\omega_{A}(d')}{\omega_{A}(d)},\frac{\omega_{B}(d')}{\omega_{B}(d)})}$$
     where $\omega_{A}(d)$ is the multiplicity of $d$ in A
     (see [Moulton-Jiang-arxiv](https://arxiv.org/abs/1809.04052)).
-    In this case we use the probminhash algorithm as implemented in [probminhash](https://github.com/jean-pierreBoth/probminhash)  
+    In this case for J_p we use the probminhash algorithm as implemented in [probminhash](https://github.com/jean-pierreBoth/probminhash)  
     2. The unweighted (simple) Jaccard index defined by :
         $$Jaccard(A,B)=\frac{A \cap B}{A \cup B}$$
-        In this case we use the SuperMinhash or the SetSketch (based on hyperloglog) method.  
-    The estimated Jaccard index is used to build HNSW graph database, which is implemented in crate [hnswlib-rs](https://crates.io/crates/hnsw_rs).
+        In this case for J we use the [SuperMinHash](https://arxiv.org/abs/1706.05698) or the [SetSketch](https://vldb.org/pvldb/vol14/p2244-ertl.pdf) (based on hyperloglog) method, also implemented in probminhash mentioned above.  
+    The estimated Jaccard-like index is used to build HNSW graph database, which is implemented in crate [hnswlib-rs](https://crates.io/crates/hnsw_rs).
 
-The sketching of reference genomes can take some time (one or 2 hours for ~65,000 bacterial genomes of NCBI for parameters giving a correct quality of sketching). Result is stored in 2 structures:
+The sketching of reference genomes can take some time (less than one hours for ~65,000 bacterial genomes of GTDB for parameters giving a correct quality of sketching, or 3 to 4 hours for entire NCBI/RefSeq prokaryotic genomes. ~318K). Result is stored in 2 structures:
 
 - A Hnsw structure storing rank of data processed and corresponding sketches.
 - A Dictionary associating each rank to a fasta id and fasta filename.
@@ -59,27 +59,25 @@ Otherwise it is possible to install/compile by yourself (see install section)
 
 ### get the binary for linux (make sure you have recent Linux installed with GCC, e.g., Ubuntu 18.0.4 or above)
 
-wget <https://github.com/jean-pierreBoth/gsearch/releases/download/v0.0.12/GSearch_Linux_x86-64_intel-mkl-static.zip>
-unzip GSearch_Linux_x86-64_intel-mkl-static.zip
+wget <https://github.com/jean-pierreBoth/gsearch/releases/download/0.1.1/gsearch-linux-x86-64.zip>
+unzip gsearch-linux-x86-64.zip
 
 ## get the binary for macOS
 
-wget <https://github.com/jean-pierreBoth/gsearch/releases/download/v0.0.12/GSearch_darwin_universal.zip>
-unzip GSearch_darwin_universal.zip
+wget <https://github.com/jean-pierreBoth/gsearch/releases/download/0.1.1/gsearch-darwin-x86-64.zip>
+unzip gsearch-darwin-x86-64.zip
 
 * **make it excutable (changed it accordingly on macOS)**
 
-chmod a+x ./GSearch_Linux_x86-64_intel-mkl-static/*
+chmod a+x ./gsearch
 
 
 ### put it under your system/usr bin directory (/usr/local/bin/ as an example) where it can be called
 
-mv ./GSearch_Linux_x86-64_intel-mkl-static/* /usr/local/bin/
+mv ./gsearch /usr/local/bin/
 
 ### check install
-
-tohnsw -h
-request -h
+gsearch -h
 
 ### check install MacOS, you may need to change the system setup to allow external binary to run by type the following first and use your admin password
 
@@ -87,7 +85,7 @@ sudo spctl --master-disable
 
 ### and then
 
-gsearchbin -h
+gsearch -h
 
 ```
 
@@ -110,24 +108,24 @@ cd ./GTDB_r207_hnsw_graph/nucl
 
 ### request neighbors for nt genomes (here -n is how many neighbors you want to return for each of your query genome)
 
-gsearchbin request -b ./ -r ../../test_data/query_dir_nt -n 50
+gsearch request -b ./ -r ../../test_data/query_dir_nt -n 50
 
 ### or request neighbors for aa genomes (predicted by Prodigal or FragGeneScanRs)
 
 cd ./GTDB_r207_hnsw_graph/prot
-gsearchbin request -b ./ -r ../../test_data/query_dir_aa -n 50 --aa
+gsearch request -b ./ -r ../../test_data/query_dir_aa -n 50 --aa
 
 ### or request neighbors for aa universal gene (extracted by hmmer according to hmm files from gtdb, we also provide one in release page)
 
 cd ./GTDB_r207_hnsw_graph/universal
-gsearchbin request -b ./ -r ../../test_data/query_dir_universal_aa -n 50 --aa
+gsearch request -b ./ -r ../../test_data/query_dir_universal_aa -n 50 --aa
 
 ### Building database. database is huge in size, users are welcome to download gtdb database here: (<https://data.ace.uq.edu.au/public/gtdb/data/releases/release207/207.0/genomic_files_reps/gtdb_genomes_reps_r207.tar.gz>) and here (<https://data.ace.uq.edu.au/public/gtdb/data/releases/release207/207.0/genomic_files_reps/gtdb_proteins_aa_reps_r207.tar.gz>)
 
 ### build database given genome file directory, fna.gz was expected. L for nt and .faa or .faa.gz for --aa. Limit for k is 32 (15 not work due to compression), for s is 65535 (u16) and for n is 255 (u8)
 
-gsearchbin tohnsw -d db_dir_nt -s 12000 -k 16 --ef 1600 -n 128
-gsearchbin tohnsw -d db_dir_aa -s 12000 -k 7 --ef 1600 -n 128 --aa
+gsearch tohnsw -d db_dir_nt -s 12000 -k 16 --ef 1600 -n 128
+gsearch tohnsw -d db_dir_aa -s 12000 -k 7 --ef 1600 -n 128 --aa
 
 ### When there are new genomes  after comparing with the current database (GTDB v207, e.g. ANI < 95% with any genome after searcing, corresponding to >0.875 ProbMinHash distance), those genomes can be added to the database
 
@@ -137,12 +135,12 @@ cd ./GTDB_r207_hnsw_graph/nucl
 
 ### old .graph,.data and all .json files will be updated to the new one. Then the new one can be used for requesting as an updated database
 
-gsearchbin tohnsw -d db_dir_nt (new genomes directory) -s 12000 -k 16 --ef 1600 -n 128 --add
+gsearch add -b hnsw_dir -n db_dir_nt (new genomes directory) 
 
 ### or add at the amino acid level
 
 cd ./GTDB_r207_hnsw_graph/prot
-gsearchbin tohnsw -d db_dir_nt (new genomes directory in AA format predicted by prodigal/FragGeneScanRs) -s 12000 -k 16 --ef 1600 -n 128 --aa --add
+gsearch add -b hnsw_dir -n db_dir_nt (new genomes directory in AA format predicted by prodigal/FragGeneScanRs)
 
 ```
 
