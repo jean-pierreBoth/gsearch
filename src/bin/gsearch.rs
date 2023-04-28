@@ -62,7 +62,7 @@
 //! 3. ### sub command **request**  --hnsw \[-b\] databasedir --query [-r]  requestdir -n neighbours
 //! 
 //!     * \--hnsw expects the name of directory containing hnsw dump files and seqdict dump
-//!     * \--requestdir expects a directory containing list of fasta file containing sequence to search for
+//!     * \--query expects a directory containing list of fasta file containing sequence to search for
 //!     * -n number of neighbours asked for, i.e number of neighbours asked for
 //!
 //! 4. ### sub command ann
@@ -497,7 +497,7 @@ fn main() {
         )
         .arg(Arg::new("request_dir")
             .short('r')
-            .long("request_dir")
+            .long("query")
             .value_name("request_dir")
             .help("Sets the directory of request genomes")
             .value_parser(clap::value_parser!(String))
