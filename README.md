@@ -1,4 +1,4 @@
-# GSearch: A Rust Classifier based on Various MinHash-like Metric and HNSW for Microbial Genomes
+# GSearch: A Rust Genomic Search Program based on Various MinHash-like Metric and HNSW for Microbial Genomes
 
 ![Alt!](https://github.com/jean-pierreBoth/gsearch/blob/master/GSearch-logo.jpg?raw=true)
 
@@ -59,88 +59,103 @@ Otherwise it is possible to install/compile by yourself (see install section)
 
 ### get the binary for linux (make sure you have recent Linux installed with GCC, e.g., Ubuntu 18.0.4 or above)
 
-wget <https://github.com/jean-pierreBoth/gsearch/releases/download/0.1.1/gsearch-linux-x86-64.zip>
+wget https://github.com/jean-pierreBoth/gsearch/releases/download/0.1.1/gsearch-linux-x86-64.zip --no-check-certificate
 unzip gsearch-linux-x86-64.zip
 
-## get the binary for macOS
-
-wget <https://github.com/jean-pierreBoth/gsearch/releases/download/0.1.1/gsearch-darwin-x86-64.zip>
+## get the x86-64 binary for macOS
+wget https://github.com/jean-pierreBoth/gsearch/releases/download/0.1.1/gsearch-darwin-x86-64.zip --no-check-certificate
 unzip gsearch-darwin-x86-64.zip
+## get the aarch64/arm64 binary for macOS
+wget https://github.com/jean-pierreBoth/gsearch/releases/download/0.1.1/gsearch-darwin-aarch64.zip --no-check-certificate
+unzip gsearch-darwin-aarch64.zip
+
+
+## Note that for MacOS, xz library will need to be installed. You need to install homebrew first (with your user password)
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+brew install openblas xz
 
 * **make it excutable (changed it accordingly on macOS)**
-
 chmod a+x ./gsearch
 
-
 ### put it under your system/usr bin directory (/usr/local/bin/ as an example) where it can be called
-
 mv ./gsearch /usr/local/bin/
-
 ### check install
 gsearch -h
-
 ### check install MacOS, you may need to change the system setup to allow external binary to run by type the following first and use your admin password
-
 sudo spctl --master-disable
 
-### and then
-
-gsearch -h
 
 ```
 
 ## usage
 
-We give here an example of utilization with prebuilt databases.
+```bash
+gsearch -h
+ ************** initializing logger *****************
+
+Approximate nearest neighbour search for microbial genomes based on minhash metric
+
+Usage: gsearch [OPTIONS] [COMMAND]
+
+Commands:
+  tohnsw   Build HNSW graph database from a collection of database genomes based on MinHash-like metric
+  add      Add new genome files to a pre-built HNSW graph database
+  request  Request nearest neighbors of query genomes against a pre-built HNSW graph database/index
+  ann      Approximate Nearest Neighbor Embedding using UMAP-like algorithm
+  help     Print this message or the help of the given subcommand(s)
+
+Options:
+      --pio <pio>  Parallel IO processing
+  -h, --help       Print help
+  -V, --version    Print version
+
+```
+
+We then give here an example of utilization with prebuilt databases.
 
 ```bash
 ### download neighbours for each genomes (fna, fasta, faa et.al. are supported) in query_dir_nt or aa using pre-built database
 
-wget <http://enve-omics.ce.gatech.edu/data/public_gsearch/GTDB_r207_hnsw_graph.tar.gz>
-tar xzvf ./GTDB_r207_hnsw_graph.tar.gz
+wget http://enve-omics.ce.gatech.edu/data/public_gsearch/GTDBv207_v2023.tar.gz
+tar xzvf ./GTDBv207_v2023.tar.gz
 
 ### get test data, we provide 2 genomes at nt, AA and universal gene level
 
-wget <https://github.com/jean-pierreBoth/gsearch/releases/download/v0.0.12/test_data.tar.gz>
+wget https://github.com/jean-pierreBoth/gsearch/releases/download/v0.0.12/test_data.tar.gz --no-check-certificate
 tar xzvf ./test_data.tar.gz
 
-cd ./GTDB_r207_hnsw_graph/nucl
-
+cd ./GTDB/nucl
+tar -xzvf k16_s12000_n128_ef1600.prob.tar.gz
 ### request neighbors for nt genomes (here -n is how many neighbors you want to return for each of your query genome)
 
-gsearch request -b ./ -r ../../test_data/query_dir_nt -n 50
+gsearch request -b ./k16_s12000_n128_ef1600_canonical -r ../../test_data/query_dir_nt -n 50
 
 ### or request neighbors for aa genomes (predicted by Prodigal or FragGeneScanRs)
 
-cd ./GTDB_r207_hnsw_graph/prot
-gsearch request -b ./ -r ../../test_data/query_dir_aa -n 50 --aa
+cd ./GTDB/prot
+gsearch request -b ./k7_s12000_n128_ef1600_gsearch -r ../../test_data/query_dir_aa -n 50
 
 ### or request neighbors for aa universal gene (extracted by hmmer according to hmm files from gtdb, we also provide one in release page)
 
-cd ./GTDB_r207_hnsw_graph/universal
-gsearch request -b ./ -r ../../test_data/query_dir_universal_aa -n 50 --aa
+cd ./GTDB/universal
+gsearch request -b ./k5_n128_s1800_ef1600_universal_prob -r ../../test_data/query_dir_universal_aa -n 50
 
 ### Building database. database is huge in size, users are welcome to download gtdb database here: (<https://data.ace.uq.edu.au/public/gtdb/data/releases/release207/207.0/genomic_files_reps/gtdb_genomes_reps_r207.tar.gz>) and here (<https://data.ace.uq.edu.au/public/gtdb/data/releases/release207/207.0/genomic_files_reps/gtdb_proteins_aa_reps_r207.tar.gz>)
 
 ### build database given genome file directory, fna.gz was expected. L for nt and .faa or .faa.gz for --aa. Limit for k is 32 (15 not work due to compression), for s is 65535 (u16) and for n is 255 (u8)
 
-gsearch tohnsw -d db_dir_nt -s 12000 -k 16 --ef 1600 -n 128
-gsearch tohnsw -d db_dir_aa -s 12000 -k 7 --ef 1600 -n 128 --aa
+gsearch tohnsw -d db_dir_nt -s 12000 -k 16 --ef 1600 -n 128 --algo prob
+gsearch tohnsw -d db_dir_aa -s 12000 -k 7 --ef 1600 -n 128 --aa --algo prob
 
 ### When there are new genomes  after comparing with the current database (GTDB v207, e.g. ANI < 95% with any genome after searcing, corresponding to >0.875 ProbMinHash distance), those genomes can be added to the database
 
-### must run in the existing database file folder
-
-cd ./GTDB_r207_hnsw_graph/nucl
-
 ### old .graph,.data and all .json files will be updated to the new one. Then the new one can be used for requesting as an updated database
 
-gsearch add -b hnsw_dir -n db_dir_nt (new genomes directory) 
+gsearch add -b ./k16_s12000_n128_ef1600_canonical -n db_dir_nt (new genomes directory) 
 
-### or add at the amino acid level
-
-cd ./GTDB_r207_hnsw_graph/prot
-gsearch add -b hnsw_dir -n db_dir_nt (new genomes directory in AA format predicted by prodigal/FragGeneScanRs)
+### or add at the amino acid level, in the parameters.json file you can check whether it is DNA or AA data via the "data_t" field
+cd ./GTDB/prot
+gsearch add -b ./k7_s12000_n128_ef1600_gsearch -n db_dir_nt (new genomes directory in AA format predicted by prodigal/FragGeneScanRs)
 
 ```
 
@@ -242,10 +257,11 @@ cargo install --git https://gitlab.com/Jianshu_Zhao/fraggenescanrs
 
 We provide pre-built genome/proteome database graph file for bacteria/archaea, virus and fungi. Proteome database are based on genes for each genome, predicted by FragGeneScanRs (<https://gitlab.com/Jianshu_Zhao/fraggenescanrs>) for bacteria/archaea/virus and GeneMark-ES version 2 (<http://exon.gatech.edu/GeneMark/license_download.cgi>) for fungi.  
 
-- Bacteria/archaea genomes are the newest version of GTDB database (<https://gtdb.ecogenomic.org>), which defines a bacterial speces at 95% ANI. Note that GSearch can also run for even higher resolution species database such as 99% ANI.
+- Bacteria/archaea genomes are the newest version of GTDB database (v207, 67,503genomes) (<https://gtdb.ecogenomic.org>), which defines a bacterial speces at 95% ANI. Note that GSearch can also run for even higher resolution species database such as 99% ANI.
+- Bacteria/archaea genomes from NCBI/RefSeq until Jan. 2023 (~318,000 genomes)(<https://www.ncbi.nlm.nih.gov/refseq/about/prokaryotes/>), no clustering at a given ANI threshold.
 - Virus data base are based on the JGI IMG/VR database newest version (<https://genome.jgi.doe.gov/portal/IMG_VR/IMG_VR.home.html>), which also define a virus OTU (vOTU) at 95% ANI.  
 - Fungi database are based on the entire RefSeq fungal genomes (retrived via the MycoCosm website), we dereplicated and define a fungal speices at 99.5% ANI.
-- All three pre-built databases are available here:<http://enve-omics.ce.gatech.edu/data/gsearch>
+- All four pre-built databases are available here:<http://enve-omics.ce.gatech.edu/data/gsearch>
 
 ## References
 
