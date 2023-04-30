@@ -65,8 +65,15 @@
 //!     * \--query expects a directory containing list of fasta file containing sequence to search for
 //!     * -n number of neighbours asked for, i.e number of neighbours asked for
 //!
-//! 4. ### sub command ann
-//!
+//! 4. ### sub command ann --hnsw \[\b\] hnsw_dir --embed or --stats (or both flags)
+//! 
+//!     * \--hnsw expects the name of directory containing hnsw dump files and seqdict dump, it is mandatory
+//!     * \--embed    this flag ask for an embedding with default parameters. A csv file will be produced.
+//!     * \--stats    this flag ask for neighbourhood statistics
+//!     
+//!     At least one of the two flags **embed** or **stats**  is required
+//!     
+//! 
 //! ## Some hints on sketching to use
 //! 
 //!  The Probminhash algorithm takes multiplicity of kmers of kmers into account, so it is useful for cases where kmer multiplicity is important.
@@ -359,23 +366,39 @@ fn parse_request_cmd(matches : &ArgMatches) -> Result<RequestParams, anyhow::Err
 
     // parse ann command
 
-pub fn parse_ann_cmd( matches : &ArgMatches) -> Result<AnnParameters, anyhow::Error> {
+pub fn parse_ann_cmd(matches : &ArgMatches) -> Result<AnnParameters, anyhow::Error> {
     log::debug!("in parse_ann_cmd");
+    // parse database dir
+    let database_dir : &String;
+    if matches.contains_id("hnsw_dir") {
+        println!("decoding argument dir");
+        database_dir = matches.get_one("hnsw_dir").expect("");
+        if database_dir == "" {
+            println!("parsing of database_dir failed");
+            std::process::exit(1);
+        }
+    }
+    else {
+        println!("-b database_dir is mandatory");
+        std::process::exit(1);
+    }
+    //
     let ask_stats = matches.get_flag("stats");
-    let embed = matches.get_flag("embed");
     if ask_stats {
         log::info!("ann cmd with stats flag")
     }
     //
+    let embed = matches.get_flag("embed");
     if embed {
         log::info!("ann cmd with embed flag")
     }
+    // we must have at least one flag
     if !ask_stats && !embed {
         log::error!("ann cmd without flag");
         std::panic!("ann cmd without flag");
     }
     //
-    let ann_params = AnnParameters::new(ask_stats, embed);
+    let ann_params = AnnParameters::new(database_dir.clone(), ask_stats, embed);
     //
     return Ok(ann_params);
 } // end of parse_ann_cmd
@@ -387,6 +410,7 @@ enum CmdType {
     TOHNSW,
     ADD,
     REQUEST,
+    ANN,
 }
 
 fn main() {
@@ -506,6 +530,14 @@ fn main() {
     // ann command
     let ann_cmd = Command::new("ann")
         .about("Approximate Nearest Neighbor Embedding using UMAP-like algorithm")
+        .arg(Arg::new("hnsw_dir")
+            .short('b')
+            .long("hnsw")
+            .help("directory containing hnsw")
+            .required(true)
+            .value_parser(clap::value_parser!(String))
+            .action(ArgAction::Set)
+        )
         .arg(Arg::new("stats")
             .long("stats")
             .short('s')
@@ -513,6 +545,7 @@ fn main() {
             .help("to get stats on nb neighbours"))
         .arg(Arg::new("embed")
             .long("embed")
+            .short('e')
             .action(ArgAction::SetTrue)
             .help("--embed to do an embedding")
     );
@@ -547,6 +580,7 @@ fn main() {
     let cmd : CmdType;
     let mut add_params_opt : Option<AddParams> = None;
     let mut req_params_opt : Option<RequestParams> = None;
+    let mut ann_params_opt : Option<AnnParameters> = None;
     let mut addseq = false;
     //
     // which command do we have
@@ -603,18 +637,25 @@ fn main() {
         }
         hnsw_dir = req_params_opt.as_ref().unwrap().get_hnsw_dir().clone();
     } // end of request
-    else {
-        log::error!("at least one command  tohnnsw, add or request must be given");
-        std::panic!("at least one command  tohnnsw, add or request must be given");
+    else if let Some(ann_match) = matches.subcommand_matches("ann") {
+        // parsing ann command
+        log::debug!("subcommand_matches got ann command");
+        cmd = CmdType::ANN;
+        let ann_params= parse_ann_cmd(ann_match).unwrap();
+        hnsw_dir = ann_params.get_hnsw_dir().unwrap().clone();
+        ann_params_opt = Some(ann_params);
     }
-
+    else {
+        log::error!("at least one command  tohnnsw, add, request or ann  must be given");
+        std::panic!("at least one command  tohnnsw, add, request or ann must be given");
+    }
+    // 
     let ann_params : AnnParameters;
-    if let Some(ann_match) = matches.subcommand_matches("ann") {
-        log::debug!("subcommand_matches got ann command"); 
-        ann_params = parse_ann_cmd(ann_match).unwrap();
+    if ann_params_opt.is_none() {
+        ann_params = AnnParameters::default();
     }
-    else {
-        ann_params = AnnParameters::new(false, false)
+    else{
+        ann_params = ann_params_opt.unwrap();
     }
     //
     // Now we have parsed commands
@@ -663,7 +704,35 @@ fn main() {
                                     treat_from_hnsw(req_params_opt.as_ref().unwrap(), &filter_params, 
                                                                 &processing_params,
                                                                 &computing_params,
-                                                                &ann_params); }
+                                                                &ann_params); 
+                                }  // end REQUEST
+
+        CmdType::ANN            =>  {
+                                    let hnsw_path = Path::new(&hnsw_dir);
+                                    let type_name = reloadhnsw::get_hnsw_type(hnsw_path);
+                                    if type_name.is_err() {
+                                        log::error!("cannot get type of data in Hnsw");
+                                        std::process::exit(1);
+                                    }
+                                    let type_name = type_name.unwrap();
+                                    log::info!("got type in hnsw : {}", &type_name);
+                                    match type_name.as_str() {
+                                        "u32" => {  // probminhash case
+                                            let _ = reloadhnsw::reload_hnsw::<u32>(&hnsw_path, &ann_params);
+                                        }
+                                        "u16" => {
+                                            // hll case
+                                            let _ = reloadhnsw::reload_hnsw::<u16>(&hnsw_path, &ann_params);
+                                        }
+                                        "f32" => {
+                                            // superminhash case
+                                            let _ = reloadhnsw::reload_hnsw::<f32>(&hnsw_path, &ann_params);
+                                        }  
+                                        _    => {
+                                            log::error!("unknow type of data in hnsw, type : {}", &type_name);
+                                        }                 
+                                    } // end match
+                                }  // end ANN 
     }
 }  // end of main
 

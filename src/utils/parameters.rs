@@ -61,8 +61,10 @@ impl HnswParams {
 
 //======================================================================================
 
-#[derive(Clone, Copy, Serialize,Deserialize)]
+#[derive(Clone, Serialize,Deserialize)]
 pub struct AnnParameters {
+    /// directory containing the Hnsw previous dmps
+    hnsw_dir : Option<String>,
     /// true to get statistics on neighbours
     ask_stats : bool,
     /// do an embedding or not
@@ -72,15 +74,15 @@ pub struct AnnParameters {
 
 impl Default for AnnParameters {
     fn default() -> Self {
-        AnnParameters{ask_stats:false, embed:false}
+        AnnParameters{hnsw_dir : None, ask_stats:false, embed:false}
     }
 } // end of default for AnnParameters
 
 
 impl AnnParameters {
     // default initiaization is false for embed
-    pub fn new(ask_stats : bool, embed : bool) -> Self {
-        AnnParameters{ask_stats, embed}
+    pub fn new(hnsw_dir : String, ask_stats : bool, embed : bool) -> Self {
+        AnnParameters{hnsw_dir : Some(hnsw_dir), ask_stats, embed}
     }
 
     /// returns if stats on distance on nearest neighbours resulting from hnsw information were asked for
@@ -91,6 +93,14 @@ impl AnnParameters {
 
     pub fn embed(&self) -> bool {
         self.embed
+    }
+
+    // returns hnsw directory if any
+    pub fn get_hnsw_dir(&self) -> Option<&String> {
+        match self.hnsw_dir {
+            Some(_) => { self.hnsw_dir.as_ref()}
+            _                  => { None}
+        }
     }
 } // end of impl AnnParameters
 
