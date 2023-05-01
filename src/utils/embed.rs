@@ -7,7 +7,7 @@ use csv::Writer;
 
 // our use
 use hnsw_rs::prelude::*;
-use annembed::fromhnsw::kgraph_from_hnsw_all;
+use annembed::fromhnsw::{hubness::Hubness,kgraph_from_hnsw_all};
 use annembed::prelude::*;
 
 
@@ -22,8 +22,13 @@ where
     let kgraph_res = kgraph_from_hnsw_all::<T, D, f32>(hnsw, knbn);
     if let Ok(kgraph) = kgraph_res {
         // we are just interested in quantile statistics on first distance to neighbours.
-        log::info!(" computing graph statistics");
+        log::info!("\n\n computing graph statistics");
         let _kgraph_stats = kgraph.get_kraph_stats();
+        // 
+        log::info!("\n\n hubness summary");
+        let hubness = Hubness::new(&kgraph);
+        let _ = hubness.get_hubness_histogram();
+        //
         if embed {
             log::info!(" going to embedding");
             let mut embed_params = EmbedderParams::default();

@@ -69,7 +69,7 @@
 //! 
 //!     * \--hnsw expects the name of directory containing hnsw dump files and seqdict dump, it is mandatory
 //!     * \--embed    this flag ask for an embedding with default parameters. A csv file will be produced.
-//!     * \--stats    this flag ask for neighbourhood statistics
+//!     * \--stats    this flag ask for neighbourhood statistics and node hubness histogram. See the crate [annembed](https://crates.io/crates/annembed)
 //!     
 //!     At least one of the two flags **embed** or **stats**  is required
 //!     
