@@ -198,90 +198,40 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT+KmerBuilder<Kmer>, Ske
                 // try read, if error is Disconnected we stop read and both threads are finished.
                 let res_receive = receive.recv();
                 match res_receive {
-                    Err(RecvError) => { read_more = false;
-                        // sketch the content of  insertion_queue if not empty
-                        if insertion_queue.len() > 0 {
-                            log::debug!("end of reception");
-                            let sequencegroup_ref : Vec<&Sequence> = insertion_queue.iter().map(|s| s.get_sequence_dna().unwrap()).collect();
-                            log::debug!("end of reception received nb seq : {}", sequencegroup_ref.len());
-                            // collect rank
-                            let seq_rank :  Vec<usize> = insertion_queue.iter().map(|s| s.get_rank()).collect();
-                            // collect Id
-                            let mut seq_id :  Vec<ItemDict> = insertion_queue.iter().map(|s| ItemDict::new(Id::new(s.get_path(), s.get_fasta_id()), s.get_seq_len())).collect();
-                            seqdict.0.append(&mut seq_id);
-                            let signatures = sketcher.sketch_compressedkmer(&sequencegroup_ref, kmer_hash_fn);                            
-                            // we have Vec<u64> signatures we must go back to a vector of IdSketch for hnsw insertion
-                            let mut data_for_hnsw = Vec::<(&VecSig<Sketcher,Kmer>, usize)>::with_capacity(signatures.len());
-                            for i in 0..signatures.len() {
-                                data_for_hnsw.push((&signatures[i], seq_rank[i]));
-                            }
-                            // parallel insertion
-                            log::debug!("inserting residue in hnsw");
-                            hnsw.parallel_insert(&data_for_hnsw);
-                        }
+                    Err(RecvError) =>   {   read_more = false;
+                                            log::debug!("end of reception");
                     }
                     Ok(mut idsequences) => {
-                        // concat the new idsketch in insertion queue.
-                        insertion_queue.append(&mut idsequences);
-                        // if insertion_queue is beyond threshold size we can go to threaded sketching and threading insertion
-                        if insertion_queue.len() > insertion_block_size {
-                            let sequencegroup_ref : Vec<&Sequence> = insertion_queue.iter().map(|s| s.get_sequence_dna().unwrap()).collect();
-                            log::debug!("received nb seq : {}", sequencegroup_ref.len());
-                            let seq_rank :  Vec<usize> = insertion_queue.iter().map(|s| s.get_rank()).collect();
-                            // collect Id
-                            let mut seq_id :  Vec<ItemDict> = insertion_queue.iter().map(|s| ItemDict::new(Id::new(s.get_path(), s.get_fasta_id()), s.get_seq_len())).collect();
-                            seqdict.0.append(&mut seq_id);
-                            // computes hash signature
-                            log::debug!("calling sketch_compressedkmer");
-                            let signatures = sketcher.sketch_compressedkmer(&sequencegroup_ref, kmer_hash_fn);
-                            // we have Vec<u32> signatures we must go back to a vector of IdSketch, inserting unique id, for hnsw insertion
-                            let mut data_for_hnsw = Vec::<(&VecSig<Sketcher,Kmer>, usize)>::with_capacity(signatures.len());
-                            for i in 0..signatures.len() {
-                                data_for_hnsw.push((&signatures[i], seq_rank[i]));
-                            }
-                            // parallel insertion
-                            log::debug!("inserting block in hnsw");
-                            hnsw.parallel_insert(&data_for_hnsw);
-                            // we reset insertion_queue
-                            insertion_queue.clear();
-                        }
+                            // concat the new idsketch in insertion queue.
+                            log::debug!("received nb seq : {}", idsequences.len());
+                            insertion_queue.append(&mut idsequences);
                     }
                 }
+                // if insertion_queue is beyond threshold size we can go to threaded sketching and threading insertion
+                if insertion_queue.len() >= insertion_block_size || read_more == false {
+                    let sequencegroup_ref : Vec<&Sequence> = insertion_queue.iter().map(|s| s.get_sequence_dna().unwrap()).collect();
+                    log::debug!("received nb seq : {}", sequencegroup_ref.len());
+                    let seq_rank :  Vec<usize> = insertion_queue.iter().map(|s| s.get_rank()).collect();
+                    // collect Id
+                    let mut seq_id :  Vec<ItemDict> = insertion_queue.iter().map(|s| ItemDict::new(Id::new(s.get_path(), s.get_fasta_id()), s.get_seq_len())).collect();
+                    seqdict.0.append(&mut seq_id);
+                    // computes hash signature
+                    log::debug!("calling sketch_compressedkmer");
+                    let signatures = sketcher.sketch_compressedkmer(&sequencegroup_ref, kmer_hash_fn);
+                    // we have Vec<u32> signatures we must go back to a vector of IdSketch, inserting unique id, for hnsw insertion
+                    let mut data_for_hnsw = Vec::<(&VecSig<Sketcher,Kmer>, usize)>::with_capacity(signatures.len());
+                    for i in 0..signatures.len() {
+                        data_for_hnsw.push((&signatures[i], seq_rank[i]));
+                    }
+                    // parallel insertion
+                    log::debug!("inserting block in hnsw");
+                    hnsw.parallel_insert(&data_for_hnsw);
+                    // we reset insertion_queue
+                    insertion_queue.clear();
+                }
             }
-            //
             // We must dump hnsw to save "database" if not empty
-            //
-            if  hnsw.get_nb_point() > 0 {
-                let mut hnsw_dump = dump_path_ref.to_path_buf().clone();
-                hnsw_dump.push("hnswdump");
-                let hnswdumpname = String::from(hnsw_dump.to_str().unwrap());
-                log::info!("going to dump hnsw with prefix : {:?}", hnswdumpname);
-                let resdump = hnsw.file_dump(&hnswdumpname);
-                match resdump {
-                    Err(msg) => {
-                        println!("dump failed error msg : {}", msg);
-                    },
-                    _ =>  { println!("dump of hnsw ended");}
-                };
-                // dump some info on layer structure
-                hnsw.dump_layer_info();
-                // dumping dictionary
-                let mut seq_pb = dump_path_ref.clone();
-                seq_pb.push("seqdict.json");
-                let seqdict_name = String::from(seq_pb.to_str().unwrap());
-                let resdump = seqdict.dump(seqdict_name);
-                match resdump {
-                    Err(msg) => {
-                        println!("seqdict dump failed error msg : {}", msg);
-                    },
-                    _ =>  { println!("dump of seqdict ended OK");}
-                };                
-            }
-            else {
-                log::info!("no dumping hnsw, no data points");
-            }
-            // and finally dump processing parameters in file name "parameters.json"
-            let _ = processing_params.dump_json(dump_path_ref);
+            let _ = dumpall(dump_path_ref, &hnsw, &seqdict, &processing_params);
             // get time for io and fasta parsing
             if sender_cpu.is_ok() {
                 let cpu_time = sender_cpu.unwrap().try_elapsed();
@@ -430,3 +380,44 @@ pub fn dna_process_tohnsw(dirpath : &PathBuf, filter_params : &FilterParams, pro
         }        
     }
 } // end of dna_process
+
+
+// This function dumps hnsw , seqdict and processing params in the same directory given by dump_path_ref
+fn dumpall<Sig>(dump_path_ref : &PathBuf, hnsw : &Hnsw<Sig, DistHamming>, seqdict : &SeqDict, processing_params : &ProcessingParams) -> anyhow::Result<(),String>
+    where Sig : Clone + Copy + Send + Sync + Serialize + DeserializeOwned + Debug ,
+    DistHamming : Distance<Sig> {
+
+    if  hnsw.get_nb_point() > 0 {
+        let mut hnsw_dump = dump_path_ref.to_path_buf().clone();
+        hnsw_dump.push("hnswdump");
+        let hnswdumpname = String::from(hnsw_dump.to_str().unwrap());
+        log::info!("going to dump hnsw with prefix : {:?}", hnswdumpname);
+        let resdump = hnsw.file_dump(&hnswdumpname);
+        match resdump {
+            Err(msg) => {
+                println!("dump failed error msg : {}", msg);
+            },
+            _ =>  { println!("dump of hnsw ended");}
+        };
+        // dump some info on layer structure
+        hnsw.dump_layer_info();
+        // dumping dictionary
+        let mut seq_pb = dump_path_ref.clone();
+        seq_pb.push("seqdict.json");
+        let seqdict_name = String::from(seq_pb.to_str().unwrap());
+        let resdump = seqdict.dump(seqdict_name);
+        match resdump {
+            Err(msg) => {
+                println!("seqdict dump failed error msg : {}", msg);
+            },
+            _ =>  { println!("dump of seqdict ended OK");}
+        };  
+    }             
+    else {
+        log::info!("no dumping hnsw, no data points");
+    }
+    // and finally dump processing parameters in file name "parameters.json"
+    let _ = processing_params.dump_json(dump_path_ref);
+    //
+    Ok(())
+} // end of dumpall
