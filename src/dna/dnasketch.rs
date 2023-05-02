@@ -171,27 +171,9 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT+KmerBuilder<Kmer>, Ske
         //
         let receptor_handle = scope.spawn(move |_| {
             let sender_cpu = ThreadTime::try_now();
+            // get or allocate a SeqDict
             let mut seqdict : SeqDict;
-            if other_params.get_adding_mode() {
-                // must reload seqdict
-                let mut filepath = PathBuf::from(dump_path_ref.clone());
-                filepath.push("seqdict.json");
-                let res_reload = SeqDict::reload_json(&filepath);
-                if res_reload.is_err() {
-                    let cwd = std::env::current_dir();
-                    if cwd.is_ok() {
-                        log::info!("current directory : {:?}", cwd.unwrap());
-                    }
-                    log::error!("cannot reload SeqDict (file 'seq.json' from current directory");
-                    std::process::exit(1);   
-                }
-                else {
-                    seqdict = res_reload.unwrap();
-                }
-            }
-            else {
-                seqdict =  SeqDict::new(100000);
-            }
+            seqdict = get_seqdict(dump_path_ref, other_params).unwrap();
             // we must read messages, sketch and insert into hnsw
             let mut read_more = true;
             while read_more {
@@ -381,6 +363,9 @@ pub fn dna_process_tohnsw(dirpath : &PathBuf, filter_params : &FilterParams, pro
     }
 } // end of dna_process
 
+//===========================================================================
+// TODO to be transferred into utils and factored for dna and aa
+// Dump reload stuff
 
 // This function dumps hnsw , seqdict and processing params in the same directory given by dump_path_ref
 fn dumpall<Sig>(dump_path_ref : &PathBuf, hnsw : &Hnsw<Sig, DistHamming>, seqdict : &SeqDict, processing_params : &ProcessingParams) -> anyhow::Result<(),String>
@@ -421,3 +406,33 @@ fn dumpall<Sig>(dump_path_ref : &PathBuf, hnsw : &Hnsw<Sig, DistHamming>, seqdic
     //
     Ok(())
 } // end of dumpall
+
+
+
+// retrieve or allocate a SeqDict depending on use case
+fn get_seqdict(dump_path_ref : &PathBuf, other_params : &ComputingParams) -> anyhow::Result<SeqDict> {
+    //
+    let seqdict : SeqDict;
+    if other_params.get_adding_mode() {
+        // must reload seqdict
+        let mut filepath = PathBuf::from(dump_path_ref.clone());
+        filepath.push("seqdict.json");
+        let res_reload = SeqDict::reload_json(&filepath);
+        if res_reload.is_err() {
+            let cwd = std::env::current_dir();
+            if cwd.is_ok() {
+                log::info!("current directory : {:?}", cwd.unwrap());
+            }
+            log::error!("cannot reload SeqDict (file 'seq.json' from current directory");
+            std::process::exit(1);   
+        }
+        else {
+            seqdict = res_reload.unwrap();
+        }
+    }
+    else {
+        seqdict =  SeqDict::new(100000);
+    }
+    //
+    return Ok(seqdict);
+} // end of get_seqdict
