@@ -27,6 +27,9 @@ where
         // 
         log::info!("\n\n hubness summary");
         let hubness = Hubness::new(&kgraph);
+        let s3_hubness = hubness.get_standard3m();
+        log::info!("\n graph hubness estimation : {:.3e}", s3_hubness);
+        println!("\n graph hubness estimation : {:.3e} \n", s3_hubness);
         let _ = hubness.get_hubness_histogram();
         //
         if embed {
