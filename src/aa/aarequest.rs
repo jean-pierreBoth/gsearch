@@ -52,7 +52,7 @@ fn sketch_and_request_dir_compressedkmer<Kmer:CompressedKmerT + KmerBuilder<Kmer
     // TODO This parameter needs to be analyzed and initialized depending on kmer size and sequences structure 
     let out_threshold = 0.99;
     // creating an output file in the current directory
-    let outname = "gsearch.answers";
+    let outname = "gsearch.answers.txt";
     let outpath = PathBuf::from(outname.clone());
     let outfile = OpenOptions::new().write(true).create(true).truncate(true).open(&outpath);
     if outfile.is_err() {
