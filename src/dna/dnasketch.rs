@@ -223,39 +223,37 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT+KmerBuilder<Kmer>, Ske
                             for id in idsequences {
                                 let _res = insertion_queue.push(id);
                             }
-//                            insertion_queue.append(&mut idsequences);
                     }
                 }
                 // if insertion_queue is beyond threshold size we can go to threaded sketching and threading insertion
 
                 if insertion_queue.len() >= 2  || read_more == false {
-                    let insertion_queue_clone = insertion_queue.clone();
                     let collect_sender_clone = collect_sender.clone();
                     let sketcher_clone = sketcher.clone();
-                    scope.spawn(  move |_|  {
-                    log::info!("spawning thread nb seq : {}", insertion_queue_clone.len());
-                    let mut local_queue = Vec::<IdSeq>::with_capacity(insertion_queue_clone.len());
-                    let q_len = insertion_queue_clone.len();
+                    let mut local_queue = Vec::<IdSeq>::with_capacity(insertion_queue.len());
+                    let q_len = insertion_queue.len();
                     for _ in 0..q_len {
-                        let res_pop = insertion_queue_clone.pop();
+                        let res_pop = insertion_queue.pop();
                         if res_pop.is_ok() {
-                            local_queue.push(insertion_queue_clone.pop().unwrap());
+                            local_queue.push(res_pop.unwrap());
                         }
-                    }
+                    }                    
                     if local_queue.len() > 0 {
-                        let sequencegroup_ref : Vec<&Sequence> = local_queue.iter().map(|s| s.get_sequence_dna().unwrap()).collect();
-                        log::debug!("calling sketch_compressedkmer nb seq : {}", sequencegroup_ref.len());
-                        // computes hash signature
-                        let signatures = sketcher_clone.sketch_compressedkmer(&sequencegroup_ref, kmer_hash_fn);
-                        let seq_rank :  Vec<usize> = local_queue.iter().map(|s| s.get_rank()).collect();
-                        assert_eq!(signatures.len(), seq_rank.len());
-                        for i in 0..signatures.len() {
-                            let item = ItemDict::new(Id::new(local_queue[i].get_path(), local_queue[i].get_fasta_id()), local_queue[i].get_seq_len());
-                            let msg = CollectMsg::new((signatures[i].clone(), seq_rank[i]), item);
-                            let _ = collect_sender_clone.send(msg);
-                        }
+                        scope.spawn(  move |_|  {
+                            log::info!("spawning thread nb seq : {}", local_queue.len());
+                            let sequencegroup_ref : Vec<&Sequence> = local_queue.iter().map(|s| s.get_sequence_dna().unwrap()).collect();
+                            log::debug!("calling sketch_compressedkmer nb seq : {}", sequencegroup_ref.len());
+                            // computes hash signature
+                            let signatures = sketcher_clone.sketch_compressedkmer(&sequencegroup_ref, kmer_hash_fn);
+                            let seq_rank :  Vec<usize> = local_queue.iter().map(|s| s.get_rank()).collect();
+                            assert_eq!(signatures.len(), seq_rank.len());
+                            for i in 0..signatures.len() {
+                                let item = ItemDict::new(Id::new(local_queue[i].get_path(), local_queue[i].get_fasta_id()), local_queue[i].get_seq_len());
+                                let msg = CollectMsg::new((signatures[i].clone(), seq_rank[i]), item);
+                                let _ = collect_sender_clone.send(msg);
+                            }       
+                        });              // end internal thread 
                     }
-                });              // end internal thread 
                 }
             } // end while
             if reciever_cpu.is_ok() {
