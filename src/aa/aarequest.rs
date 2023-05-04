@@ -227,7 +227,7 @@ fn sketch_and_request_dir_compressedkmer<Kmer:CompressedKmerT + KmerBuilder<Kmer
 
 // This function returns paired sequence by probminhash and hnsw 
 pub fn get_sequence_matcher(request_params : &RequestParams, processing_params : &ProcessingParams,
-            filter_params : &FilterParams, ann_params: &AnnParameters,  other_params : &ComputingParams, seqdict : &SeqDict, 
+            filter_params : &FilterParams, other_params : &ComputingParams, seqdict : &SeqDict, 
             ef_search : usize) -> Result<Matcher, String> {
     //
     let sketch_params = processing_params.get_sketching_params();
@@ -243,14 +243,14 @@ pub fn get_sequence_matcher(request_params : &RequestParams, processing_params :
         SketchAlgo::PROB3A => {
             match kmer_size {
                 1..=6 => {
-                    let hnsw = reloadhnsw::reload_hnsw::< <KmerAA32bit as CompressedKmerT>::Val>(database_dirpath, ann_params)?;
+                    let hnsw = reloadhnsw::reload_hnsw::< <KmerAA32bit as CompressedKmerT>::Val>(database_dirpath)?;
                     let sketcher = ProbHash3aSketch::<KmerAA32bit>::new(sketch_params);
                     matcher = sketch_and_request_dir_compressedkmer::<KmerAA32bit, ProbHash3aSketch::<KmerAA32bit> >(&request_dirpath, sketcher, 
                             &filter_params, &seqdict, &processing_params, other_params,
                             &hnsw, nbng as usize, ef_search);
                 }
                 7..=12 => {
-                    let hnsw = reloadhnsw::reload_hnsw::< <KmerAA64bit as CompressedKmerT>::Val>(database_dirpath, ann_params)?;
+                    let hnsw = reloadhnsw::reload_hnsw::< <KmerAA64bit as CompressedKmerT>::Val>(database_dirpath)?;
                     let sketcher = ProbHash3aSketch::<KmerAA64bit>::new(sketch_params);
                     matcher = sketch_and_request_dir_compressedkmer::<KmerAA64bit, ProbHash3aSketch::<KmerAA64bit> >(&request_dirpath, sketcher,
                             &filter_params, &seqdict, &processing_params, other_params, 
@@ -264,14 +264,14 @@ pub fn get_sequence_matcher(request_params : &RequestParams, processing_params :
         SketchAlgo::SUPER => {
             match kmer_size {
                 1..=6 => {
-                    let hnsw = reloadhnsw::reload_hnsw::< <SuperHashSketch<KmerAA32bit,f32> as SeqSketcherAAT<KmerAA32bit>>::Sig>(database_dirpath, ann_params)?;
+                    let hnsw = reloadhnsw::reload_hnsw::< <SuperHashSketch<KmerAA32bit,f32> as SeqSketcherAAT<KmerAA32bit>>::Sig>(database_dirpath)?;
                     let sketcher = SuperHashSketch::<KmerAA32bit, f32>::new(sketch_params);
                     matcher = sketch_and_request_dir_compressedkmer::<KmerAA32bit, SuperHashSketch<KmerAA32bit,f32> >(&request_dirpath, sketcher, 
                             &filter_params, &seqdict, &processing_params, other_params,
                             &hnsw, nbng as usize, ef_search);
                 }
                 7..=12 => {
-                    let hnsw = reloadhnsw::reload_hnsw::< <SuperHashSketch<KmerAA32bit, f32> as SeqSketcherAAT<KmerAA32bit>>::Sig >(database_dirpath, ann_params)?;
+                    let hnsw = reloadhnsw::reload_hnsw::< <SuperHashSketch<KmerAA32bit, f32> as SeqSketcherAAT<KmerAA32bit>>::Sig >(database_dirpath)?;
                     let sketcher = SuperHashSketch::<KmerAA64bit, f32>::new(sketch_params);
                     matcher = sketch_and_request_dir_compressedkmer::<KmerAA64bit, SuperHashSketch::<KmerAA64bit, f32> >(&request_dirpath, sketcher, 
                             &filter_params, &seqdict, &processing_params, other_params,
@@ -290,14 +290,14 @@ pub fn get_sequence_matcher(request_params : &RequestParams, processing_params :
             hll_params.set_m(sketch_params.get_sketch_size());
             match kmer_size {
                 1..=6 => {
-                    let hnsw = reloadhnsw::reload_hnsw::< <HyperLogLogSketch<KmerAA32bit,u16> as SeqSketcherAAT<KmerAA32bit>>::Sig>(database_dirpath, ann_params)?;
+                    let hnsw = reloadhnsw::reload_hnsw::< <HyperLogLogSketch<KmerAA32bit,u16> as SeqSketcherAAT<KmerAA32bit>>::Sig>(database_dirpath)?;
                     let sketcher = HyperLogLogSketch::<KmerAA32bit, u16>::new(sketch_params, hll_params);
                     matcher = sketch_and_request_dir_compressedkmer::<KmerAA32bit, HyperLogLogSketch<KmerAA32bit,u16> >(&request_dirpath, sketcher, 
                             &filter_params, &seqdict, &processing_params, other_params,
                             &hnsw, nbng as usize, ef_search);
                 }
                 7..=12 => {
-                    let hnsw = reloadhnsw::reload_hnsw::< <HyperLogLogSketch<KmerAA64bit, u16> as SeqSketcherAAT<KmerAA64bit>>::Sig >(database_dirpath, ann_params)?;
+                    let hnsw = reloadhnsw::reload_hnsw::< <HyperLogLogSketch<KmerAA64bit, u16> as SeqSketcherAAT<KmerAA64bit>>::Sig >(database_dirpath)?;
                     let sketcher = HyperLogLogSketch::<KmerAA64bit, u16>::new(sketch_params, hll_params);
                     matcher = sketch_and_request_dir_compressedkmer::<KmerAA64bit, HyperLogLogSketch::<KmerAA64bit, u16> >(&request_dirpath, sketcher, 
                             &filter_params, &seqdict, &processing_params, other_params,

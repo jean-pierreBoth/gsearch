@@ -12,7 +12,7 @@ use std::time::{SystemTime};
 use hnsw_rs::prelude::*;
 use hnsw_rs::hnswio::{load_description, load_hnsw};
 
-//mod files;
+#[allow(unused)]
 use crate::utils::AnnParameters;
 
 
@@ -42,7 +42,7 @@ pub fn get_hnsw_type(dump_dirpath : &Path) -> anyhow::Result<String>  {
     reload hnsw from dump directory
     We know filename : hnswdump.hnsw.data and hnswdump.hnsw.graph
  */
-pub fn reload_hnsw<T>(dump_dirpath : &Path, _ann_params: &AnnParameters) -> Result<Hnsw<T, DistHamming>, String>  
+pub fn reload_hnsw<T>(dump_dirpath : &Path) -> Result<Hnsw<T, DistHamming>, String>  
             where T : 'static + Clone + Send + Sync + Serialize + DeserializeOwned ,
                 DistHamming : Distance<T>  {
     // just concat dirpath to filenames and get pathbuf
@@ -75,12 +75,6 @@ pub fn reload_hnsw<T>(dump_dirpath : &Path, _ann_params: &AnnParameters) -> Resu
     }
     else {
         println!("reload_hnsw : elapsed system time(s) {}", elapsed_t);
-    }
-    // feature enabled (or not) in Cargo.toml, requires the crate annembed
-    #[cfg(any(feature="annembed_openblas-system", feature="annembed_openblas-static" , feature="annembed_intel-mkl"))]
-    if _ann_params.ask_stats() || _ann_params.embed() {
-        log::info!("calling embed::get_graph_stats_embed");
-        let _ = super::embed::get_graph_stats_embed(&hnsw, _ann_params.embed());
     }
     //
     return Ok(hnsw);

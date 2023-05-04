@@ -650,12 +650,12 @@ fn main() {
         std::panic!("at least one command  tohnnsw, add, request or ann must be given");
     }
     // 
-    let ann_params : AnnParameters;
+    let _ann_params : AnnParameters;
     if ann_params_opt.is_none() {
-        ann_params = AnnParameters::default();
+        _ann_params = AnnParameters::default();
     }
     else{
-        ann_params = ann_params_opt.unwrap();
+        _ann_params = ann_params_opt.unwrap();
     }
     //
     // Now we have parsed commands
@@ -703,8 +703,7 @@ fn main() {
                                     }
                                     treat_from_hnsw(req_params_opt.as_ref().unwrap(), &filter_params, 
                                                                 &processing_params,
-                                                                &computing_params,
-                                                                &ann_params); 
+                                                                &computing_params); 
                                 }  // end REQUEST
 
         CmdType::ANN            =>  {
@@ -716,17 +715,30 @@ fn main() {
                                     }
                                     let type_name = type_name.unwrap();
                                     log::info!("got type in hnsw : {}", &type_name);
+                                    #[cfg(any(feature="annembed_openblas-system", feature="annembed_openblas-static" , feature="annembed_intel-mkl"))]
                                     match type_name.as_str() {
                                         "u32" => {  // probminhash case
-                                            let _ = reloadhnsw::reload_hnsw::<u32>(&hnsw_path, &ann_params);
+                                            let hnsw = reloadhnsw::reload_hnsw::<u32>(&hnsw_path).unwrap();
+                                            if _ann_params.ask_stats() || _ann_params.embed() {
+                                                log::info!("calling embed::get_graph_stats_embed");
+                                                let _ = embed::get_graph_stats_embed(&hnsw, _ann_params.embed());
+                                            }
                                         }
                                         "u16" => {
                                             // hll case
-                                            let _ = reloadhnsw::reload_hnsw::<u16>(&hnsw_path, &ann_params);
+                                            let hnsw = reloadhnsw::reload_hnsw::<u16>(&hnsw_path).unwrap();
+                                            if _ann_params.ask_stats() || _ann_params.embed() {
+                                                log::info!("calling embed::get_graph_stats_embed");
+                                                let _ = embed::get_graph_stats_embed(&hnsw, _ann_params.embed());
+                                            }
                                         }
                                         "f32" => {
                                             // superminhash case
-                                            let _ = reloadhnsw::reload_hnsw::<f32>(&hnsw_path, &ann_params);
+                                            let hnsw = reloadhnsw::reload_hnsw::<f32>(&hnsw_path).unwrap();
+                                            if _ann_params.ask_stats() || _ann_params.embed() {
+                                                log::info!("calling embed::get_graph_stats_embed");
+                                                let _ = embed::get_graph_stats_embed(&hnsw, _ann_params.embed());
+                                            }
                                         }  
                                         _    => {
                                             log::error!("unknow type of data in hnsw, type : {}", &type_name);
@@ -755,7 +767,7 @@ fn treat_into_hnsw(hnswdir : &String, filter_params : &FilterParams, processing_
 
 // function to answer request from a hnsw database 
 fn treat_from_hnsw(request_params : &RequestParams, filter_params : &FilterParams, processing_params : &ProcessingParams, 
-        computing_params : &ComputingParams, ann_params : &AnnParameters) {
+        computing_params : &ComputingParams) {
 
     let database_dir = request_params.get_hnsw_dir();
     let data_type =  processing_params.get_sketching_params().get_data_t();
@@ -776,7 +788,7 @@ fn treat_from_hnsw(request_params : &RequestParams, filter_params : &FilterParam
     match data_type {
         DataType::DNA => {
             if let Ok(mut seq_matcher) = dnarequest::get_sequence_matcher(request_params, &processing_params, 
-                        &filter_params, &ann_params, &computing_params, &seqdict, ef_search) {
+                        &filter_params, &computing_params, &seqdict, ef_search) {
                 if processing_params.get_block_flag() == false {
                     log::info!("sequence mode, trying to analyze..");
                     let _= seq_matcher.analyze();
@@ -788,7 +800,7 @@ fn treat_from_hnsw(request_params : &RequestParams, filter_params : &FilterParam
         }  // end DNA case
         DataType::AA => {
             if let Ok(mut seq_matcher) = aarequest::get_sequence_matcher(request_params, &processing_params, 
-                        &filter_params, &ann_params, &computing_params, &seqdict,ef_search) {
+                        &filter_params, &computing_params, &seqdict,ef_search) {
                 if processing_params.get_block_flag() == false {
                     log::info!("sequence mode, trying to analyze..");
                     let _= seq_matcher.analyze();

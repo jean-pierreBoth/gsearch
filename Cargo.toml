@@ -38,6 +38,7 @@ num = {version = "0.4"}
 # for //
 crossbeam-utils = {version = "0.8"}
 crossbeam-channel = {version = "0.5"}
+concurrent-queue = {version = "2.2.0"}
 
 parking_lot ={version="0.12"}
 rayon = {version = "1.5"}
@@ -58,10 +59,10 @@ hnsw_rs =  {version = "0.1.19"}
 # nsw_rs = {git = "https://gitlab.com/jpboth/hnswlib-rs.git"}
 #hnsw_rs = {path = "../hnswlib-rs"}
 
-# kmerutils = {path = "../kmerutils"}
+kmerutils = {path = "../kmerutils"}
 # kmerutils = {git = "https://github.com/jean-pierreBoth/kmerutils"}
 # kmerutils = {git = "https://gitlab.com/jpboth/kmerutils.git"}
-kmerutils = {version = "0.0.8"}
+# kmerutils = {version = "0.0.9"}
 
 lazy_static = { version = "1.4"}
 

@@ -10,7 +10,9 @@ use cpu_time::{ProcessTime,ThreadTime};
 use std::path::{PathBuf};
 
 // for multithreading
+use std::sync::Arc;
 use crossbeam_channel::*;
+use concurrent_queue::ConcurrentQueue;
 use serde::{de::DeserializeOwned, Serialize};
 
 use std::fmt::{Debug};
@@ -36,15 +38,35 @@ use crate::utils::parameters::*;
 // Sig is basic item of a signature , VecSig is a vector of such items
 type VecSig<Sketcher, Kmer>  = Vec< <Sketcher as SeqSketcherT<Kmer>>::Sig>;
 
+
+// a type to describe msessage to collector task
+
+struct CollectMsg<Sig> {
+    // signature and sequence rank
+    pub skecth_and_rank : (Vec<Sig>, usize),
+    // id of sequence
+    pub item : ItemDict,
+}
+
+
+impl <Sig> CollectMsg<Sig> {
+
+    pub fn new(skecth_and_rank : (Vec<Sig>, usize), item : ItemDict) -> Self {
+        CollectMsg{skecth_and_rank, item}
+    }
+
+} // end of CollectMsg
+
 // hnsw_pb  must contains directory of hnsw database.
 // In creation mode it is the directory containings file to proceess. In add mode it is where hnsw database reside,
 // and the directory containing new data are taken from computingParams if in add mode
-fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT+KmerBuilder<Kmer>, Sketcher : SeqSketcherT<Kmer> + Send + Sync>(hnsw_pb : &PathBuf, sketcher : Sketcher ,
+fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT+KmerBuilder<Kmer>, Sketcher : SeqSketcherT<Kmer>>(hnsw_pb : &PathBuf, sketcher : Sketcher ,
                     filter_params: &FilterParams, 
                     processing_params : &ProcessingParams, 
                     other_params : &ComputingParams) 
 
-        where  <Sketcher as SeqSketcherT<Kmer>>::Sig : 'static + Clone + Copy + Send + Sync + Serialize + DeserializeOwned + Debug,
+        where   Sketcher : SeqSketcherT<Kmer> + Clone + Send + Sync,
+                <Sketcher as SeqSketcherT<Kmer>>::Sig : 'static + Clone + Copy + Send + Sync + Serialize + DeserializeOwned + Debug,
                 KmerGenerator<Kmer> :  KmerGenerationPattern<Kmer>, 
                 DistHamming : Distance< <Sketcher as  SeqSketcherT<Kmer>>::Sig>,
                 {
@@ -62,7 +84,7 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT+KmerBuilder<Kmer>, Ske
         true => { 5000.min(2 * other_params.get_nb_files_par()) },
         _    => { 5000 },
     };
-    let mut insertion_queue : Vec<IdSeq>= Vec::with_capacity(insertion_block_size);
+    log::debug!("insertion_block_size : {}", insertion_block_size);
     //
     let mut hnsw : Hnsw::< <Sketcher as SeqSketcherT<Kmer>>::Sig, DistHamming>;
     let mut state :ProcessingState;
@@ -74,7 +96,7 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT+KmerBuilder<Kmer>, Ske
         toprocess_path = PathBuf::from(toprocess_str);
         // in this case we must reload
         log::info!("dnasketch::sketchandstore_dir_compressedkmer will add new data from from directory {:?} to hnsw dir {:?}", hnsw_pb, toprocess_path);
-       let hnsw_opt = reloadhnsw::reload_hnsw(&hnsw_pb, &AnnParameters::default());
+       let hnsw_opt = reloadhnsw::reload_hnsw(&hnsw_pb);
         if hnsw_opt.is_err() {
             log::error!("cannot reload hnsw from directory : {:?}", &hnsw_pb);
             std::process::exit(1);
@@ -99,6 +121,9 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT+KmerBuilder<Kmer>, Ske
         state = ProcessingState::new();
     }
     //
+    let mut seqdict : SeqDict;
+    seqdict = get_seqdict(&hnsw_pb, other_params).unwrap();
+    //
     // where do we dump hnsw* seqdict and so on
     // If in add mode we dump where is already an hnsw database
     // If creation mode we dump in .
@@ -121,13 +146,22 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT+KmerBuilder<Kmer>, Ske
         let hashval = canonical.get_compressed_value() & mask;
         hashval
     };
+    //
+    let mut nb_sent : usize = 0;       // this variable is moved in sender  io thread
+    let mut nb_received : usize = 0;   // this variable is moved in collector thread!
     // to send IdSeq to sketch from reading thread to sketcher thread
     let (send, receive) = crossbeam_channel::bounded::<Vec<IdSeq>>(insertion_block_size+1);
+    // to send sketch result to a collector task
+    let (collect_sender , collect_receiver) = 
+            crossbeam_channel::bounded::<CollectMsg<<Sketcher as SeqSketcherT<Kmer>>::Sig>>(insertion_block_size+1);
+    //
+    let pool: rayon::ThreadPool = rayon::ThreadPoolBuilder::new().build().unwrap();
+    log::info!("nb threads in pool : {:?}", pool.current_num_threads());
+
     // launch process_dir in a thread or async
-    crossbeam_utils::thread::scope(|scope| {
+    pool.scope(|scope| {
         // sequence sending, productor thread
-        let sender_handle = scope.spawn(move |_|   {
-            let nb_sent : usize;
+        scope.spawn( |_|   {
             let start_t_prod = SystemTime::now();
             let res_nb_sent;
             if block_processing {
@@ -164,16 +198,15 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT+KmerBuilder<Kmer>, Ske
             log::info!("sender processed in  system time(s) : {}", state.elapsed_t);
             // dump processing state in the current directory
             let _ = state.dump_json(dump_path_ref);
-            Box::new(nb_sent)
         });
         //
         // sequence reception, consumer thread
         //
-        let receptor_handle = scope.spawn(move |_| {
-            let sender_cpu = ThreadTime::try_now();
-            // get or allocate a SeqDict
-            let mut seqdict : SeqDict;
-            seqdict = get_seqdict(dump_path_ref, other_params).unwrap();
+        scope.spawn( |scope| {
+            let insertion_queue = Arc::new(ConcurrentQueue::bounded(insertion_block_size));
+            let reciever_cpu = ThreadTime::try_now();
+            // get or allocate a
+            let mut nb_received_local = 0;
             // we must read messages, sketch and insert into hnsw
             let mut read_more = true;
             while read_more {
@@ -183,55 +216,96 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT+KmerBuilder<Kmer>, Ske
                     Err(RecvError) =>   {   read_more = false;
                                             log::debug!("end of reception");
                     }
-                    Ok(mut idsequences) => {
+                    Ok(idsequences) => {
                             // concat the new idsketch in insertion queue.
-                            log::debug!("received nb seq : {}", idsequences.len());
-                            insertion_queue.append(&mut idsequences);
+                            nb_received_local += idsequences.len();
+                            log::debug!("read received nb seq : {}, total received : {}", idsequences.len(), nb_received_local);
+                            for id in idsequences {
+                                let _res = insertion_queue.push(id);
+                            }
+//                            insertion_queue.append(&mut idsequences);
                     }
                 }
                 // if insertion_queue is beyond threshold size we can go to threaded sketching and threading insertion
-                if insertion_queue.len() >= insertion_block_size || read_more == false {
-                    let sequencegroup_ref : Vec<&Sequence> = insertion_queue.iter().map(|s| s.get_sequence_dna().unwrap()).collect();
-                    log::debug!("received nb seq : {}", sequencegroup_ref.len());
-                    let seq_rank :  Vec<usize> = insertion_queue.iter().map(|s| s.get_rank()).collect();
-                    // collect Id
-                    let mut seq_id :  Vec<ItemDict> = insertion_queue.iter().map(|s| ItemDict::new(Id::new(s.get_path(), s.get_fasta_id()), s.get_seq_len())).collect();
-                    seqdict.0.append(&mut seq_id);
-                    // computes hash signature
-                    log::debug!("calling sketch_compressedkmer");
-                    let signatures = sketcher.sketch_compressedkmer(&sequencegroup_ref, kmer_hash_fn);
-                    // we have Vec<u32> signatures we must go back to a vector of IdSketch, inserting unique id, for hnsw insertion
-                    let mut data_for_hnsw = Vec::<(&VecSig<Sketcher,Kmer>, usize)>::with_capacity(signatures.len());
-                    for i in 0..signatures.len() {
-                        data_for_hnsw.push((&signatures[i], seq_rank[i]));
+
+                if insertion_queue.len() >= 3  || read_more == false {
+                    let insertion_queue_clone = insertion_queue.clone();
+                    let collect_sender_clone = collect_sender.clone();
+                    let sketcher_clone = sketcher.clone();
+                    scope.spawn(  move |_|  {
+                    log::info!("spawing thread");
+                    let mut local_queue = Vec::<IdSeq>::with_capacity(insertion_queue_clone.len());
+                    let q_len = insertion_queue_clone.len();
+                    for _ in 0..q_len {
+                        local_queue.push(insertion_queue_clone.pop().unwrap());
                     }
-                    // parallel insertion
-                    log::debug!("inserting block in hnsw");
-                    hnsw.parallel_insert(&data_for_hnsw);
-                    // we reset insertion_queue
-                    insertion_queue.clear();
+                    let sequencegroup_ref : Vec<&Sequence> = local_queue.iter().map(|s| s.get_sequence_dna().unwrap()).collect();
+                    log::debug!("calling sketch_compressedkmer nb seq : {}", sequencegroup_ref.len());
+                    // computes hash signature
+                    let signatures = sketcher_clone.sketch_compressedkmer(&sequencegroup_ref, kmer_hash_fn);
+                    let seq_rank :  Vec<usize> = local_queue.iter().map(|s| s.get_rank()).collect();
+                    assert_eq!(signatures.len(), seq_rank.len());
+                    for i in 0..signatures.len() {
+                        let item = ItemDict::new(Id::new(local_queue[i].get_path(), local_queue[i].get_fasta_id()), local_queue[i].get_seq_len());
+                        let msg = CollectMsg::new((signatures[i].clone(), seq_rank[i]), item);
+                        let _ = collect_sender_clone.send(msg);
+                    }
+                });              // end internal thread 
                 }
-            }
-            // We must dump hnsw to save "database" if not empty
-            let _ = dumpall(dump_path_ref, &hnsw, &seqdict, &processing_params);
-            // get time for io and fasta parsing
-            if sender_cpu.is_ok() {
-                let cpu_time = sender_cpu.unwrap().try_elapsed();
+            } // end while
+            if reciever_cpu.is_ok() {
+                let cpu_time = reciever_cpu.unwrap().try_elapsed();
                 if cpu_time.is_ok() {
-                    log::info!("sender needed : {}", cpu_time.unwrap().as_secs());
+                    log::info!("sketching time needed : {}", cpu_time.unwrap().as_secs());
                 }
             }
             //
-            Box::new(seqdict.0.len())
+            drop(receive);
+            drop(collect_sender);
         }); // end of receptor thread
-        // now we must join handles
-        let nb_sent = sender_handle.join().unwrap();
-        let nb_received = receptor_handle.join().unwrap();
-        log::info!("sketchandstore, nb_sent = {}, nb_received = {}", nb_sent, nb_received);
-        if nb_sent != nb_received {
-            log::warn!("an error occurred  nb msg sent : {}, nb msg received : {}", nb_sent, nb_received);
-        }
-    }).unwrap();  // end of scope
+
+        // a collector task to synchronize access to hnsw and SeqDict
+        scope.spawn(|_| {
+            let mut msg_store = Vec::<(VecSig<Sketcher,Kmer>, usize)>::with_capacity(3 * insertion_block_size);
+            let mut itemv =  Vec::<ItemDict>::with_capacity(3 * insertion_block_size);
+            let mut read_more = true;
+            while read_more {
+                // try read, if error is Disconnected we stop read and both threads are finished.
+                let res_receive = collect_receiver.recv();
+                match res_receive {
+                    Err(RecvError) =>   {   read_more = false;
+                                            log::debug!("end of collector reception");
+                    }
+                    Ok(to_insert) => {
+                        log::debug!("collector received");
+                        msg_store.push(to_insert.skecth_and_rank);
+                        itemv.push(to_insert.item);
+                        nb_received += 1;
+                    }
+                }
+                if read_more == false || msg_store.len() > insertion_block_size {
+                    log::debug!("inserting block in hnsw");
+                    let mut data_for_hnsw = Vec::<(&VecSig<Sketcher,Kmer>, usize)>::with_capacity(msg_store.len());
+                    for i in 0..msg_store.len() {
+                        data_for_hnsw.push((&msg_store[i].0, msg_store[i].1));
+                    }
+                    hnsw.parallel_insert(&data_for_hnsw);  
+                    seqdict.0.append(&mut itemv); 
+                    data_for_hnsw.clear();
+                    itemv.clear();
+                }
+            }
+            //
+            log::debug!("collector thread dumping hnsw , received nb_received : {}", nb_received);
+            let _ = dumpall(dump_path_ref, &hnsw, &seqdict, &processing_params);
+        }); // end of collector thread
+
+    });  // end of pool
+    //
+    log::info!("sketchandstore, nb_sent = {}, nb_received = {}", nb_sent, nb_received);
+    if nb_sent != nb_received {
+        log::warn!("an error occurred  nb msg sent : {}, nb msg received : {}", nb_sent, nb_received);
+    }
     // get total time 
     let cpu_time = cpu_start.elapsed().as_secs();
     let elapsed_t = start_t.elapsed().unwrap().as_secs() as f32;
@@ -409,30 +483,36 @@ fn dumpall<Sig>(dump_path_ref : &PathBuf, hnsw : &Hnsw<Sig, DistHamming>, seqdic
 
 
 
+fn reload_seqdict(dump_path_ref : &PathBuf) -> SeqDict {
+       // must reload seqdict
+       let mut filepath = PathBuf::from(dump_path_ref.clone());
+       filepath.push("seqdict.json");
+       let res_reload = SeqDict::reload_json(&filepath);
+       if res_reload.is_err() {
+           let cwd = std::env::current_dir();
+           if cwd.is_ok() {
+               log::info!("current directory : {:?}", cwd.unwrap());
+           }
+           log::error!("cannot reload SeqDict (file 'seq.json' from current directory");
+           std::process::exit(1);   
+       }
+       else {
+           let seqdict = res_reload.unwrap();
+           return seqdict;
+       }    
+} // end of reload_seqdict
+
+
+
 // retrieve or allocate a SeqDict depending on use case
 fn get_seqdict(dump_path_ref : &PathBuf, other_params : &ComputingParams) -> anyhow::Result<SeqDict> {
     //
-    let seqdict : SeqDict;
-    if other_params.get_adding_mode() {
-        // must reload seqdict
-        let mut filepath = PathBuf::from(dump_path_ref.clone());
-        filepath.push("seqdict.json");
-        let res_reload = SeqDict::reload_json(&filepath);
-        if res_reload.is_err() {
-            let cwd = std::env::current_dir();
-            if cwd.is_ok() {
-                log::info!("current directory : {:?}", cwd.unwrap());
-            }
-            log::error!("cannot reload SeqDict (file 'seq.json' from current directory");
-            std::process::exit(1);   
-        }
-        else {
-            seqdict = res_reload.unwrap();
-        }
+    let seqdict = if other_params.get_adding_mode() {
+        reload_seqdict(dump_path_ref)
     }
     else {
-        seqdict =  SeqDict::new(100000);
-    }
+        SeqDict::new(100000)
+    };
     //
     return Ok(seqdict);
 } // end of get_seqdict

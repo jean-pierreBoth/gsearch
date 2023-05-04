@@ -65,7 +65,7 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT + KmerBuilder<Kmer>, S
         let toprocess_str = other_params.get_add_dir();
         toprocess_path = PathBuf::from(toprocess_str);
         log::info!("aasketch::sketchandstore_dir_compressedkmer will add new data from from directory {:?} to {:?}", hnsw_pb, toprocess_path);
-        let hnsw_opt = reloadhnsw::reload_hnsw(&hnsw_pb, &AnnParameters::default());
+        let hnsw_opt = reloadhnsw::reload_hnsw(&hnsw_pb);
         if hnsw_opt.is_err() {
             log::error!("cannot reload hnsw from directory : {:?}", &hnsw_pb);
             std::process::exit(1);
