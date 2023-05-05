@@ -10,8 +10,11 @@ This package is developped by Jean-Pierre Both [jpboth](https://github.com/jean-
 
 ## Sketching of genomes/tohnsw
 
-The objective is to use the Jaccard index as an accurate proxy of mutation rate or Average Nucleitide Identity(ANI). To achieve this we use sketching.  
-We generate kmers along sequences and sketch the kmer distribution encountered in a file. Then final sketch is stored in a Hnsw database See [hnsw](https://arxiv.org/abs/1603.09320).
+The objective is to use the Jaccard index as an accurate proxy of mutation rate or Average Nucleitide Identity(ANI) According to equation:
+$$ANI=1+\frac{1}{k}log\frac{2*J}{1+J}$$
+
+where J is Jaccard-like index (e.g. Jp from ProbMinHash or J from SuperMinHash or SetSketch, see below) and k is k-mer size.
+To achieve this we use sketching. We generate kmers along sequences and sketch the kmer distribution encountered in a file. Then final sketch is stored in a Hnsw database See [hnsw](https://arxiv.org/abs/1603.09320).
 
 The sketching and database is done by the subcommand ***tohnsw***.
 
@@ -34,15 +37,20 @@ The sketching of reference genomes can take some time (less than one hours for ~
 The Hnsw structure is dumped *in hnswdump.hnsw.graph* and  *hnswdump.hnsw.data*
 The Dictionary is dumped in a json file *seqdict.json*
 
-## Requests
+## Request
 
 For requests  the subcommand ***request*** is being used. It reloads the dumped files, hnsw and seqdict related
-takes a list of fasta files containing requests and for each fasta file dumps the asked number of nearest neighbours.
+takes a list of fasta files containing requests and for each fasta file dumps the asked number of nearest neighbours according to distance mentioned above.
+
+## Ann
+For UMAP-like algorithm to do dimension reduction and then visuzlizing genome database, we run it after the tohnsw step (pre-built database) (see below useage ann section). See [annembed](https://github.com/jean-pierreBoth/annembed) crate for details. Then the output of this step can be visualized, for example for the GTDB v207 we have the following plot.
+
+![Alt!](https://github.com/jean-pierreBoth/gsearch/blob/master/GSearch-annembed-GTDBv207.jpg?raw=true)
+
 
 ## Simple case for install
 
-**Pre-built binaries** will be available on release page [binaries](https://github.com/jean-pierreBoth/gsearch/releases/tag/0.1.1) for major platforms (no need to install but just download and make it executable). We recommend you use the linux one (gsearch-linux-x86-64.zip) for linux system in this release page for convenience because the only dependency is GCC (Recent Linux version does not allow static compiling of GCC libraries like libc.so.6). For macOS, we recommend the binary [mac-binaries](gsearch-darwin-x86-64.zip
-) for corresponding platform (x86-64 or arm64).
+**Pre-built binaries** will be available on release page [binaries](https://github.com/jean-pierreBoth/gsearch/releases/tag/0.1.1) for major platforms (no need to install but just download and make it executable). We recommend you use the linux one (gsearch-linux-x86-64.zip) for linux system in this release page for convenience because the only dependency is GCC (Recent Linux version does not allow static compiling of GCC libraries like libc.so.6). For macOS, we recommend the binary mac-binaries(gsearch-darwin-x86-64.zip or gsearch-darwin-aarch64.zip) for corresponding platform (x86-64 or arm64).
 
 ## Or if you have conda installed
 
@@ -157,11 +165,16 @@ gsearch add -b ./k16_s12000_n128_ef1600_canonical -n db_dir_nt (new genomes dire
 cd ./GTDB/prot
 gsearch add -b ./k7_s12000_n128_ef1600_gsearch -n db_dir_nt (new genomes directory in AA format predicted by prodigal/FragGeneScanRs)
 
+
+
+### visuzlizing from the tohnsw step at amino acid level (AAI distance), output order of genome files are the same with with seqdict.json
+cd ./GTDB/prot
+gsearch ann -b ./k7_s12000_n128_ef1600_gsearch --stats --embed
 ```
 
 ## Output explanation
 
-**gsearch.answers** is the default output file in your current directory.  
+**gsearch.answers.txt** is the default output file in your current directory.  
  For each of your genome in the query_dir, there will be requested N nearest genomes found and sorted by distance (smallest to largest).  
   If one genome in the query does not exist in the output file, meaning at this level (nt or aa), there is no such nearest genomes in the database (or distant away from the best hit in the database), you may then go to amino acid level or universal gene level.
 
