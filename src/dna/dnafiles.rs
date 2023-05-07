@@ -36,11 +36,14 @@ pub fn filter_out_n(seq : &[u8]) -> Vec<u8> {
 
 /// opens parse fna files with needletail
 /// extracts records , filters out capsid and send sequences to function process_dir to execute file_task to produce sequence
-/// for any client
+/// for any client.
+/// This function returns as many IdSeq as there are sequences in file
 pub fn process_file_by_sequence(pathb : &PathBuf, filter_params : &FilterParams)  -> Vec<IdSeq> {
     let mut to_sketch = Vec::<IdSeq>::new();
     //
     log::trace!("processing file {}", pathb.to_str().unwrap());
+    let alphabet2b = Alphabet2b::new();
+    //
     let mut reader = needletail::parse_fastx_file(&pathb).expect("expecting valid filename");
     while let Some(record) = reader.next() {
         if record.is_err() {
@@ -53,11 +56,11 @@ pub fn process_file_by_sequence(pathb : &PathBuf, filter_params : &FilterParams)
         let strid = String::from_utf8(Vec::from(id)).unwrap();
         // process sequence if not capsid and not filtered out
         if strid.find("capsid").is_none() && !filter_params.filter(&seqrec.seq()) {
-            // filtering cause reallocation. As we encode in 2 bits we cannot get something that does not fit. seqrec.seq is Cow so drain does not seem an option.
-            let filtered = filter_out_n(&seqrec.seq());
+            let nb_bases = seqrec.seq().len();
+            let mut new_seq = Sequence::with_capacity(2, nb_bases);
+            new_seq.encode_and_add(&seqrec.seq(), &alphabet2b);
             drop(seqrec);
             // we have DNA seq for now
-            let new_seq = Sequence::new(&filtered,2);
             let seqwithid = IdSeq::new(pathb.to_str().unwrap().to_string(), strid,SequenceType::SequenceDNA(new_seq));
             to_sketch.push(seqwithid);
             if log::log_enabled!(log::Level::Trace) {
@@ -73,9 +76,10 @@ pub fn process_file_by_sequence(pathb : &PathBuf, filter_params : &FilterParams)
 
 
 /// opens parse fna files with needletail extracts records , filters out capsid , encode in 2 bits the whome sequence on the fly,
-/// record after record; the whole bytes of file pathb .
-/// and send sequences to function process_dir to execute file_task to produce sequence
+/// record after record; the whole bytes of file pathb into one large sequence.
+/// and send sequenceto function process_dir to execute file_task to produce sequence
 /// for any client
+/// The vector returned has size 1 as the sequence is concatenated
 pub fn process_file_in_one_block(pathb : &PathBuf, filter_params : &FilterParams)  -> Vec<IdSeq> {
     //
     log::debug!("process_file_in_one_block , file : {:?}", pathb);
