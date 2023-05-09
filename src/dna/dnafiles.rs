@@ -61,7 +61,8 @@ pub fn process_file_by_sequence(pathb : &PathBuf, filter_params : &FilterParams)
             new_seq.encode_and_add(&seqrec.seq(), &alphabet2b);
             drop(seqrec);
             // we have DNA seq for now
-            let seqwithid = IdSeq::new(pathb.to_str().unwrap().to_string(), strid,SequenceType::SequenceDNA(new_seq));
+            let nullid = String::from(""); // we will sketch the whole and loose id, so we spare memory
+            let seqwithid = IdSeq::new(pathb.to_str().unwrap().to_string(), nullid,SequenceType::SequenceDNA(new_seq));
             to_sketch.push(seqwithid);
             if log::log_enabled!(log::Level::Trace) {
                 log::trace!("process_file, nb_sketched {} ", to_sketch.len());
