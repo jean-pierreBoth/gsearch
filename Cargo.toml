@@ -50,8 +50,8 @@ clap = {version = "4.1"}
 fxhash = {version = "0.2"}
 ##
 
-probminhash = {version = "0.1.8"}
-##probminhash = {git = "https://github.com/jean-pierreBoth/probminhash"}
+# probminhash = {version = "0.1.8"}
+probminhash = {git = "https://github.com/jean-pierreBoth/probminhash"}
 # probminhash = {path = "../probminhash"}
 
 hnsw_rs =  {version = "0.1.19"}
