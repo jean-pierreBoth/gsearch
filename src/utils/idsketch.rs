@@ -52,6 +52,8 @@ pub enum SequenceType {
 pub struct IdSeq {
     /// as read is sequential we can identify uniquely sequence in hnsw
     pub(crate) rank : usize,
+    /// when we sketch a whole file we can identify uniquely sketch by filenum
+    pub(crate) filerank : usize,
     /// But we do not know in which order files are read, so we store filename
     path : String,
     /// fasta id of genome Sketched as read in head of fasta record.
@@ -64,7 +66,7 @@ pub struct IdSeq {
 impl IdSeq {
     ///
     pub fn new(path : String, id: String, seq : SequenceType) -> Self {
-        IdSeq{rank : 0, path, id, seq}
+        IdSeq{rank : 0, filerank : 0, path, id, seq}
     }
     /// get file path 
     pub fn get_path(&self) -> &String {
@@ -76,10 +78,17 @@ impl IdSeq {
         &self.id
     }
 
+    ///
     pub fn get_rank(&self) -> usize {
         self.rank
     }
 
+    /// get unique file id of where the seq comes
+    pub fn get_filerank(&self) -> usize {
+        self.filerank
+    }
+
+    /// sequence is DNA or AA ?
     pub fn get_sequence(&self) -> &SequenceType {
         &self.seq
     }

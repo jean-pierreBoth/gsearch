@@ -160,6 +160,7 @@ pub fn process_dir(state : &mut ProcessingState, datatype: &DataType, dir: &Path
                 let to_sketch_ref = to_sketch.as_mut().unwrap();
                 for i in 0..to_sketch_ref.len() {
                     to_sketch_ref[i].rank = state.nb_seq;
+                    to_sketch_ref[i].filerank = state.nb_file;
                     state.nb_seq += 1;
                 }
                 state.nb_file += 1;
@@ -319,6 +320,7 @@ pub(crate) fn process_dir_parallel_rec(state : &mut ProcessingState, datatype: &
                     for mut seqfile in seqs {
                         for i in 0..seqfile.len() {
                             seqfile[i].rank = state.nb_seq;
+                            seqfile[i].filerank = state.nb_file;
                             state.nb_seq += 1;
                         }                
                         state.nb_file += 1;
@@ -377,6 +379,7 @@ pub(crate) fn process_dir_parallel(state : &mut ProcessingState, datatype: &Data
         for mut seqfile in seqs {
             for i in 0..seqfile.len() {
                 seqfile[i].rank = state.nb_seq;
+                seqfile[i].filerank = state.nb_file;
                 state.nb_seq += 1;
             }                
             state.nb_file += 1;

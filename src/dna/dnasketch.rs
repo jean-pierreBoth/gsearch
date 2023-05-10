@@ -227,7 +227,7 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT+KmerBuilder<Kmer>, Ske
                             assert!(p_res.is_ok());
                         }
                 }
-                // if insertion_queue is beyond threshold size we can go to threaded sketching and threading insertion
+                // if insertion_queue is beyond threshold size in number of bases we can go to threaded sketching and threading insertion
                 let nb_bases_thread_threshold : usize = 10_000_000_000;
                 if nb_base_in_queue > nb_bases_thread_threshold || read_more == false {
                     let collect_sender_clone = collect_sender.clone();
@@ -239,41 +239,47 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT+KmerBuilder<Kmer>, Ske
                         if res_pop.is_ok() {
                             local_queue.push(res_pop.unwrap());
                         }
-                    }                    
-                    if local_queue.len() > 0 {
-                        scope.spawn(  move |_|  {
-                            log::info!("spawning thread nb seq : {}", local_queue.len());
-                            match block_processing {
-                                true => {
-                                    let sequencegroup_ref : Vec<&Sequence> = local_queue.iter().map(|v| v[0].get_sequence_dna().unwrap()).collect();
-                                    log::debug!("calling sketch_compressedkmer nb seq : {}", sequencegroup_ref.len());
-                                    // computes hash signature
-                                    let signatures = sketcher_clone.sketch_compressedkmer(&sequencegroup_ref, kmer_hash_fn);
-                                    let seq_rank :  Vec<usize> = local_queue.iter().map(|v| v[0].get_rank()).collect();
+                    }
+                    nb_base_in_queue = 0; 
+                    assert!(local_queue.len() > 0);
+                                     
+                    scope.spawn(  move |_|  {
+                        log::info!("spawning thread nb seq : {}", local_queue.len());
+                        match block_processing {
+                            true => {
+                                for v in &local_queue {
+                                    assert_eq!(v.len(), 1);
+                                }
+                                let sequencegroup_ref : Vec<&Sequence> = local_queue.iter().map(|v| v[0].get_sequence_dna().unwrap()).collect();
+                                log::debug!("calling sketch_compressedkmer nb seq : {}", sequencegroup_ref.len());
+                                // computes hash signature , as we treat the file globally, the signature is indexed by filerank!
+                                let signatures = sketcher_clone.sketch_compressedkmer(&sequencegroup_ref, kmer_hash_fn);
+                                let seq_rank :  Vec<usize> = local_queue.iter().map(|v| v[0].get_filerank()).collect();
+                                assert_eq!(signatures.len(), seq_rank.len());
+                                for i in 0..signatures.len() {
+                                    let item: ItemDict = ItemDict::new(Id::new(local_queue[i][0].get_path(), local_queue[i][0].get_fasta_id()), local_queue[i][0].get_seq_len());
+                                    let msg = CollectMsg::new((signatures[i].clone(), seq_rank[i]), item);
+                                    let _ = collect_sender_clone.send(msg);
+                                }
+                            }
+                            false => { // means we are in seq by seq mode inside a file
+                                // TODO: This can be further // either by iter or explicit thread
+                                for i in 0..local_queue.len() {
+                                    let sequencegroup_ref : Vec<&Sequence> = local_queue[i].iter().map(|v| v.get_sequence_dna().unwrap()).collect();
+                                    // as we treat the file globally, the signature is indexed by filerank!
+                                    let seq_rank :  Vec<usize> = local_queue[i].iter().map(|v| v.get_filerank()).collect();
+                                    let signatures = sketcher_clone.sketch_compressedkmer_seqs(&sequencegroup_ref, kmer_hash_fn);
                                     assert_eq!(signatures.len(), seq_rank.len());
                                     for i in 0..signatures.len() {
-                                        let item = ItemDict::new(Id::new(local_queue[i][0].get_path(), local_queue[i][0].get_fasta_id()), local_queue[i][0].get_seq_len());
+                                        let item: ItemDict = ItemDict::new(Id::new(local_queue[i][0].get_path(), local_queue[i][0].get_fasta_id()), local_queue[i][0].get_seq_len());
                                         let msg = CollectMsg::new((signatures[i].clone(), seq_rank[i]), item);
                                         let _ = collect_sender_clone.send(msg);
                                     }
                                 }
-                                false => { // means we are in seq by seq mode inside a file
-                                    // TODO: This can be further // either by iter or explicit thread
-                                    for i in 0..local_queue.len() {
-                                        let sequencegroup_ref : Vec<&Sequence> = local_queue[i].iter().map(|v| v.get_sequence_dna().unwrap()).collect();
-                                        let seq_rank :  Vec<usize> = local_queue[i].iter().map(|v| v.get_rank()).collect();
-                                        let signatures = sketcher_clone.sketch_compressedkmer_seqs(&sequencegroup_ref, kmer_hash_fn);
-                                        for i in 0..signatures.len() {
-                                            let item = ItemDict::new(Id::new(local_queue[i][0].get_path(), local_queue[i][0].get_fasta_id()), local_queue[i][0].get_seq_len());
-                                            let msg = CollectMsg::new((signatures[i].clone(), seq_rank[i]), item);
-                                            let _ = collect_sender_clone.send(msg);
-                                        }
-                                    }
-                                    panic!("not yet implemented");
-                                }
-                            }        
-                        });              // end internal thread 
-                    }
+                            }
+                        }        
+                    });   // end internal thread 
+                    
                 }
             } // end while
             if reciever_cpu.is_ok() {
