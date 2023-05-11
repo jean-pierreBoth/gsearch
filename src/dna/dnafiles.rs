@@ -204,6 +204,13 @@ pub fn process_buffer_in_one_block(pathb : &PathBuf, bufread : &[u8], filter_par
 
 
 
+pub fn process_buffer_by_sequence(pathb : &PathBuf, bufread : &[u8], filter_params : &FilterParams)  -> Vec<IdSeq> {
+
+    std::panic!("not yet implemented");
+}
+
+
+
 /// opens parse fna files with needletail
 /// extracts records , concat in a whole block and split in equal parts.
 /// The split is done in 10 segments (hard coded at present time)

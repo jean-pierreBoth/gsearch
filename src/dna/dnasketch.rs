@@ -30,7 +30,7 @@ use probminhash::{setsketcher::SetSketchParams};
 use crate::utils::{idsketch::*, reloadhnsw};
 use crate::utils::files::{process_dir,process_dir_parallel, ProcessingState};
 
-use crate::dna::dnafiles::{process_file_in_one_block, process_buffer_in_one_block, process_file_by_sequence};
+use crate::dna::dnafiles::{process_file_in_one_block, process_buffer_in_one_block, process_file_by_sequence, process_buffer_by_sequence};
 
 use crate::utils::parameters::*;
 
@@ -164,24 +164,35 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT+KmerBuilder<Kmer>, Ske
         scope.spawn( |_|   {
             let start_t_prod = SystemTime::now();
             let res_nb_sent;
-            if block_processing {
-                log::info!("dnasketch::sketchandstore_dir_compressedkmer : block processing");
-                if other_params.get_parallel_io() {
-                    let nb_files_by_group = other_params.get_nb_files_par();
-                    log::info!("dnasketch::sketchandstore_dir_compressedkmer : calling process_dir_parallel, nb_files in parallel : {}", nb_files_by_group);
-                    res_nb_sent = process_dir_parallel(&mut state, &DataType::DNA,  &toprocess_path, filter_params, 
-                                    nb_files_by_group, &process_buffer_in_one_block, &send);
-                } // end case parallel io
-                else {
-                    log::info!("dnasketch::sketchandstore_dir_compressedkmer : calling process_dir serial");
-                    res_nb_sent = process_dir(&mut state, &DataType::DNA, &toprocess_path, filter_params, 
-                                    &process_file_in_one_block, &send);
+            match block_processing {
+                true => {
+                    log::info!("dnasketch::sketchandstore_dir_compressedkmer : block processing");
+                    if other_params.get_parallel_io() {
+                        let nb_files_by_group = other_params.get_nb_files_par();
+                        log::info!("dnasketch::sketchandstore_dir_compressedkmer : calling process_dir_parallel, nb_files in parallel : {}", nb_files_by_group);
+                        res_nb_sent = process_dir_parallel(&mut state, &DataType::DNA,  &toprocess_path, filter_params, 
+                                        nb_files_by_group, &process_buffer_in_one_block, &send);
+                    } // end case parallel io
+                    else {
+                        log::info!("dnasketch::sketchandstore_dir_compressedkmer : calling process_dir serial");
+                        res_nb_sent = process_dir(&mut state, &DataType::DNA, &toprocess_path, filter_params, 
+                                        &process_file_in_one_block, &send);
+                    }                
                 }
-            }
-            else {
-                log::info!("processing by sequence, sketching whole file globally");
-                res_nb_sent = process_dir(&mut state, &DataType::DNA, &toprocess_path, filter_params, &process_file_by_sequence, &send);
-            }
+                false => {
+                    if other_params.get_parallel_io() {
+                        let nb_files_by_group = other_params.get_nb_files_par();
+                        log::info!("dnasketch::sketchandstore_dir_compressedkmer : calling process_dir_parallel, nb_files in parallel : {}", nb_files_by_group);
+                        res_nb_sent = process_dir_parallel(&mut state, &DataType::DNA,  &toprocess_path, filter_params, 
+                                nb_files_by_group, &process_buffer_by_sequence, &send);
+                    }
+                    else {
+                        log::info!("processing by sequence, sketching whole file globally");
+                        res_nb_sent = process_dir(&mut state, &DataType::DNA, &toprocess_path, filter_params,
+                                     &process_file_by_sequence, &send);
+                    }
+                }                
+            };
             match res_nb_sent {
                 Ok(nb_really_sent) => {
                     nb_sent = nb_really_sent;
@@ -244,7 +255,7 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT+KmerBuilder<Kmer>, Ske
                     assert!(local_queue.len() > 0);
                                      
                     scope.spawn(  move |_|  {
-                        log::info!("spawning thread nb seq : {}", local_queue.len());
+                        log::info!("spawning thread on nb files : {}", local_queue.len());
                         match block_processing {
                             true => {
                                 for v in &local_queue {
@@ -255,21 +266,21 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT+KmerBuilder<Kmer>, Ske
                                 // computes hash signature , as we treat the file globally, the signature is indexed by filerank!
                                 let signatures = sketcher_clone.sketch_compressedkmer(&sequencegroup_ref, kmer_hash_fn);
                                 let seq_rank :  Vec<usize> = local_queue.iter().map(|v| v[0].get_filerank()).collect();
-                                assert_eq!(signatures.len(), seq_rank.len());
+                                assert_eq!(signatures.len(), seq_rank.len(), "signatures len != seq rank len");
                                 for i in 0..signatures.len() {
                                     let item: ItemDict = ItemDict::new(Id::new(local_queue[i][0].get_path(), local_queue[i][0].get_fasta_id()), local_queue[i][0].get_seq_len());
                                     let msg = CollectMsg::new((signatures[i].clone(), seq_rank[i]), item);
                                     let _ = collect_sender_clone.send(msg);
                                 }
                             }
-                            false => { // means we are in seq by seq mode inside a file
+                            false => { // means we are in seq by seq mode inside a file. We get one signature by msg (or file)
                                 // TODO: This can be further // either by iter or explicit thread
                                 for i in 0..local_queue.len() {
                                     let sequencegroup_ref : Vec<&Sequence> = local_queue[i].iter().map(|v| v.get_sequence_dna().unwrap()).collect();
                                     // as we treat the file globally, the signature is indexed by filerank!
                                     let seq_rank :  Vec<usize> = local_queue[i].iter().map(|v| v.get_filerank()).collect();
                                     let signatures = sketcher_clone.sketch_compressedkmer_seqs(&sequencegroup_ref, kmer_hash_fn);
-                                    assert_eq!(signatures.len(), seq_rank.len());
+                                    log::debug!("msg num : {}, nb seq : {}", i, local_queue[i].len());
                                     for i in 0..signatures.len() {
                                         let item: ItemDict = ItemDict::new(Id::new(local_queue[i][0].get_path(), local_queue[i][0].get_fasta_id()), local_queue[i][0].get_seq_len());
                                         let msg = CollectMsg::new((signatures[i].clone(), seq_rank[i]), item);

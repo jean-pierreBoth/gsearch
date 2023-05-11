@@ -178,7 +178,7 @@ pub fn process_dir(state : &mut ProcessingState, datatype: &DataType, dir: &Path
     //
     drop(sender);
     //
-    Ok(state.nb_seq)
+    Ok(state.nb_file)
 }  // end of process_dirs
 
 
@@ -346,7 +346,7 @@ pub(crate) fn process_dir_parallel_rec(state : &mut ProcessingState, datatype: &
     //
     drop(sender);
     //    
-    Ok(state.nb_seq)
+    Ok(state.nb_file)
 }  // end of process_dir_parallel_rec
 
 
