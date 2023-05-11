@@ -30,7 +30,7 @@ use probminhash::{setsketcher::SetSketchParams};
 use crate::utils::{idsketch::*, reloadhnsw};
 use crate::utils::files::{process_dir,process_dir_parallel, ProcessingState};
 
-use crate::dna::dnafiles::{process_file_in_one_block, process_buffer_in_one_block, process_file_concat_split};
+use crate::dna::dnafiles::{process_file_in_one_block, process_buffer_in_one_block, process_file_by_sequence};
 
 use crate::utils::parameters::*;
 
@@ -179,8 +179,8 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT+KmerBuilder<Kmer>, Ske
                 }
             }
             else {
-                log::info!("processing by concat and split");
-                res_nb_sent = process_dir(&mut state, &DataType::DNA, &toprocess_path, filter_params, &process_file_concat_split, &send);
+                log::info!("processing by sequence, sketching whole file globally");
+                res_nb_sent = process_dir(&mut state, &DataType::DNA, &toprocess_path, filter_params, &process_file_by_sequence, &send);
             }
             match res_nb_sent {
                 Ok(nb_really_sent) => {

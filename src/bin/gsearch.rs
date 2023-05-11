@@ -560,8 +560,11 @@ fn main() {
                 .long("pio")
                 .value_name("pio")
                 .value_parser(clap::value_parser!(usize))
-                .help("Parallel IO processing")
-        )
+                .help("Parallel IO processing"))
+            .arg(Arg::new("seq")
+                .long("seq")
+                .action(ArgAction::SetTrue) 
+                .help("--seq : sketching is done without concatenating sequences"))
         .subcommand(tohnsw_cmd)
         .subcommand(add_cmd)
         .subcommand(request_cmd)
@@ -571,6 +574,11 @@ fn main() {
     // now we fill other parameters : parallel fasta parsing and adding mode in hnsw
     let nb_files_par: usize = *matches.get_one("pario").unwrap_or(&0usize);
     println!("parallel io, nb_files_par : {}", nb_files_par);
+    let seq_flag = matches.get_flag("seq");
+    if seq_flag {
+        log::debug!("setting seq flag true, block = false");
+    }
+
     //
     let hnsw_dir : String;
     let mut processing_params: Option<ProcessingParams> = None;
@@ -591,7 +599,15 @@ fn main() {
         cmd = CmdType::TOHNSW;   
         match res {
             Ok(params) => { hnsw_dir = params.0;
-                                                        processing_params = Some(params.1); },
+                                                        if seq_flag { 
+                                                                processing_params = Some(ProcessingParams::new(*params.1.get_hnsw_params(), 
+                                                                            *params.1.get_sketching_params(), 
+                                                                            false));
+                                                        } 
+                                                        else {
+                                                            processing_params = Some(params.1);
+                                                        }
+                                                     },
             _          => { 
                             log::error!("parsing tohnsw command failed");
                             println!("exiting with error {}", res.as_ref().err().as_ref().unwrap());
