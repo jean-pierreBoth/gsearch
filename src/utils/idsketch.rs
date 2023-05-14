@@ -49,6 +49,7 @@ pub enum SequenceType {
 /// This structure is used for returning info from function process_file
 /// It stores all info on treated sequences 
 /// 
+
 pub struct IdSeq {
     /// as read is sequential we can identify uniquely sequence in hnsw
     pub(crate) rank : usize,

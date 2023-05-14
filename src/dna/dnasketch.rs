@@ -12,7 +12,9 @@ use std::path::{PathBuf};
 // for multithreading
 use std::sync::Arc;
 use crossbeam_channel::*;
-use concurrent_queue::ConcurrentQueue;
+use concurrent_queue::{ConcurrentQueue, PushError};
+
+
 use serde::{de::DeserializeOwned, Serialize};
 
 use std::fmt::{Debug};
@@ -74,7 +76,7 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT+KmerBuilder<Kmer>, Ske
     //
     log::info!("sketchandstore_dir {}", hnsw_pb.to_str().unwrap());
     let start_t = SystemTime::now();
-    let cpu_start = ProcessTime::now();
+    let cpu_start: ProcessTime = ProcessTime::now();
     //
     let block_processing = processing_params.get_block_flag();
     // a queue of signature waiting to be inserted , size must be sufficient to benefit from threaded probminhash and insert
@@ -156,13 +158,15 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT+KmerBuilder<Kmer>, Ske
             crossbeam_channel::bounded::<CollectMsg<<Sketcher as SeqSketcherT<Kmer>>::Sig>>(insertion_block_size+1);
     //
     let pool: rayon::ThreadPool = rayon::ThreadPoolBuilder::new().build().unwrap();
-    log::info!("nb threads in pool : {:?}", pool.current_num_threads());
+    let pool_nb_thread = pool.current_num_threads();
+    log::info!("nb threads in pool : {:?}", pool_nb_thread);
 
     // launch process_dir in a thread or async
     pool.scope(|scope| {
         // sequence sending, productor thread
         scope.spawn( |_|   {
             let start_t_prod = SystemTime::now();
+            let cpu_start_prod:  ProcessTime = ProcessTime::now();
             let res_nb_sent;
             match block_processing {
                 true => {
@@ -206,7 +210,7 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT+KmerBuilder<Kmer>, Ske
             };
             drop(send);
             state.elapsed_t =  start_t_prod.elapsed().unwrap().as_secs() as f32;
-            log::info!("sender processed in  system time(s) : {}", state.elapsed_t);
+            log::info!("sender processed in  system time(s) : {}, cpu time(s) : {}", state.elapsed_t, cpu_start_prod.elapsed().as_secs());
             // dump processing state in the current directory
             let _ = state.dump_json(dump_path_ref);
         });
@@ -214,8 +218,15 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT+KmerBuilder<Kmer>, Ske
         // sequence reception, consumer thread
         //
         scope.spawn( |scope| {
-            let insertion_queue = Arc::new(ConcurrentQueue::bounded(insertion_block_size));
-            let reciever_cpu = ThreadTime::try_now();
+            let insertion_queue = Arc::new(ConcurrentQueue::bounded(2 * insertion_block_size));
+            let sketching_start_time = SystemTime::now();
+            let sketching_start_cpu = ThreadTime::now();
+            // we can create a new thread for at least nb_bases_thread_threshold bases.
+            let nb_bases_thread_threshold : usize = 1_000_000;
+            // a bounded blocking queue to limit the number of threads to pool_nb_thread.
+            // at thread creation we send a msg into queue, at thread end we receive a msg.
+            // So the length of the queue is number of active thread
+            let (thread_token_sender, thread_token_receiver) = crossbeam_channel::bounded::<u32>(pool_nb_thread);
             // how many msg we received
             let mut nb_msg_received = 0;
             // we must read messages, sketch and insert into hnsw
@@ -223,28 +234,40 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT+KmerBuilder<Kmer>, Ske
             let mut nb_base_in_queue = 0;
             while read_more {
                 // try read, if error is Disconnected we stop read and both threads are finished.
-                let res_receive = receive.recv();
-                match res_receive {
-                    Err(RecvError) =>   {   read_more = false;
-                                            log::debug!("end of reception");
-                    }
-                    Ok(idsequences) => {
+                if !insertion_queue.is_full() {
+                    let res_receive = receive.recv();
+                    match res_receive {
+                        Err(RecvError) =>   {   read_more = false;
+                                                log::debug!("end of reception");
+                        }
+                        Ok(idsequences) => {
                             // concat the new idsketch in insertion queue.
                             nb_msg_received += 1;
                             nb_base_in_queue = idsequences.iter().fold(0, |acc, s| acc + s.get_seq_len());
                             log::debug!("nb_base_in_queue : {}", nb_base_in_queue);
                             log::debug!("read received nb seq : {}, total nb msg received : {}", idsequences.len(), nb_msg_received);
                             let p_res = insertion_queue.push(idsequences);
-                            assert!(p_res.is_ok());
+                            if let Err(e) = p_res {
+                                match e {
+                                    PushError::Full(_)   => { log::error!("queue is full"); },
+                                    PushError::Closed(_) => { log::error!("queue is closed"); },
+                                };
+                                std::panic!("exiting");
+                            };
                         }
+                    }
                 }
+                if read_more == false && insertion_queue.len() == 0 {
+                    break;
+                }
+
                 // if insertion_queue is beyond threshold size in number of bases we can go to threaded sketching and threading insertion
-                let nb_bases_thread_threshold : usize = 10_000_000_000;
-                if nb_base_in_queue > nb_bases_thread_threshold || read_more == false {
+                if nb_base_in_queue > nb_bases_thread_threshold || insertion_queue.is_full() {
                     let collect_sender_clone = collect_sender.clone();
                     let sketcher_clone = sketcher.clone();
                     let mut local_queue = Vec::<Vec<IdSeq> >::with_capacity(insertion_queue.len());
                     let q_len = insertion_queue.len();
+                    log::debug!("insertion_queue.len() : {}", q_len);
                     for _ in 0..q_len {
                         let res_pop = insertion_queue.pop();
                         if res_pop.is_ok() {
@@ -253,7 +276,9 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT+KmerBuilder<Kmer>, Ske
                     }
                     nb_base_in_queue = 0; 
                     assert!(local_queue.len() > 0);
-                                     
+                    let _ = thread_token_sender.send(1);
+                    log::debug!("nb running threads = {:?}", thread_token_sender.len());
+                    let thread_token_receiver_cloned = thread_token_receiver.clone();
                     scope.spawn(  move |_|  {
                         log::info!("spawning thread on nb files : {}", local_queue.len());
                         match block_processing {
@@ -277,27 +302,37 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT+KmerBuilder<Kmer>, Ske
                                 // TODO: This can be further // either by iter or explicit thread
                                 for i in 0..local_queue.len() {
                                     let sequencegroup_ref : Vec<&Sequence> = local_queue[i].iter().map(|v| v.get_sequence_dna().unwrap()).collect();
+                                    let seq_len = sequencegroup_ref.iter().fold(0, | acc, s | acc + s.size());
                                     // as we treat the file globally, the signature is indexed by filerank!
                                     let seq_rank :  Vec<usize> = local_queue[i].iter().map(|v| v.get_filerank()).collect();
                                     let signatures = sketcher_clone.sketch_compressedkmer_seqs(&sequencegroup_ref, kmer_hash_fn);
                                     log::debug!("msg num : {}, nb seq : {}", i, local_queue[i].len());
                                     for i in 0..signatures.len() {
-                                        let item: ItemDict = ItemDict::new(Id::new(local_queue[i][0].get_path(), local_queue[i][0].get_fasta_id()), local_queue[i][0].get_seq_len());
+                                        let item: ItemDict = ItemDict::new(Id::new(local_queue[i][0].get_path(), local_queue[i][0].get_fasta_id()), seq_len);
                                         let msg = CollectMsg::new((signatures[i].clone(), seq_rank[i]), item);
                                         let _ = collect_sender_clone.send(msg);
                                     }
                                 }
                             }
-                        }        
+                        }
+                        // cleaning
+                        local_queue.clear();
+                        drop(local_queue); // a precaution as  local_queue has been moved into the thread 
+                        // we free a token in queue
+                        let res = thread_token_receiver_cloned.recv();
+                        log::debug!("thread_token_receiver_cloned.len = {:?}", thread_token_receiver_cloned.len());
+                        match res {
+                            Ok(_) => { log::debug!("thread ending OK");},
+                            Err(_) => { log::error!("thread exit with a token error");},
+                        }
                     });   // end internal thread 
-                    
                 }
             } // end while
-            if reciever_cpu.is_ok() {
-                let cpu_time = reciever_cpu.unwrap().try_elapsed();
-                if cpu_time.is_ok() {
-                    log::info!("sketching time needed : {}", cpu_time.unwrap().as_secs());
-                }
+            // information on how time is spent
+            let thread_cpu_time = sketching_start_cpu.try_elapsed();
+            if thread_cpu_time.is_ok() {
+                log::info!("sketcher processed in  system time(s) : {}, cpu time(s) : {}", 
+                    sketching_start_time.elapsed().unwrap().as_secs(), thread_cpu_time.unwrap().as_secs());
             }
             //
             drop(receive);

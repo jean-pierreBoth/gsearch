@@ -76,6 +76,50 @@ pub fn process_file_by_sequence(pathb : &PathBuf, filter_params : &FilterParams)
 
 
 
+/// This function will parse with needletail (and do the decompressing).
+/// We encode sequences in 2 bits the whole sequence on the fly; record after record; the whole bytes of file pathb contained in  bufread.
+/// In this way process_buffer_in_one_block do not have any IO to do and can be called // for fasta parsing without disk constraints.
+/// We nevertheless needs pathb to fill in IdSeq.  
+/// /// The return of this function is a vector of size the number of record in the file.
+pub fn process_buffer_by_sequence(pathb : &PathBuf, bufread : &[u8], filter_params : &FilterParams)  -> Vec<IdSeq> {
+    //
+    log::debug!("process_buffer_by_sequence , file : {:?}", pathb);
+    //
+    let mut to_sketch = Vec::<IdSeq>::new();
+    let alphabet2b = Alphabet2b::new();
+    //
+    let mut reader = needletail::parse_fastx_reader(bufread).expect("expecting valid filename");
+    // 
+    while let Some(record) = reader.next() {
+        if record.is_err() {
+            println!("got bd record in file {:?}", pathb.file_name().unwrap());
+            std::process::exit(1);
+        }
+        // do we keep record ? we must get its id
+        let seqrec = record.expect("invalid record");
+        let id = seqrec.id();
+        let strid = String::from_utf8(Vec::from(id)).unwrap();
+        // process sequence if not capsid and not filtered out, in block mode we do not filter any at the moment
+        if strid.find("capsid").is_none()  && !filter_params.filter(&seqrec.seq()) {
+            let nb_bases = seqrec.seq().len();
+            let mut new_seq = Sequence::with_capacity(2, nb_bases);
+            new_seq.encode_and_add(&seqrec.seq(), &alphabet2b);
+            drop(seqrec);
+            // we have DNA seq for now
+            let nullid = String::from(""); // we will sketch the whole and loose id, so we spare memory
+            let seqwithid = IdSeq::new(pathb.to_str().unwrap().to_string(), nullid,SequenceType::SequenceDNA(new_seq));
+            to_sketch.push(seqwithid);
+        }
+    }
+    if log::log_enabled!(log::Level::Trace) {
+        log::trace!("process_file, nb_sketched {} ", to_sketch.len());
+    }
+    //
+    return to_sketch;
+} // end of process_buffer_by_sequence
+
+
+
 /// opens parse fna files with needletail extracts records , filters out capsid , encode in 2 bits the whome sequence on the fly,
 /// record after record; the whole bytes of file pathb into one large sequence.
 /// and send sequenceto function process_dir to execute file_task to produce sequence
@@ -147,9 +191,10 @@ pub fn process_file_in_one_block(pathb : &PathBuf, filter_params : &FilterParams
 
 
 /// This function will parse with needletail (and do the decompressing).
-/// We encode in 2 bits the whome sequence on the fly; record after record; the whole bytes of file pathb contained in  bufread.
-/// In this way process_buffer_in_one_block do not have any IO to do and can b called // for fasta parsing without disk constraints.
+/// We encode in 2 bits the whole fly file on the fly into a concatenated sequence, record after record; the whole bytes of file pathb contained in  bufread.
+/// In this way process_buffer_in_one_block do not have any IO to do and can be called // for fasta parsing without disk constraints.
 /// We nevertheless needs pathb to fill in IdSeq
+/// The return of this function is a vector of size 1 as the sequence is concatenated
 pub fn process_buffer_in_one_block(pathb : &PathBuf, bufread : &[u8], filter_params : &FilterParams)  -> Vec<IdSeq> {
     //
     log::debug!("process_buffer_in_one_block , file : {:?}", pathb);
@@ -203,11 +248,6 @@ pub fn process_buffer_in_one_block(pathb : &PathBuf, bufread : &[u8], filter_par
 }  // end of process_buffer_in_one_block
 
 
-
-pub fn process_buffer_by_sequence(pathb : &PathBuf, bufread : &[u8], filter_params : &FilterParams)  -> Vec<IdSeq> {
-
-    std::panic!("not yet implemented");
-}
 
 
 

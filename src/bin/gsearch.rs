@@ -85,23 +85,14 @@
 //! 
 //! 
 
-// must loop on sub directories , open gzipped files
-// extracts complete genomes possiby many in one file (get rid of capsid records if any)
-// compute probminhash sketch and store in a Hnsw.
-
-// one thread should read sequences and do the probminhash
-// another process should store in hnsw
-
-// hnsw should also run in a query server mode after insertion.
 
 
-//In fact as in basedirname there must be a file (processingparams.json) specifying sketch size and kmer size, these
-// 2 options are useless in standard mode.
+// TODO:
+// - add a parsing of parameters to EmbedderParams in Ann subcommand
+// - hnsw should also run in a query server mode after insertion.
 
-// We can use the same structure as the tohnsw module
-// We parse a directory and send to a thread that do sketching and query
-// we must enforce that the sketching size is the same as used in the database, so SketcherParams
-// must have been dumped also in database directory.
+
+
 
 
 
@@ -737,7 +728,7 @@ fn main() {
                                             let hnsw = reloadhnsw::reload_hnsw::<u32>(&hnsw_path).unwrap();
                                             if _ann_params.ask_stats() || _ann_params.embed() {
                                                 log::info!("calling embed::get_graph_stats_embed");
-                                                let _ = embed::get_graph_stats_embed(&hnsw, _ann_params.embed());
+                                                let _ = embed::get_graph_stats_embed(&hnsw, _ann_params.embed(), None);
                                             }
                                         }
                                         "u16" => {
@@ -745,7 +736,7 @@ fn main() {
                                             let hnsw = reloadhnsw::reload_hnsw::<u16>(&hnsw_path).unwrap();
                                             if _ann_params.ask_stats() || _ann_params.embed() {
                                                 log::info!("calling embed::get_graph_stats_embed");
-                                                let _ = embed::get_graph_stats_embed(&hnsw, _ann_params.embed());
+                                                let _ = embed::get_graph_stats_embed(&hnsw, _ann_params.embed(), None);
                                             }
                                         }
                                         "f32" => {
@@ -753,7 +744,7 @@ fn main() {
                                             let hnsw = reloadhnsw::reload_hnsw::<f32>(&hnsw_path).unwrap();
                                             if _ann_params.ask_stats() || _ann_params.embed() {
                                                 log::info!("calling embed::get_graph_stats_embed");
-                                                let _ = embed::get_graph_stats_embed(&hnsw, _ann_params.embed());
+                                                let _ = embed::get_graph_stats_embed(&hnsw, _ann_params.embed(), None);
                                             }
                                         }  
                                         _    => {

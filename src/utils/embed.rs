@@ -11,7 +11,7 @@ use annembed::fromhnsw::{hubness::Hubness,kgraph_from_hnsw_all};
 use annembed::prelude::*;
 
 
-pub fn get_graph_stats_embed<T, D>(hnsw: &Hnsw<T, D>, embed: bool) -> Result<(), ()>
+pub fn get_graph_stats_embed<T, D>(hnsw: &Hnsw<T, D>, embed: bool, embed_params_opt : Option<EmbedderParams>) -> Result<(), ()>
 where
     T: Clone + Send + Sync,
     D: Distance<T> + Send + Sync,
@@ -34,13 +34,20 @@ where
         //
         if embed {
             log::info!(" going to embedding");
-            let mut embed_params = EmbedderParams::default();
-            embed_params.nb_grad_batch = 15;
-            embed_params.scale_rho = 0.75;
-            embed_params.beta = 1.;
-            embed_params.grad_step = 3.;
-            embed_params.nb_sampling_by_edge = 10;
-            embed_params.dmap_init = true;
+            let mut embed_params = match embed_params_opt {
+                Some(embed_params) => { embed_params },
+                None               => {
+                                        let mut embed_params = EmbedderParams::default();
+                                        embed_params.nb_grad_batch = 15;
+                                        embed_params.scale_rho = 0.75;
+                                        embed_params.beta = 1.;
+                                        embed_params.grad_step = 3.;
+                                        embed_params.nb_sampling_by_edge = 10;
+                                        embed_params.dmap_init = true;
+                                        embed_params
+                }
+            };
+            //
             if hnsw.get_point_indexation().get_layer_nb_point(1) > 30000 {
                 log::info!("doing hierarchical embedding from layer 1");
                 embed_params.set_hierarchy_layer(1);
