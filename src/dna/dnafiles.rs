@@ -80,7 +80,7 @@ pub fn process_file_by_sequence(pathb : &PathBuf, filter_params : &FilterParams)
 /// We encode sequences in 2 bits the whole sequence on the fly; record after record; the whole bytes of file pathb contained in  bufread.
 /// In this way process_buffer_in_one_block do not have any IO to do and can be called // for fasta parsing without disk constraints.
 /// We nevertheless needs pathb to fill in IdSeq.  
-/// /// The return of this function is a vector of size the number of record in the file.
+/// The return of this function is a vector of size the number of record in the file.
 pub fn process_buffer_by_sequence(pathb : &PathBuf, bufread : &[u8], filter_params : &FilterParams)  -> Vec<IdSeq> {
     //
     log::debug!("process_buffer_by_sequence , file : {:?}", pathb);
@@ -131,7 +131,6 @@ pub fn process_file_in_one_block(pathb : &PathBuf, filter_params : &FilterParams
     //
     let mut to_sketch = Vec::<IdSeq>::new();
     //
-    log::trace!("processing file {}", pathb.to_str().unwrap());
     let metadata = std::fs::metadata(pathb.clone());
     let nb_bases : usize;
     match metadata {
@@ -197,7 +196,7 @@ pub fn process_file_in_one_block(pathb : &PathBuf, filter_params : &FilterParams
 /// The return of this function is a vector of size 1 as the sequence is concatenated
 pub fn process_buffer_in_one_block(pathb : &PathBuf, bufread : &[u8], filter_params : &FilterParams)  -> Vec<IdSeq> {
     //
-    log::debug!("process_buffer_in_one_block , file : {:?}", pathb);
+    log::trace!("process_buffer_in_one_block , file : {:?}", pathb);
     //
     let mut to_sketch = Vec::<IdSeq>::new();
     //
@@ -211,7 +210,7 @@ pub fn process_buffer_in_one_block(pathb : &PathBuf, bufread : &[u8], filter_par
     else {
         nb_bases = bufread.len();
     }
-    log::debug!("allocating seq for {:?}, estimated nb bases : {}", pathb, nb_bases);
+    log::trace!("allocating seq for {:?}, estimated nb bases : {}", pathb, nb_bases);
     // We allocate one large block tht will contain the whole filtered genome and we know the sequence size it will produce
     // if file is not compressed f_len is a majorant (as N and capsid are excluded), if file is compressed a compression of 2 can be expected
     let mut new_seq = Sequence::with_capacity(2, nb_bases);
@@ -239,7 +238,7 @@ pub fn process_buffer_in_one_block(pathb : &PathBuf, bufread : &[u8], filter_par
     }
     new_seq.shrink_to_fit();
     // we are at end of file, we have one large sequence for the whole file
-    log::debug!("decompressed seq for file : {:?}, nb bases : {}", pathb.file_name().unwrap_or_default(), new_seq.size());
+    log::debug!("decompressed seq for file : {:?}, nb bases : {}, estimated nb bases : {}", pathb.file_name().unwrap_or_default(), new_seq.size(), nb_bases);
     // we have DNA seq for now
     let seqwithid = IdSeq::new(pathb.to_str().unwrap().to_string(), String::from("total sequence"), SequenceType::SequenceDNA(new_seq));
     to_sketch.push(seqwithid);

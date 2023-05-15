@@ -233,5 +233,9 @@ impl SeqDict {
        self.0.iter().map(|s| s.len).sum()
     }
 
+    /// return number of entries in sequence dictionary
+    pub fn get_nb_entries(&self) -> usize {
+        self.0.len()
+    }
 }  // end of impl SeqDict
 

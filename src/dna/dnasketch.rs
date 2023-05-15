@@ -200,12 +200,14 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT+KmerBuilder<Kmer>, Ske
             match res_nb_sent {
                 Ok(nb_really_sent) => {
                     nb_sent = nb_really_sent;
-                    println!("process_dir processed nb sequences : {}", nb_sent);
+                    log::info!("process_dir processed nb files (msg) : {}", nb_sent);
+                    println!("process_dir processed nb files (msg): {}", nb_sent);
                 }
                 Err(_) => {
                     nb_sent = 0;
                     println!("some error occured in process_dir");
-                    log::error!("some error occured in process_dir");
+                    log::error!("some error occured in process_dir, aborting in thread sending files/sequences");
+                    std::process::abort();
                 }
             };
             drop(send);
@@ -223,6 +225,7 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT+KmerBuilder<Kmer>, Ske
             let sketching_start_cpu = ThreadTime::now();
             // we can create a new thread for at least nb_bases_thread_threshold bases.
             let nb_bases_thread_threshold : usize = 1_000_000;
+            log::info!("threshold number of bases for thread cretaion : {:?}", nb_bases_thread_threshold);
             // a bounded blocking queue to limit the number of threads to pool_nb_thread.
             // at thread creation we send a msg into queue, at thread end we receive a msg.
             // So the length of the queue is number of active thread
@@ -252,7 +255,9 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT+KmerBuilder<Kmer>, Ske
                                     PushError::Full(_)   => { log::error!("queue is full"); },
                                     PushError::Closed(_) => { log::error!("queue is closed"); },
                                 };
-                                std::panic!("exiting");
+                                // 
+                                log::error!("aborting in thread dispatcher, cannot push in insertion queue");
+                                std::process::abort();
                             };
                         }
                     }
@@ -322,8 +327,10 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT+KmerBuilder<Kmer>, Ske
                         let res = thread_token_receiver_cloned.recv();
                         log::debug!("thread_token_receiver_cloned.len = {:?}", thread_token_receiver_cloned.len());
                         match res {
-                            Ok(_) => { log::debug!("thread ending OK");},
-                            Err(_) => { log::error!("thread exit with a token error");},
+                            Ok(_)   => { log::debug!("thread ending OK");},
+                            Err(_)  => { log::error!("thread exit with a token error, aborting");
+                                        std::process::abort();
+                                    },
                         }
                     });   // end internal thread 
                 }
@@ -352,21 +359,23 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT+KmerBuilder<Kmer>, Ske
                                             log::debug!("end of collector reception");
                     }
                     Ok(to_insert) => {
-                        log::debug!("collector received");
                         msg_store.push(to_insert.skecth_and_rank);
                         itemv.push(to_insert.item);
                         nb_received += 1;
+                        log::debug!("collector received nb_received : {}", nb_received);
                     }
                 }
                 if read_more == false || msg_store.len() > insertion_block_size {
-                    log::debug!("inserting block in hnsw");
+                    log::debug!("inserting block in hnsw : {:?}", msg_store.len());
                     let mut data_for_hnsw = Vec::<(&VecSig<Sketcher,Kmer>, usize)>::with_capacity(msg_store.len());
                     for i in 0..msg_store.len() {
                         data_for_hnsw.push((&msg_store[i].0, msg_store[i].1));
                     }
                     hnsw.parallel_insert(&data_for_hnsw);  
                     seqdict.0.append(&mut itemv); 
-                    data_for_hnsw.clear();
+                    assert_eq!( seqdict.get_nb_entries(), hnsw.get_nb_point());
+                    log::debug!(" dictionary size : {} hnsw nb points : {}", seqdict.get_nb_entries(), hnsw.get_nb_point());
+                    msg_store.clear();
                     itemv.clear();
                 }
             }
