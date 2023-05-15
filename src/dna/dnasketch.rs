@@ -166,7 +166,7 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT+KmerBuilder<Kmer>, Ske
         // sequence sending, productor thread
         scope.spawn( |_|   {
             let start_t_prod = SystemTime::now();
-            let cpu_start_prod:  ProcessTime = ProcessTime::now();
+            let cpu_start_prod = ThreadTime::now();
             let res_nb_sent;
             match block_processing {
                 true => {
@@ -241,7 +241,7 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT+KmerBuilder<Kmer>, Ske
                     let res_receive = receive.recv();
                     match res_receive {
                         Err(RecvError) =>   {   read_more = false;
-                                                log::debug!("end of reception");
+                                                log::debug!("end of collector reception");
                         }
                         Ok(idsequences) => {
                             // concat the new idsketch in insertion queue.
@@ -285,7 +285,7 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT+KmerBuilder<Kmer>, Ske
                     log::debug!("nb running threads = {:?}", thread_token_sender.len());
                     let thread_token_receiver_cloned = thread_token_receiver.clone();
                     scope.spawn(  move |_|  {
-                        log::info!("spawning thread on nb files : {}", local_queue.len());
+                        log::trace!("spawning thread on nb files : {}", local_queue.len());
                         match block_processing {
                             true => {
                                 for v in &local_queue {
@@ -366,7 +366,7 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT+KmerBuilder<Kmer>, Ske
                     }
                 }
                 if read_more == false || msg_store.len() > insertion_block_size {
-                    log::debug!("inserting block in hnsw : {:?}", msg_store.len());
+                    log::debug!("inserting block in hnsw, nb new points : {:?}", msg_store.len());
                     let mut data_for_hnsw = Vec::<(&VecSig<Sketcher,Kmer>, usize)>::with_capacity(msg_store.len());
                     for i in 0..msg_store.len() {
                         data_for_hnsw.push((&msg_store[i].0, msg_store[i].1));
