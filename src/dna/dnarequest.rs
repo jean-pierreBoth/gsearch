@@ -24,8 +24,34 @@ use kmerutils::sketching::seqsketchjaccard::*;
 use probminhash::{setsketcher::SetSketchParams};
 
 use crate::utils::*;
-use crate::dna::dnafiles::{process_file_concat_split, process_buffer_in_one_block, process_file_in_one_block};
+use crate::dna::dnafiles::{process_file_by_sequence, process_buffer_by_sequence, process_buffer_in_one_block, process_file_in_one_block};
 use crate::{matcher::*, answer::ReqAnswer};
+
+
+
+// Sig is basic item of a signature , VecSig is a vector of such items
+type VecSig<Sketcher, Kmer>  = Vec< <Sketcher as SeqSketcherT<Kmer>>::Sig>;
+
+
+// a type to describe msessage to collector task
+
+struct RequestMsg<Sig> {
+    // signature and sequence rank in requests
+    pub sketch_and_rank : Vec<Sig>,
+    // id of sequence
+    pub item : ItemDict,
+}
+
+
+impl <Sig> RequestMsg<Sig> {
+
+    pub fn new(sketch_and_rank : Vec<Sig>, item : ItemDict) -> Self {
+        RequestMsg{sketch_and_rank, item}
+    }
+
+} // end of RequestMsg
+
+
 
 
 
@@ -65,7 +91,6 @@ fn sketch_and_request_dir_compressedkmer<Kmer:CompressedKmerT + KmerBuilder<Kmer
     let cpu_start = ProcessTime::now();
     // a queue of signature request , size must be sufficient to benefit from threaded probminhash and search
     let request_block_size = 500;
-    let mut request_queue : Vec<IdSeq>= Vec::with_capacity(request_block_size);
     let mut state = ProcessingState::new();
     
     //
@@ -79,31 +104,52 @@ fn sketch_and_request_dir_compressedkmer<Kmer:CompressedKmerT + KmerBuilder<Kmer
     };
     // create something for likelyhood computation
     let mut matcher = Matcher::new(processing_parameters.get_kmer_size(), sketcher_params.get_sketch_size(), seqdict);
+    let mut nb_sent = 0;
+    let nb_received = 0;
     //
     // to send IdSeq to sketch from reading thread to sketcher thread
     let (send, receive) = crossbeam_channel::bounded::<Vec<IdSeq>>(request_block_size + 10);
+    // to send sketch result to a collector task
+    let (request_sender , request_receiver) = 
+        crossbeam_channel::bounded::<RequestMsg<<Sketcher as SeqSketcherT<Kmer>>::Sig>>(request_block_size+1);
+    //
+    let pool: rayon::ThreadPool = rayon::ThreadPoolBuilder::new().build().unwrap();
+    let pool_nb_thread = pool.current_num_threads();
+    log::info!("nb threads in pool : {:?}", pool_nb_thread);
     // launch process_dir in a thread or async
-    crossbeam_utils::thread::scope(|scope| {
-
+    pool.scope(|scope| {
         // sequence sending, productor thread
-        let mut nb_sent = 0;
-        let sender_handle = scope.spawn(move |_|   {
+        scope.spawn(|_|   {
             let res_nb_sent;
-            if block_processing {
-                if other_params.get_parallel_io() {
-                    let nb_files_by_group = other_params.get_nb_files_par();
-                    log::info!("dnasketch::sketchandstore_dir_compressedkmer : calling process_dir_parallel, nb_files in parallel : {}", nb_files_by_group);
-                    res_nb_sent = process_dir_parallel(&mut state, &DataType::DNA, request_dirpath, filter_params, 
-                                    nb_files_by_group, &process_buffer_in_one_block, &send);
-                } // end case parallel io
-                else {
-                    res_nb_sent = process_dir(&mut state, &DataType::DNA, request_dirpath, &filter_params, &process_file_in_one_block, &send);
-                }
-            }
-            else {
-                log::info!("processing by concat and split");
-                res_nb_sent = process_dir(&mut state, &DataType::DNA,  request_dirpath, &filter_params, &process_file_concat_split, &send);
-            }
+            match block_processing {
+                true => {
+                    log::info!("dnarequest::sketchandstore_dir_compressedkmer : block processing");
+                    if other_params.get_parallel_io() {
+                        let nb_files_by_group = other_params.get_nb_files_par();
+                        log::info!("dnarequest::sketchandstore_dir_compressedkmer : calling process_dir_parallel, nb_files in parallel : {}", nb_files_by_group);
+                        res_nb_sent = process_dir_parallel(&mut state, &DataType::DNA, request_dirpath, filter_params, 
+                                        nb_files_by_group, &process_buffer_in_one_block, &send);
+                    } // end case parallel io
+                    else {
+                        res_nb_sent = process_dir(&mut state, &DataType::DNA, request_dirpath, &filter_params, &process_file_in_one_block, &send);
+                    }
+                },
+                false => {
+                    log::info!("request::sketchandstore_dir_compressedkmer : seq by seq processing");
+                    if other_params.get_parallel_io() {
+                        let nb_files_by_group = other_params.get_nb_files_par();
+                        log::info!("dnarequest::sketchandstore_dir_compressedkmer : calling process_dir_parallel, nb_files in parallel : {}", nb_files_by_group);
+                        res_nb_sent = process_dir_parallel(&mut state, &DataType::DNA,  &request_dirpath, filter_params, 
+                                nb_files_by_group, &process_buffer_by_sequence, &send);
+                    }
+                    else {
+                        log::info!("processing by sequence, sketching whole file globally");
+                        res_nb_sent = process_dir(&mut state, &DataType::DNA, &request_dirpath, filter_params,
+                                     &process_file_by_sequence, &send);
+                    }
+                },
+            };
+            //
             match res_nb_sent {
                 Ok(nb_really_sent) => {
                     nb_sent = nb_really_sent;
@@ -117,90 +163,120 @@ fn sketch_and_request_dir_compressedkmer<Kmer:CompressedKmerT + KmerBuilder<Kmer
             state.elapsed_t =  start_t.elapsed().unwrap().as_secs() as f32;
             log::info!("sender processed in  system time(s) : {}", state.elapsed_t);
             drop(send);
-            Box::new(nb_sent)
-        });
-        // sequence reception, consumer thread
-        let receptor_handle = scope.spawn( |_| {
-            let mut nb_request = 0;
+        }); // end of request sender 
+
+        // sequence reception, sketching/request consumer thread
+        scope.spawn( |scope| {
             // we must read messages, sketch and insert into hnsw
+            let mut sketcher_queue : Vec<IdSeq>= Vec::with_capacity(request_block_size);
+            let mut nb_sketched = 0;
             let mut read_more = true;
             while read_more {
                 // try read, if error is Disconnected we stop read and both threads are finished.
                 let res_receive = receive.recv();
                 match res_receive {
                     Err(_) => { read_more = false;
-                        // sketch the content of  insertion_queue if not empty
-                        if request_queue.len() > 0 {
-                            let sequencegroup_ref : Vec<&Sequence> = request_queue.iter().map(|s| s.get_sequence_dna().unwrap()).collect();                   
-                            let seq_item : Vec<ItemDict> = request_queue.iter().map(|s| ItemDict::new(Id::new(s.get_path(), s.get_fasta_id()), s.get_seq_len())).collect();
-                            if log::log_enabled!(log::Level::Debug) {
-                                for s in &seq_item  {
-                                    log::debug!("treating request : {}", s.get_id().get_path());
-                                }
-                            }   
-                            let signatures = sketcher.sketch_compressedkmer(&sequencegroup_ref, kmer_hash_fn);                            
-                            // we have Vec<u64> signatures we must go back to a vector of IdSketch for hnsw insertion
-                            let knn_neighbours  = hnsw.parallel_search(&signatures, knbn, ef_search);
-                            for i in 0..knn_neighbours.len() {
-                                let answer = ReqAnswer::new(nb_request+i, seq_item[i].clone(), &knn_neighbours[i]);
-                                if answer.dump(&seqdict, out_threshold, &mut outfile).is_err() {
-                                    log::info!("could not dump answer for request id {}", answer.get_request_id().get_id().get_fasta_id());
-                                }
-                                // store in matcher. remind that each i corresponds to a request
-                                let candidates = knn_neighbours[i].iter().map(|n| SequenceMatch::new(seqdict.0[n.d_id].clone(), n.get_distance())).collect();
-                                matcher.insert_sequence_match(seq_item[i].clone(), candidates);
-                            }
-                            //  dump results
-                            nb_request += signatures.len();
-                        }
-                    }
+                        log::debug!("end of request reception");
+                    },
                     Ok(mut idsequences) => {
                         // concat the new idsketch in insertion queue.
-                        request_queue.append(&mut idsequences);
-                        // if request_queue is beyond threshold size we can go to threaded sketching and threading insertion
-                        if request_queue.len() > request_block_size {
-                            let sequencegroup_ref : Vec<&Sequence> = request_queue.iter().map(|s| s.get_sequence_dna().unwrap()).collect();
+                        log::debug!("request reception nb request : {}", idsequences.len());
+                        sketcher_queue.append(&mut idsequences);
+                    }
+                };
+                // if request_queue is beyond threshold size we can go to threaded sketching and threading insertion
+                if sketcher_queue.len() > request_block_size  || !read_more {
+                    match block_processing { 
+                        true => {
+                            let sequencegroup_ref : Vec<&Sequence> = sketcher_queue.iter().map(|s| s.get_sequence_dna().unwrap()).collect();
                             // collect Id
-                            let seq_item : Vec<ItemDict> = request_queue.iter().map(|s| ItemDict::new(Id::new(s.get_path(), s.get_fasta_id()), s.get_seq_len())).collect();
+                            let seq_item : Vec<ItemDict> = sketcher_queue.iter().map(|s| ItemDict::new(Id::new(s.get_path(), s.get_fasta_id()), s.get_seq_len())).collect();
                             // computes hash signature
                             let signatures = sketcher.sketch_compressedkmer(&sequencegroup_ref, kmer_hash_fn);
-                            // we have Vec<u64> signatures we must go back to a vector of IdSketch, inserting unique id, for hnsw insertion
-                            // parallel search
-                            let knn_neighbours  = hnsw.parallel_search(&signatures, knbn, ef_search);
-                            // construct and dump answers
-                            for i in 0..knn_neighbours.len() {
-                                let answer = ReqAnswer::new(nb_request+i, seq_item[i].clone(), &knn_neighbours[i]);
-                                if answer.dump(&seqdict, out_threshold, &mut outfile).is_err() {
-                                    log::info!("could not dump answer for request id {}", answer.get_request_id().get_id().get_fasta_id());
-                                }
-                                // store in matcher. remind that each i corresponds to a request
-                                let candidates = knn_neighbours[i].iter().map(|n| SequenceMatch::new(seqdict.0[n.d_id].clone(), n.get_distance())).collect();
-                                matcher.insert_sequence_match(seq_item[i].clone(), candidates);
+                            // now we must send signatures, rak and seq_items to request collector
+                            for i in 0..signatures.len() {
+                                let request_msg = RequestMsg::new(signatures[i].clone() , seq_item[i].clone());
+                                let _ = request_sender.send(request_msg);
                             }
-                            nb_request += signatures.len();
-                            request_queue.clear();
-                        }
-                    }
+                            // update state
+                            nb_sketched += signatures.len();
+                            sketcher_queue.clear();                            
+                        },
+                        //
+                        false => { // means we are in seq by seq mode inside a file. We get one signature by msg (or file)
+                            let sequencegroup_ref : Vec<&Sequence> = sketcher_queue.iter().map(|s| s.get_sequence_dna().unwrap()).collect();
+                            // collect Id
+                            let seq_item : Vec<ItemDict> = sketcher_queue.iter().map(|s| ItemDict::new(Id::new(s.get_path(), s.get_fasta_id()), s.get_seq_len())).collect();
+                            // computes hash signature
+                            let signatures = sketcher.sketch_compressedkmer_seqs(&sequencegroup_ref, kmer_hash_fn);
+                            // now we must send signatures, rak and seq_items to request collector
+                            for i in 0..signatures.len() {
+                                let request_msg = RequestMsg::new(signatures[i].clone() , seq_item[i].clone());
+                                let _ = request_sender.send(request_msg);
+                            }
+                            // update state
+                            nb_sketched += signatures.len();
+                            sketcher_queue.clear();  
+                        },
+                    };
                 }
             } // end while 
             //
-            Box::new(nb_request)
-        }); // end of receptor thread
-        // now we must join handles
-        let join_opt = sender_handle.join();
-        if join_opt.is_err() {
-            log::error!("sketch_and_request_dir_compressedkmer : error occurred in thread join");
-            std::panic!("sketch_and_request_dir_compressedkmer : error occurred in thread join");
-        }
-        let nb_sent = join_opt.unwrap();
-        let nb_received = receptor_handle.join().unwrap();
-        log::debug!("sketch_and_request_dir, nb_sent = {}, nb_received = {}", nb_sent, nb_received);
-        if nb_sent != nb_received {
-            log::error!("an error occurred  nb msg sent : {}, nb msg received : {}", nb_sent, nb_received);
-        }
-    }  // end of closure in scope
-    ).unwrap();  // end of scope
+            log::info!("nb request sketched : {}", nb_sketched);
+        }); // end of receptor sketcher thread
+        //
+        // now we spawn a new thread that is devoted to is devoted to hnsw search
+        //
+        scope.spawn(|_| {
+            let mut request_store = Vec::<VecSig<Sketcher,Kmer>>::with_capacity(3 * request_block_size);
+            let mut itemv = Vec::<ItemDict>::with_capacity(3 * request_block_size);
+            let mut read_more = true;
+            let mut nb_request = 0;
+            while read_more {
+                // try read, if error is Disconnected we stop read and both threads are finished.
+                let res_receive = request_receiver.recv();
+                match res_receive {
+                    Err(_recv_error) =>  { read_more = false;
+                                                    log::debug!("end of collector reception");
+                    }
+                    Ok(to_insert) => {
+                        request_store.push(to_insert.sketch_and_rank);
+                        itemv.push(to_insert.item);
+                        nb_request += 1;
+                        log::debug!("request collector received nb_received : {}", nb_received);
+                    }
+                }
+                if read_more == false || request_store.len() > request_block_size {
+                    log::debug!("inserting block in hnsw, nb new points : {:?}", request_store.len());
+                    let mut data_for_hnsw = Vec::<VecSig<Sketcher,Kmer> >::with_capacity(request_store.len());
+                    for i in 0..request_store.len() {
+                        data_for_hnsw.push(request_store[i].clone());
+                    }
+                    let knn_neighbours = hnsw.parallel_search(&data_for_hnsw, knbn, ef_search);  
+                    // construct and dump answers
+                    for i in 0..knn_neighbours.len() {
+                        let answer = ReqAnswer::new(nb_request+i, itemv[i].clone(), &knn_neighbours[i]);
+                        if answer.dump(&seqdict, out_threshold, &mut outfile).is_err() {
+                            log::info!("could not dump answer for request id {}", answer.get_request_id().get_id().get_fasta_id());
+                        }
+                        // store in matcher. remind that each i corresponds to a request
+                        let candidates = knn_neighbours[i].iter().map(|n| SequenceMatch::new(seqdict.0[n.d_id].clone(), n.get_distance())).collect();
+                        matcher.insert_sequence_match(itemv[i].clone(), candidates);
+                    }
+                    nb_request += request_store.len();
+                    request_store.clear();
+                    itemv.clear();
+                }
+            }
+            //
+            log::debug!("request collector thread dumping hnsw , received nb_received : {}", nb_received);
+        }); // end of collector thread
+    });  // end of pool.scope
     //
+    log::debug!("sketch_and_request_dir, nb_sent = {}, nb_received = {}", nb_sent, &nb_received);
+    if nb_sent != nb_received {
+        log::error!("an error occurred  nb msg sent : {}, nb msg received : {}", nb_sent, nb_received);
+    }
     log::info!("matcher collected {} answers", matcher.get_nb_sequence_match());
     let cpu_time = cpu_start.elapsed().as_secs();
     log::info!("process_dir : cpu time(s) {}", cpu_time);

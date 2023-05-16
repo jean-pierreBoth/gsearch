@@ -32,7 +32,7 @@ use probminhash::{setsketcher::SetSketchParams};
 use crate::utils::{idsketch::*, reloadhnsw};
 use crate::utils::files::{process_dir,process_dir_parallel, ProcessingState};
 
-use crate::dna::dnafiles::{process_file_in_one_block, process_buffer_in_one_block, process_file_by_sequence, process_buffer_by_sequence};
+use crate::dna::dnafiles::{process_file_in_one_block, process_file_by_sequence, process_buffer_in_one_block, process_buffer_by_sequence};
 
 use crate::utils::parameters::*;
 
@@ -184,6 +184,7 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT+KmerBuilder<Kmer>, Ske
                     }                
                 }
                 false => {
+                    log::info!("dnasketch::sketchandstore_dir_compressedkmer : seq by seq processing");
                     if other_params.get_parallel_io() {
                         let nb_files_by_group = other_params.get_nb_files_par();
                         log::info!("dnasketch::sketchandstore_dir_compressedkmer : calling process_dir_parallel, nb_files in parallel : {}", nb_files_by_group);
