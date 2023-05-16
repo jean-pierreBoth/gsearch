@@ -98,7 +98,7 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT+KmerBuilder<Kmer>, Ske
         toprocess_path = PathBuf::from(toprocess_str);
         // in this case we must reload
         log::info!("dnasketch::sketchandstore_dir_compressedkmer will add new data from from directory {:?} to hnsw dir {:?}", hnsw_pb, toprocess_path);
-       let hnsw_opt = reloadhnsw::reload_hnsw(&hnsw_pb);
+        let hnsw_opt = reloadhnsw::reload_hnsw(&hnsw_pb);
         if hnsw_opt.is_err() {
             log::error!("cannot reload hnsw from directory : {:?}", &hnsw_pb);
             std::process::exit(1);
@@ -313,9 +313,9 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT+KmerBuilder<Kmer>, Ske
                                     let seq_rank :  Vec<usize> = local_queue[i].iter().map(|v| v.get_filerank()).collect();
                                     let signatures = sketcher_clone.sketch_compressedkmer_seqs(&sequencegroup_ref, kmer_hash_fn);
                                     log::debug!("msg num : {}, nb seq : {}", i, local_queue[i].len());
-                                    for i in 0..signatures.len() {
-                                        let item: ItemDict = ItemDict::new(Id::new(local_queue[i][0].get_path(), local_queue[i][0].get_fasta_id()), seq_len);
-                                        let msg = CollectMsg::new((signatures[i].clone(), seq_rank[i]), item);
+                                    for j in 0..signatures.len() {
+                                        let item: ItemDict = ItemDict::new(Id::new(local_queue[j][0].get_path(), local_queue[j][0].get_fasta_id()), seq_len);
+                                        let msg = CollectMsg::new((signatures[j].clone(), seq_rank[j]), item);
                                         let _ = collect_sender_clone.send(msg);
                                     }
                                 }

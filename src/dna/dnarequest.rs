@@ -64,9 +64,10 @@ fn sketch_and_request_dir_compressedkmer<Kmer:CompressedKmerT + KmerBuilder<Kmer
                 hnsw : &Hnsw< <Sketcher as SeqSketcherT<Kmer>>::Sig ,DistHamming>, 
                 knbn : usize, ef_search : usize) -> Matcher
 
-            where Kmer::Val : num::PrimInt + Clone + Copy + Send + Sync + Serialize + DeserializeOwned + Debug,
-                  KmerGenerator<Kmer> :  KmerGenerationPattern<Kmer>, 
-                  DistHamming : Distance< <Sketcher as SeqSketcherT<Kmer>>::Sig > {
+            where   Kmer::Val : num::PrimInt + Clone + Copy + Send + Sync + Serialize + DeserializeOwned + Debug,
+                    Sketcher : SeqSketcherT<Kmer> + Clone + Send + Sync,
+                    KmerGenerator<Kmer> :  KmerGenerationPattern<Kmer>, 
+                    DistHamming : Distance< <Sketcher as SeqSketcherT<Kmer>>::Sig > {
     //
     let sketcher_params = processing_parameters.get_sketching_params();
     let block_processing = processing_parameters.get_block_flag();
@@ -167,8 +168,9 @@ fn sketch_and_request_dir_compressedkmer<Kmer:CompressedKmerT + KmerBuilder<Kmer
 
         // sequence reception, sketching/request consumer thread
         scope.spawn( |scope| {
+            // TODO: add thread_token_sender to contol number of spawned threads
             // we must read messages, sketch and insert into hnsw
-            let mut sketcher_queue : Vec<IdSeq>= Vec::with_capacity(request_block_size);
+            let mut sketcher_queue : Vec<Vec<IdSeq>> = Vec::with_capacity(request_block_size);
             let mut nb_sketched = 0;
             let mut read_more = true;
             while read_more {
@@ -178,47 +180,69 @@ fn sketch_and_request_dir_compressedkmer<Kmer:CompressedKmerT + KmerBuilder<Kmer
                     Err(_) => { read_more = false;
                         log::debug!("end of request reception");
                     },
-                    Ok(mut idsequences) => {
+                    Ok(idsequences) => {
                         // concat the new idsketch in insertion queue.
                         log::debug!("request reception nb request : {}", idsequences.len());
-                        sketcher_queue.append(&mut idsequences);
+                        sketcher_queue.push(idsequences);
                     }
                 };
+                // no more thing to receive no more work to do
+                if read_more == false && sketcher_queue.len() == 0 {
+                    break;
+                }
+                //
                 // if request_queue is beyond threshold size we can go to threaded sketching and threading insertion
+                // we will spawn a thread that must do sketching of request and send request singature to hnsw dedicated thread
                 if sketcher_queue.len() > request_block_size  || !read_more {
-                    match block_processing { 
-                        true => {
-                            let sequencegroup_ref : Vec<&Sequence> = sketcher_queue.iter().map(|s| s.get_sequence_dna().unwrap()).collect();
-                            // collect Id
-                            let seq_item : Vec<ItemDict> = sketcher_queue.iter().map(|s| ItemDict::new(Id::new(s.get_path(), s.get_fasta_id()), s.get_seq_len())).collect();
-                            // computes hash signature
-                            let signatures = sketcher.sketch_compressedkmer(&sequencegroup_ref, kmer_hash_fn);
-                            // now we must send signatures, rak and seq_items to request collector
-                            for i in 0..signatures.len() {
-                                let request_msg = RequestMsg::new(signatures[i].clone() , seq_item[i].clone());
-                                let _ = request_sender.send(request_msg);
-                            }
-                            // update state
-                            nb_sketched += signatures.len();
-                            sketcher_queue.clear();                            
-                        },
-                        //
-                        false => { // means we are in seq by seq mode inside a file. We get one signature by msg (or file)
-                            let sequencegroup_ref : Vec<&Sequence> = sketcher_queue.iter().map(|s| s.get_sequence_dna().unwrap()).collect();
-                            // collect Id
-                            let seq_item : Vec<ItemDict> = sketcher_queue.iter().map(|s| ItemDict::new(Id::new(s.get_path(), s.get_fasta_id()), s.get_seq_len())).collect();
-                            // computes hash signature
-                            let signatures = sketcher.sketch_compressedkmer_seqs(&sequencegroup_ref, kmer_hash_fn);
-                            // now we must send signatures, rak and seq_items to request collector
-                            for i in 0..signatures.len() {
-                                let request_msg = RequestMsg::new(signatures[i].clone() , seq_item[i].clone());
-                                let _ = request_sender.send(request_msg);
-                            }
-                            // update state
-                            nb_sketched += signatures.len();
-                            sketcher_queue.clear();  
-                        },
-                    };
+                    let request_sender_clone = request_sender.clone();
+                    let sketcher_clone = sketcher.clone();
+                    // transfer from  sketcher_queue to a local queue that will be move to spawn task
+                    let q_len = sketcher_queue.len();
+                    let mut local_queue = Vec::<Vec<IdSeq> >::with_capacity(q_len);
+                    for _ in 0..q_len {
+                        let res_pop = sketcher_queue.pop();
+                        if res_pop.is_some() {
+                            local_queue.push(res_pop.unwrap());
+                        }
+                    }
+                    nb_sketched += q_len;
+                    scope.spawn(move  |_|  {
+                        log::trace!("spawning thread on nb files : {}", local_queue.len());
+                        match block_processing { 
+                            true => {
+                                for v in &local_queue {
+                                    assert_eq!(v.len(), 1);
+                                }
+                                let sequencegroup_ref : Vec<&Sequence> = local_queue.iter().map(|s| s[0].get_sequence_dna().unwrap()).collect();
+                                // collect Id
+                                let seq_item : Vec<ItemDict> = local_queue.iter().map(|s| ItemDict::new(Id::new(s[0].get_path(), s[0].get_fasta_id()), s[0].get_seq_len())).collect();
+                                // computes hash signature
+                                let signatures = sketcher_clone.sketch_compressedkmer(&sequencegroup_ref, kmer_hash_fn);
+                                // now we must send signatures, rak and seq_items to request collector
+                                for i in 0..signatures.len() {
+                                    let request_msg = RequestMsg::new(signatures[i].clone() , seq_item[i].clone());
+                                    let _ = request_sender_clone.send(request_msg);
+                                }
+                            },
+                            //
+                            false => { // means we are in seq by seq mode inside a file. We get one signature by msg (or file)
+                                for i in 0..local_queue.len() {
+                                    let sequencegroup_ref : Vec<&Sequence> = local_queue[i].iter().map(|s| s.get_sequence_dna().unwrap()).collect();
+                                    // collect Id
+                                    let seq_item : Vec<ItemDict> = local_queue[i].iter().map(|s| ItemDict::new(Id::new(s.get_path(), s.get_fasta_id()), s.get_seq_len())).collect();
+                                    // computes hash signature
+                                    let signatures = sketcher_clone.sketch_compressedkmer_seqs(&sequencegroup_ref, kmer_hash_fn);
+                                    // now we must send signatures, rak and seq_items to request collector
+                                    for j in 0..signatures.len() {
+                                        let request_msg = RequestMsg::new(signatures[j].clone() , seq_item[j].clone());
+                                        let _ = request_sender_clone.send(request_msg);
+                                    }
+                                }
+                            },  // end by seq case
+                        }; // end match
+                        local_queue.clear();  
+                        drop(local_queue);                          
+                    }); // end spawned thread
                 }
             } // end while 
             //
