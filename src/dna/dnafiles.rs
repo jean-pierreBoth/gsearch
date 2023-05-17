@@ -41,7 +41,7 @@ pub fn filter_out_n(seq : &[u8]) -> Vec<u8> {
 pub fn process_file_by_sequence(pathb : &PathBuf, filter_params : &FilterParams)  -> Vec<IdSeq> {
     let mut to_sketch = Vec::<IdSeq>::new();
     //
-    log::trace!("processing file {}", pathb.to_str().unwrap());
+    log::debug!("processing file {}", pathb.to_str().unwrap());
     let alphabet2b = Alphabet2b::new();
     //
     let mut reader = needletail::parse_fastx_file(&pathb).expect("expecting valid filename");

@@ -221,7 +221,7 @@ impl Matcher{
     pub fn analyze(&mut self) -> Result<(), String> {
         //
         let threshold = 0.99; // TODO ...
-        let outname = "archea.matches";
+        let outname = "gsearch.matches";
         let outpath = PathBuf::from(outname.clone());
         let outfile = OpenOptions::new().write(true).create(true).truncate(true).open(&outpath);
         if outfile.is_err() {

@@ -221,6 +221,7 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT+KmerBuilder<Kmer>, Ske
         // sequence reception, consumer thread
         //
         scope.spawn( |scope| {
+            // we need a bounded queue (no need for a concurrent queue yet) to be able to block the thread if max number of thread is reached
             let insertion_queue = Arc::new(ConcurrentQueue::bounded(2 * insertion_block_size));
             let sketching_start_time = SystemTime::now();
             let sketching_start_cpu = ThreadTime::now();
@@ -229,7 +230,7 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT+KmerBuilder<Kmer>, Ske
             log::info!("threshold number of bases for thread cretaion : {:?}", nb_bases_thread_threshold);
             // a bounded blocking queue to limit the number of threads to pool_nb_thread.
             // at thread creation we send a msg into queue, at thread end we receive a msg.
-            // So the length of the queue is number of active thread
+            // So the length of the channel is number of active thread
             let (thread_token_sender, thread_token_receiver) = crossbeam_channel::bounded::<u32>(pool_nb_thread);
             // how many msg we received
             let mut nb_msg_received = 0;
@@ -283,7 +284,7 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT+KmerBuilder<Kmer>, Ske
                     nb_base_in_queue = 0; 
                     assert!(local_queue.len() > 0);
                     let _ = thread_token_sender.send(1);
-                    log::debug!("nb running threads = {:?}", thread_token_sender.len());
+                    log::debug!("nb sketching threads running = {:?}", thread_token_sender.len());
                     let thread_token_receiver_cloned = thread_token_receiver.clone();
                     scope.spawn(  move |_|  {
                         log::trace!("spawning thread on nb files : {}", local_queue.len());
@@ -312,12 +313,12 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT+KmerBuilder<Kmer>, Ske
                                     // as we treat the file globally, the signature is indexed by filerank!
                                     let seq_rank :  Vec<usize> = local_queue[i].iter().map(|v| v.get_filerank()).collect();
                                     let signatures = sketcher_clone.sketch_compressedkmer_seqs(&sequencegroup_ref, kmer_hash_fn);
-                                    log::debug!("msg num : {}, nb seq : {}", i, local_queue[i].len());
-                                    for j in 0..signatures.len() {
-                                        let item: ItemDict = ItemDict::new(Id::new(local_queue[j][0].get_path(), local_queue[j][0].get_fasta_id()), seq_len);
-                                        let msg = CollectMsg::new((signatures[j].clone(), seq_rank[j]), item);
-                                        let _ = collect_sender_clone.send(msg);
-                                    }
+                                    log::debug!("msg num : {}, nb sub seq : {}, path : {:?}", i, local_queue[i].len(), local_queue[i][0].get_path());
+                                    assert_eq!(signatures.len(), 1);
+                                    // we get the item for the first seq (all sub sequences have same identity)
+                                    let item: ItemDict = ItemDict::new(Id::new(local_queue[i][0].get_path(), local_queue[i][0].get_fasta_id()), seq_len);
+                                    let msg = CollectMsg::new((signatures[i].clone(), seq_rank[i]), item);
+                                    let _ = collect_sender_clone.send(msg);
                                 }
                             }
                         }

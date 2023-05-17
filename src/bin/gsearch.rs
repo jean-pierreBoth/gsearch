@@ -235,15 +235,15 @@ fn parse_tohnsw_cmd(matches : &ArgMatches) -> Result<(String, ProcessingParams),
     let ef_construction = matches.get_one("ef_construct").unwrap_or(&ef_construction_default);      
     println!("ef construction parameters in hnsw construction {}", ef_construction);
     
-    let block_processing = if matches.contains_id("seq") {
-        println!("seq option , will process by concatenating and splitting ");
-        false
+    let seq_flag = matches.get_flag("seq");
+    if seq_flag {
+        log::info!("setting seq flag true, block = false, will process files seq by seq");
     }
     else {
-        println!("seq option , will process by concatenating");
-        true
-    };
-
+        log::info!("setting seq flag false, block = true, will process by concatenating seqs of file");
+    }
+    let block_processing = !seq_flag;
+    //
     let data_t = if matches.contains_id("aa_opt") {
         println!("aa option , processing of AA sequences");
         DataType::AA
@@ -464,7 +464,8 @@ fn main() {
         )
         .arg(Arg::new("seq")
             .long("seq")
-            .help("--seq to get a processing by sequence")
+            .action(clap::ArgAction::SetTrue)
+            .help("--seq : sketching is done without concatenating sequences")
     );
 
 
@@ -552,10 +553,6 @@ fn main() {
                 .value_name("pio")
                 .value_parser(clap::value_parser!(usize))
                 .help("Parallel IO processing"))
-            .arg(Arg::new("seq")
-                .long("seq")
-                .action(ArgAction::SetTrue) 
-                .help("--seq : sketching is done without concatenating sequences"))
         .subcommand(tohnsw_cmd)
         .subcommand(add_cmd)
         .subcommand(request_cmd)
@@ -565,10 +562,6 @@ fn main() {
     // now we fill other parameters : parallel fasta parsing and adding mode in hnsw
     let nb_files_par: usize = *matches.get_one("pario").unwrap_or(&0usize);
     println!("parallel io, nb_files_par : {}", nb_files_par);
-    let seq_flag = matches.get_flag("seq");
-    if seq_flag {
-        log::debug!("setting seq flag true, block = false");
-    }
 
     //
     let hnsw_dir : String;
@@ -590,14 +583,7 @@ fn main() {
         cmd = CmdType::TOHNSW;   
         match res {
             Ok(params) => { hnsw_dir = params.0;
-                                                        if seq_flag { 
-                                                                processing_params = Some(ProcessingParams::new(*params.1.get_hnsw_params(), 
-                                                                            *params.1.get_sketching_params(), 
-                                                                            false));
-                                                        } 
-                                                        else {
-                                                            processing_params = Some(params.1);
-                                                        }
+                                                        processing_params = Some(params.1);
                                                      },
             _          => { 
                             log::error!("parsing tohnsw command failed");
@@ -683,6 +669,7 @@ fn main() {
                             if reload_res.is_ok()  {
                                 processing_params = Some(reload_res.unwrap());
                                 log::info!("sketching parameters : {:?}", processing_params.as_ref().unwrap().get_sketching_params());
+                                log::info!("block processing : {:?}", processing_params.as_ref().unwrap().get_block_flag());
                             }
                             else {
                                 std::panic!("cannot reload parameters (file parameters.json) from dir : {:?}", &hnsw_path);
