@@ -128,11 +128,13 @@ pub fn process_dir(state : &mut ProcessingState, datatype: &DataType, dir: &Path
                 sender : &crossbeam_channel::Sender::<Vec<IdSeq>>) -> io::Result<usize> {
     //
     // we checked that we have a directory
+    let nb_files_at_entry = state.nb_file;
+    let mut nb_sent = 0;
     for entry in std::fs::read_dir(dir)? {
         let entry = entry?;
         let pathb = entry.path();
         if pathb.is_dir() {
-            let _ =  process_dir(state, &datatype, &pathb, filter_params, file_task, sender)?;
+            nb_sent =  process_dir(state, &datatype, &pathb, filter_params, file_task, sender)?;
         } else {
             // check if entry is a fasta.gz file or a .faa file
             let mut to_sketch = match datatype {
@@ -178,7 +180,7 @@ pub fn process_dir(state : &mut ProcessingState, datatype: &DataType, dir: &Path
     //
     drop(sender);
     //
-    Ok(state.nb_file)
+    Ok(nb_sent + state.nb_file - nb_files_at_entry)
 }  // end of process_dirs
 
 

@@ -97,7 +97,7 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT+KmerBuilder<Kmer>, Ske
         let toprocess_str = other_params.get_add_dir();
         toprocess_path = PathBuf::from(toprocess_str);
         // in this case we must reload
-        log::info!("dnasketch::sketchandstore_dir_compressedkmer will add new data from from directory {:?} to hnsw dir {:?}", hnsw_pb, toprocess_path);
+        log::info!("dnasketch::sketchandstore_dir_compressedkmer will add new data from directory {:?} to hnsw dir {:?}", toprocess_path, hnsw_pb);
         let hnsw_opt = reloadhnsw::reload_hnsw(&hnsw_pb);
         if hnsw_opt.is_err() {
             log::error!("cannot reload hnsw from directory : {:?}", &hnsw_pb);
@@ -313,7 +313,7 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT+KmerBuilder<Kmer>, Ske
                                     // as we treat the file globally, the signature is indexed by filerank!
                                     let seq_rank :  Vec<usize> = local_queue[i].iter().map(|v| v.get_filerank()).collect();
                                     let signatures = sketcher_clone.sketch_compressedkmer_seqs(&sequencegroup_ref, kmer_hash_fn);
-                                    log::debug!("msg num : {}, nb sub seq : {}, path : {:?}", i, local_queue[i].len(), local_queue[i][0].get_path());
+                                    log::debug!("msg num : {}, nb sub seq : {}, path : {:?}, file rank : {}", i, local_queue[i].len(), local_queue[i][0].get_path(), seq_rank[i]);
                                     assert_eq!(signatures.len(), 1);
                                     // we get the item for the first seq (all sub sequences have same identity)
                                     let item: ItemDict = ItemDict::new(Id::new(local_queue[i][0].get_path(), local_queue[i][0].get_fasta_id()), seq_len);
@@ -352,6 +352,7 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT+KmerBuilder<Kmer>, Ske
         scope.spawn(|_| {
             let mut msg_store = Vec::<(VecSig<Sketcher,Kmer>, usize)>::with_capacity(3 * insertion_block_size);
             let mut itemv =  Vec::<ItemDict>::with_capacity(3 * insertion_block_size);
+            let mut dict_size = seqdict.get_nb_entries();
             let mut read_more = true;
             while read_more {
                 // try read, if error is Disconnected we stop read and both threads are finished.
@@ -371,7 +372,11 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT+KmerBuilder<Kmer>, Ske
                     log::debug!("inserting block in hnsw, nb new points : {:?}", msg_store.len());
                     let mut data_for_hnsw = Vec::<(&VecSig<Sketcher,Kmer>, usize)>::with_capacity(msg_store.len());
                     for i in 0..msg_store.len() {
-                        data_for_hnsw.push((&msg_store[i].0, msg_store[i].1));
+                        log::debug!("inserting data id(filerank) : {}, itemdict : {}", msg_store[i].1, itemv[i].get_id().get_path());
+                        // due to threading file arrive in random order, so it this thread responsability to affect id in dictionary
+                        // otherwise we must introduce an indexmap in SeqDict
+                        data_for_hnsw.push((&msg_store[i].0, dict_size));
+                        dict_size += 1;
                     }
                     hnsw.parallel_insert(&data_for_hnsw);  
                     seqdict.0.append(&mut itemv); 

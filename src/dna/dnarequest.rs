@@ -112,7 +112,7 @@ fn sketch_and_request_dir_compressedkmer<Kmer:CompressedKmerT + KmerBuilder<Kmer
     // create something for likelyhood computation
     let mut matcher = Matcher::new(processing_parameters.get_kmer_size(), sketcher_params.get_sketch_size(), seqdict);
     let mut nb_sent = 0;
-    let nb_received = 0;
+    let mut nb_received = 0;
     //
     // to send IdSeq to sketch from reading thread to sketcher thread
     let (send, receive) = crossbeam_channel::bounded::<Vec<IdSeq>>(request_block_size + 10);
@@ -258,14 +258,15 @@ fn sketch_and_request_dir_compressedkmer<Kmer:CompressedKmerT + KmerBuilder<Kmer
                             false => { // means we are in seq by seq mode inside a file. We get one signature by msg (or file)
                                 for i in 0..local_queue.len() {
                                     let sequencegroup_ref : Vec<&Sequence> = local_queue[i].iter().map(|s| s.get_sequence_dna().unwrap()).collect();
+                                    let seq_len = sequencegroup_ref.iter().fold(0, | acc, s | acc + s.size());
                                     // collect Id
-                                    let seq_item : Vec<ItemDict> = local_queue[i].iter().map(|s| ItemDict::new(Id::new(s.get_path(), s.get_fasta_id()), s.get_seq_len())).collect();
+                                    let seq_item : ItemDict = ItemDict::new(Id::new(local_queue[i][0].get_path(), local_queue[i][0].get_fasta_id()), seq_len);
                                     // computes hash signature
                                     let signatures = sketcher_clone.sketch_compressedkmer_seqs(&sequencegroup_ref, kmer_hash_fn);
-                                    log::debug!("msg num : {}, nb seq : {}", i, local_queue[i].len());
+                                    log::debug!("msg num : {}, nb seq : {}, path : {:?}", i, local_queue[i].len(), seq_item.get_id().get_path());
                                     // now we must send signatures, rank and seq_items to request collector
                                     assert_eq!(signatures.len(), 1);
-                                    let request_msg = RequestMsg::new(signatures[0].clone() , seq_item[i].clone());
+                                    let request_msg = RequestMsg::new(signatures[0].clone() , seq_item.clone());
                                     let _ = request_sender_clone.send(request_msg);
                                 }
                             },  // end by seq case
@@ -297,7 +298,7 @@ fn sketch_and_request_dir_compressedkmer<Kmer:CompressedKmerT + KmerBuilder<Kmer
             let mut itemv = Vec::<ItemDict>::with_capacity(3 * request_block_size);
             let mut read_more = true;
             let mut nb_request = 0;
-            let mut nb_received = 0;
+            let mut nb_answer = 0;
             while read_more {
                 // try read, if error is Disconnected we stop read and both threads are finished.
                 let res_receive = request_receiver.recv();
@@ -312,7 +313,6 @@ fn sketch_and_request_dir_compressedkmer<Kmer:CompressedKmerT + KmerBuilder<Kmer
                         log::debug!("request collector received nb_received : {}", nb_received);
                     }
                 }
-                nb_received += 1;
                 if read_more == false || request_store.len() > request_block_size {
                     log::debug!("recieving new requests nb : {:?}", request_store.len());
                     let mut data_for_hnsw = Vec::<VecSig<Sketcher,Kmer> >::with_capacity(request_store.len());
@@ -322,7 +322,7 @@ fn sketch_and_request_dir_compressedkmer<Kmer:CompressedKmerT + KmerBuilder<Kmer
                     let knn_neighbours = hnsw.parallel_search(&data_for_hnsw, knbn, ef_search);  
                     // construct and dump answers
                     for i in 0..knn_neighbours.len() {
-                        let answer = ReqAnswer::new(nb_request+i, itemv[i].clone(), &knn_neighbours[i]);
+                        let answer = ReqAnswer::new(nb_answer+i, itemv[i].clone(), &knn_neighbours[i]);
                         if answer.dump(&seqdict, out_threshold, &mut outfile).is_err() {
                             log::info!("could not dump answer for request id {}", answer.get_request_id().get_id().get_fasta_id());
                         }
@@ -330,18 +330,19 @@ fn sketch_and_request_dir_compressedkmer<Kmer:CompressedKmerT + KmerBuilder<Kmer
                         let candidates = knn_neighbours[i].iter().map(|n| SequenceMatch::new(seqdict.0[n.d_id].clone(), n.get_distance())).collect();
                         matcher.insert_sequence_match(itemv[i].clone(), candidates);
                     }
+                    nb_answer += knn_neighbours.len();
                     let _ = outfile.flush();
-                    nb_request += request_store.len();
                     request_store.clear();
                     itemv.clear();
                 }
             }
-            //
-            log::info!("request collector , exiting after answering to nb_request {} from nb msg: {}", nb_request, nb_received);
+            // transfer nb_received to global nb_received
+            nb_received = nb_request;
+            log::info!("request collector , exiting after answering to nb_request {}", nb_received);
         }); // end of collector thread
     });  // end of pool.scope
     //
-    log::debug!("sketch_and_request_dir_compressedkmer, nb_sent = {}, nb_received = {}", nb_sent, &nb_received);
+    log::debug!("sketch_and_request_dir_compressedkmer, nb_sent = {}, nb_received = {}", nb_sent, nb_received);
     if nb_sent != nb_received {
         log::error!("an error occurred  nb msg sent : {}, nb msg received : {}", nb_sent, nb_received);
     }
