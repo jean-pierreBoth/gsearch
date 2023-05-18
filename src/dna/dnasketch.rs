@@ -267,7 +267,6 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT+KmerBuilder<Kmer>, Ske
                 if read_more == false && insertion_queue.len() == 0 {
                     break;
                 }
-
                 // if insertion_queue is beyond threshold size in number of bases we can go to threaded sketching and threading insertion
                 if nb_base_in_queue > nb_bases_thread_threshold || insertion_queue.is_full() {
                     let collect_sender_clone = collect_sender.clone();
@@ -367,6 +366,9 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT+KmerBuilder<Kmer>, Ske
                         nb_received += 1;
                         log::debug!("collector received nb_received : {}", nb_received);
                     }
+                }
+                if read_more == false && msg_store.len() == 0 {
+                    break;
                 }
                 if read_more == false || msg_store.len() > insertion_block_size {
                     log::debug!("inserting block in hnsw, nb new points : {:?}", msg_store.len());

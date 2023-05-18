@@ -295,13 +295,15 @@ pub(crate) fn process_dir_parallel_rec(state : &mut ProcessingState, datatype: &
     //
     // We will process files in parallel by blocks of size block_size to control memory
     // and to balance cpu and memory with threads doing hnsw work
+    // we want to keep track of how many file are processed.
+    let mut nb_sent :usize = 0;
     let mut nb_entries = 0usize;
     //
     for entry in std::fs::read_dir(dir)? {
         let entry = entry?;
         let pathb = entry.path();
         if pathb.is_dir() {
-            let _ =  process_dir_parallel_rec(state, &datatype, &pathb, filter_params, block_size, path_block, file_task, sender)?;
+            nb_sent =  process_dir_parallel_rec(state, &datatype, &pathb, filter_params, block_size, path_block, file_task, sender)?;
         } 
         else {
             nb_entries += 1;
@@ -326,6 +328,7 @@ pub(crate) fn process_dir_parallel_rec(state : &mut ProcessingState, datatype: &
                             state.nb_seq += 1;
                         }                
                         state.nb_file += 1;
+                        nb_sent += 1;
                         sender.send(seqfile).unwrap();
                     }
                     if log::log_enabled!(log::Level::Info) && state.nb_file % 1000 == 0 {
@@ -348,7 +351,7 @@ pub(crate) fn process_dir_parallel_rec(state : &mut ProcessingState, datatype: &
     //
     drop(sender);
     //    
-    Ok(state.nb_file)
+    Ok(nb_sent)
 }  // end of process_dir_parallel_rec
 
 
@@ -362,14 +365,15 @@ pub(crate) fn process_dir_parallel(state : &mut ProcessingState, datatype: &Data
         //
     log::info!("files::process_dir_parallel : calling process_dir_parallel, nb_files in parallel : {}", nb_files_by_group);
     //
-    let mut nb_sent_parallel;
+    let nb_files_at_entry = state.nb_file;
+    let mut nb_sent_parallel_rec;
     let mut path_block = Vec::<PathBuf>::with_capacity(nb_files_by_group);
     //
     let res_nb_sent_parallel = process_dir_parallel_rec(state, datatype,  dirpath, filter_params, 
                     nb_files_by_group,  &mut path_block, &file_task, &sender);
     // we must treat residue in path_block if any
     match res_nb_sent_parallel {
-        Ok(nb) => { nb_sent_parallel = nb;},
+        Ok(nb) => { nb_sent_parallel_rec = nb;},
         _             => {  log::error!("\n some error occurred in process_dir_parallel_rec");
                             std::panic!("\n some error occurred in process_dir_parallel_rec");
                         },
@@ -385,9 +389,9 @@ pub(crate) fn process_dir_parallel(state : &mut ProcessingState, datatype: &Data
                 state.nb_seq += 1;
             }                
             state.nb_file += 1;
-            nb_sent_parallel += 1;
+            nb_sent_parallel_rec += 1;
             sender.send(seqfile).unwrap();
-            log::trace!("sketchandstore_dir_compressedkmer parallel io case nb msg sent : {}", nb_sent_parallel);
+            log::trace!("sketchandstore_dir_compressedkmer parallel io case nb msg sent : {}", nb_sent_parallel_rec);
         }
         path_block.clear();
         if log::log_enabled!(log::Level::Info) && state.nb_file % 1000 == 0 {
@@ -397,7 +401,8 @@ pub(crate) fn process_dir_parallel(state : &mut ProcessingState, datatype: &Data
             println!("nb file processed : {}, nb sequences processed : {}", state.nb_file, state.nb_seq);
         }
     }
-    log::debug!("sketchandstore_dir_compressedkmer parallel io case : all messages sent");
+    let nb_sent_parallel = state.nb_file - nb_files_at_entry;
+    log::debug!("process_dir_parallel parallel io case : all messages sent :{}", nb_sent_parallel_rec);
     let res_nb_sent = Ok(nb_sent_parallel);
     //
     return res_nb_sent;
