@@ -83,7 +83,7 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT+KmerBuilder<Kmer>, Ske
     // and not too large to spare memory. If parallel_io is set dimension message queue to size of group
     // for files of size more than Gb we must use pario to limit memory, but leave enough msg in queue to get // sketch and insertion 
     let insertion_block_size = match other_params.get_parallel_io() {
-        true => { 5000.min(2 * other_params.get_nb_files_par()) },
+        true => { 5000.min(1 + other_params.get_nb_files_par()) },
         _    => { 5000 },
     };
     log::debug!("insertion_block_size : {}", insertion_block_size);
@@ -222,7 +222,7 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT+KmerBuilder<Kmer>, Ske
         //
         scope.spawn( |scope| {
             // we need a bounded queue (no need for a concurrent queue yet) to be able to block the thread if max number of thread is reached
-            let insertion_queue = Arc::new(ConcurrentQueue::bounded(2 * insertion_block_size));
+            let insertion_queue = Arc::new(ConcurrentQueue::bounded( insertion_block_size));
             let sketching_start_time = SystemTime::now();
             let sketching_start_cpu = ThreadTime::now();
             // we can create a new thread for at least nb_bases_thread_threshold bases.
