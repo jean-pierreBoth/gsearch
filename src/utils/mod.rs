@@ -4,6 +4,9 @@ pub mod files;
 pub mod idsketch;
 pub mod parameters;
 pub mod reloadhnsw;
+
+pub mod dumpload;
+
 #[cfg(any(feature="annembed_openblas-system", feature="annembed_openblas-static" , feature="annembed_intel-mkl"))]
 pub mod embed;
 

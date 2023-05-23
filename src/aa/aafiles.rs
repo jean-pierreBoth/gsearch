@@ -145,7 +145,7 @@ pub fn process_aabuffer_in_one_block(pathb : &PathBuf, bufread : &[u8], filter_p
 /// In this way process_buffer_by_sequence do not have any IO to do and can be called // for fasta parsing without disk constraints.
 /// We nevertheless needs pathb to fill in IdSeq.  
 /// The return of this function is a vector of size the number of record in the file.
-pub fn process_buffer_by_sequence(pathb : &PathBuf, bufread : &[u8], filter_params : &FilterParams)  -> Vec<IdSeq> {
+pub fn process_aabuffer_by_sequence(pathb : &PathBuf, bufread : &[u8], filter_params : &FilterParams)  -> Vec<IdSeq> {
     //
     log::debug!("process_buffer_by_sequence , aa file : {:?}", pathb);
     //
@@ -177,4 +177,42 @@ pub fn process_buffer_by_sequence(pathb : &PathBuf, bufread : &[u8], filter_para
     //
     return to_sketch;
 } // end of process_buffer_by_sequence
+
+
+/// opens parse fna files with needletail
+/// extracts records , filters out capsid and send sequences to function process_dir to execute file_task to produce sequence
+/// for any client.
+/// This function returns as many IdSeq as there are sequences in file
+pub fn process_aafile_by_sequence(pathb : &PathBuf, filter_params : &FilterParams)  -> Vec<IdSeq> {
+    let mut to_sketch = Vec::<IdSeq>::new();
+    //
+    log::debug!("processing file {}", pathb.to_str().unwrap());
+    let alphabet = kmeraa::Alphabet::new();
+    //
+    let mut reader = needletail::parse_fastx_file(&pathb).expect("expecting valid filename");
+    while let Some(record) = reader.next() {
+        if record.is_err() {
+            println!("got bd record in file {:?}", pathb.file_name().unwrap());
+            std::process::exit(1);
+        }
+        // do we keep record ? we must get its id
+        let seqrec = record.expect("invalid record");
+        let id = seqrec.id();
+        let strid = String::from_utf8(Vec::from(id)).unwrap();
+        // process sequence if not capsid and not filtered out
+        if strid.find("capsid").is_none() && !filter_params.filter(&seqrec.seq()) {
+            let new_seq = kmeraa::SequenceAA::new_filtered(&seqrec.seq(), &alphabet);
+            drop(seqrec);
+            // we have AA seq for now
+            let nullid = String::from(""); // we will sketch the whole and loose id, so we spare memory
+            let seqwithid = IdSeq::new(pathb.to_str().unwrap().to_string(), nullid,SequenceType::SequenceAA(new_seq));
+            to_sketch.push(seqwithid);
+            if log::log_enabled!(log::Level::Trace) {
+                log::trace!("process_file, nb_sketched {} ", to_sketch.len());
+            }
+        }
+    }
+    // we must send to_sketch to some sketcher
+    return to_sketch;
+} // end of process_file_by_sequence
 
