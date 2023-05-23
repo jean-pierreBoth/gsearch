@@ -138,3 +138,43 @@ pub fn process_aabuffer_in_one_block(pathb : &PathBuf, bufread : &[u8], filter_p
     to_sketch
 }  // end of process_buffer_in_one_block
 
+
+
+/// This function will parse with needletail (and do the decompressing).
+/// We encode sequences in 2 bits the whole sequence on the fly; record after record; the whole bytes of file pathb contained in  bufread.
+/// In this way process_buffer_by_sequence do not have any IO to do and can be called // for fasta parsing without disk constraints.
+/// We nevertheless needs pathb to fill in IdSeq.  
+/// The return of this function is a vector of size the number of record in the file.
+pub fn process_buffer_by_sequence(pathb : &PathBuf, bufread : &[u8], filter_params : &FilterParams)  -> Vec<IdSeq> {
+    //
+    log::debug!("process_buffer_by_sequence , aa file : {:?}", pathb);
+    //
+    let mut to_sketch = Vec::<IdSeq>::new();
+    let alphabet = kmeraa::Alphabet::new();
+    //
+    let mut reader = needletail::parse_fastx_reader(bufread).expect("expecting valid filename");
+    // 
+    while let Some(record) = reader.next() {
+        if record.is_err() {
+            println!("got bd record in file {:?}", pathb.file_name().unwrap());
+            std::process::exit(1);
+        }
+        // do we keep record ? we must get its id
+        let seqrec = record.expect("invalid record");
+        let id = seqrec.id();
+        let strid = String::from_utf8(Vec::from(id)).unwrap();
+        // process sequence if not capsid and not filtered out, in block mode we do not filter any at the moment
+        if strid.find("capsid").is_none()  && !filter_params.filter(&seqrec.seq()) {
+            let new_seq = kmeraa::SequenceAA::new_filtered(&seqrec.seq(), &alphabet);
+            let nullid = String::from(""); // we will sketch the whole and loose id, so we spare memory
+            let seqwithid = IdSeq::new(pathb.to_str().unwrap().to_string(), nullid,SequenceType::SequenceAA(new_seq));
+            to_sketch.push(seqwithid);
+        }
+    }
+    if log::log_enabled!(log::Level::Trace) {
+        log::trace!("process_file, nb_sketched {} ", to_sketch.len());
+    }
+    //
+    return to_sketch;
+} // end of process_buffer_by_sequence
+

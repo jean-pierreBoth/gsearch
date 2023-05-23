@@ -78,7 +78,7 @@ pub fn process_file_by_sequence(pathb : &PathBuf, filter_params : &FilterParams)
 
 /// This function will parse with needletail (and do the decompressing).
 /// We encode sequences in 2 bits the whole sequence on the fly; record after record; the whole bytes of file pathb contained in  bufread.
-/// In this way process_buffer_in_one_block do not have any IO to do and can be called // for fasta parsing without disk constraints.
+/// In this way process_buffer_by_sequence do not have any IO to do and can be called // for fasta parsing without disk constraints.
 /// We nevertheless needs pathb to fill in IdSeq.  
 /// The return of this function is a vector of size the number of record in the file.
 pub fn process_buffer_by_sequence(pathb : &PathBuf, bufread : &[u8], filter_params : &FilterParams)  -> Vec<IdSeq> {
