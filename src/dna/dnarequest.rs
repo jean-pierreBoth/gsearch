@@ -97,7 +97,13 @@ fn sketch_and_request_dir_compressedkmer<Kmer:CompressedKmerT + KmerBuilder<Kmer
     let start_t = SystemTime::now();
     let cpu_start = ProcessTime::now();
     // a queue of signature request , size must be sufficient to benefit from threaded probminhash and search
-    let request_block_size = 500;
+    // but if request files are very large we must not have too many files in memory
+    // pario is used also to limit the number of file loaded simultanuously.
+    let request_block_size = match other_params.get_parallel_io() {
+        true => { 5000.min(1 + other_params.get_nb_files_par()) },
+        _    => { 20 },
+    };
+    log::debug!("request_block_size : {}", request_block_size);
     let mut state = ProcessingState::new();
     
     //
@@ -294,8 +300,8 @@ fn sketch_and_request_dir_compressedkmer<Kmer:CompressedKmerT + KmerBuilder<Kmer
         // now we spawn a new thread that is devoted to is devoted to hnsw search
         //
         scope.spawn(|_| {
-            let mut request_store = Vec::<VecSig<Sketcher,Kmer>>::with_capacity(3 * request_block_size);
-            let mut itemv = Vec::<ItemDict>::with_capacity(3 * request_block_size);
+            let mut request_store = Vec::<VecSig<Sketcher,Kmer>>::with_capacity(request_block_size);
+            let mut itemv = Vec::<ItemDict>::with_capacity(request_block_size + 1);
             let mut read_more = true;
             let mut nb_request = 0;
             let mut nb_answer = 0;
@@ -313,7 +319,7 @@ fn sketch_and_request_dir_compressedkmer<Kmer:CompressedKmerT + KmerBuilder<Kmer
                         log::debug!("request collector received nb_received : {}", nb_received);
                     }
                 }
-                if read_more == false || request_store.len() > request_block_size {
+                if read_more == false || request_store.len() >= request_block_size {
                     log::debug!("recieving new requests nb : {:?}", request_store.len());
                     let mut data_for_hnsw = Vec::<VecSig<Sketcher,Kmer> >::with_capacity(request_store.len());
                     for i in 0..request_store.len() {

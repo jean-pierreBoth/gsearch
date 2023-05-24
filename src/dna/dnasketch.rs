@@ -350,8 +350,8 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT+KmerBuilder<Kmer>, Ske
 
         // a collector task to synchronize access to hnsw and SeqDict
         scope.spawn(|_| {
-            let mut msg_store = Vec::<(VecSig<Sketcher,Kmer>, usize)>::with_capacity(3 * insertion_block_size);
-            let mut itemv =  Vec::<ItemDict>::with_capacity(3 * insertion_block_size);
+            let mut msg_store = Vec::<(VecSig<Sketcher,Kmer>, usize)>::with_capacity(2 * insertion_block_size);
+            let mut itemv =  Vec::<ItemDict>::with_capacity(2 * insertion_block_size);
             let mut dict_size = seqdict.get_nb_entries();
             let mut read_more = true;
             while read_more {
@@ -371,7 +371,7 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT+KmerBuilder<Kmer>, Ske
                 if read_more == false && msg_store.len() == 0 {
                     break;
                 }
-                if read_more == false || msg_store.len() > insertion_block_size {
+                if read_more == false || msg_store.len() >= insertion_block_size {
                     log::debug!("inserting block in hnsw, nb new points : {:?}", msg_store.len());
                     let mut data_for_hnsw = Vec::<(&VecSig<Sketcher,Kmer>, usize)>::with_capacity(msg_store.len());
                     for i in 0..msg_store.len() {
