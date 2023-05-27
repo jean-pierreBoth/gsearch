@@ -1,53 +1,10 @@
-## installation help with libzmq feature
-
-###  zmq install on linux server without sudo privilege (install miniconda3 first):
-
-* Install via conda (recommended):
-
-  `conda activate`
-
-  `conda install zeromq`
-
-  
-
-  Install Rustup.  On linux: `conda install -c milesgranger rustup` or on MacOs :  
-  `curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh`
-
-  `rustup default nightly`
-  
-  change to you miniconda installation path
-  
-  `a=$(which conda)`
-  
-  `LIBZMQ_LIB_DIR=${a%/*/*}/lib LIBZMQ_INCLUDE_DIR=${a%/*/*}/include cargo install gsearch`
-  
-  `cargo install --git https://gitlab.com/Jianshu_Zhao/fraggenescanrs`
-  
-  `conda install hmmer`
-
-
-
-
-### zmq and libsodium install on linux
-
-```
-sudo apt-get install libzmq-dev libsodium-dev openblas
-```
-
-### zmq and libsodium on MacOS
-
-```
-brew install zeromq  
-brew install libsodium
-```
-
-### with MacOS Monterey
+### Build on MacOS (Intel)
 
 BLAS are installed in the Architecture.framework, but you can still install openblas and add library path to environmental variables according to homebrew promt message. See above annembed part to see how to use a different openblas in intel-mkl library
 
 ```bash
 ### install openblas on intel MACs (note that openblas install lib path is different on M1 MACs)
-brew install openblas
+brew install openblas xz
 echo 'export LDFLAGS="-L/usr/local/opt/openblas/lib"' >> ~/.bash_profile
 echo 'export CPPFLAGS="-I/usr/local/opt/openblas/include"' >> ~/.bash_profile
 echo 'export PKG_CONFIG_PATH="/usr/local/opt/openblas/lib/pkgconfig"' >> ~/.bash_profile
@@ -58,24 +15,7 @@ or, if openblas library is not needed
 
 ```cargo build --release```
 
-
-## using anaconda/miniconda3 or on a server
-
-you can install them first, but remember to add library configuration path and dynamic library config path to you environmental variables. Openblas must be installed at system level for MacOS system (static link is not prefered by Apple). Ask your system manager to install it for you.
-### with installed miniconda3 to the home directory
-```
-LIBZMQ_LIB_DIR=~/miniconda3/lib LIBZMQ_INCLUDE_DIR=~/miniconda3/include cargo build --release --features annembed_intel-mkl
-```
-
-or without annembed feature, in this case openblas denpendency is not required:
-```
-LIBZMQ_LIB_DIR=~/miniconda3/lib LIBZMQ_INCLUDE_DIR=~/miniconda3/include cargo build --release
-```
-
-
-
-
-## Build on ARM64/aarch64
+## Build on MacOS ARM64/aarch64
 
 rust nightly version only
 Nightly rust must be used
@@ -84,8 +24,17 @@ Nightly rust must be used
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 ## setup nightly rust
 rustup default nightly
-## go to the kmerutils, annembed and gsearch directory you just cloned, and change the line: hnsw_rs =  {version = "0.1.15"} to hnsw_rs = {path = "../hnswlib-rs"} in both Cargo.toml
+## go to the kmerutils, annembed and gsearch directory you just cloned, and change the line: hnsw_rs =  {version = "0.1.19"} to hnsw_rs = {path = "../hnswlib-rs"} in both Cargo.toml
 ## same procedure with the above regular compiling.
+```
+### Crosscompiling for Windows on MacOS or Linux, gcc must be installed (or clang if you are on MacOS via brew)
+
+```
+cargo install cargo-xwin
+rustup target add x86_64-pc-windows-msvc
+cd gsearch
+cargo xwin build --target x86_64-pc-windows-msvc
+
 ```
 
 ### Homology search
