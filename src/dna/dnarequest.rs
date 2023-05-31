@@ -100,7 +100,7 @@ fn sketch_and_request_dir_compressedkmer<Kmer:CompressedKmerT + KmerBuilder<Kmer
     // but if request files are very large we must not have too many files in memory
     // pario is used also to limit the number of file loaded simultanuously.
     let request_block_size = match other_params.get_parallel_io() {
-        true => { 5000.min(1 + other_params.get_nb_files_par()) },
+        true => { 2000.min(other_params.get_nb_files_par()) },
         _    => { 20 },
     };
     log::debug!("request_block_size : {}", request_block_size);
@@ -128,8 +128,11 @@ fn sketch_and_request_dir_compressedkmer<Kmer:CompressedKmerT + KmerBuilder<Kmer
     //
     let pool: rayon::ThreadPool = rayon::ThreadPoolBuilder::new().build().unwrap();
     let pool_nb_thread = pool.current_num_threads();
-    log::info!("nb threads in pool : {:?}", pool_nb_thread);
+    let nb_max_threads = request_block_size.min(pool_nb_thread);
+    log::info!("nb threads in pool : {:?}, using nb threads : {}", pool_nb_thread, nb_max_threads);
+    //
     // launch process_dir in a thread or async
+    //
     pool.scope(|scope| {
         // sequence sending, productor thread
         scope.spawn(|_|   {
@@ -182,11 +185,11 @@ fn sketch_and_request_dir_compressedkmer<Kmer:CompressedKmerT + KmerBuilder<Kmer
         scope.spawn( |scope| {
             // we must read messages, sketch and insert into hnsw
             // we can create a new thread for at least nb_bases_thread_threshold bases.
-            let nb_bases_thread_threshold : usize = 1_000_000;
+            let nb_bases_thread_threshold : usize = 10_000_000;
             // a bounded blocking channel to limit the number of threads to pool_nb_thread.
             // at thread creation we send a msg into queue, at thread end we receive a msg.
             // So the length of the channel is number of active thread
-            let (thread_token_sender, thread_token_receiver) = crossbeam_channel::bounded::<u32>(pool_nb_thread);
+            let (thread_token_sender, thread_token_receiver) = crossbeam_channel::bounded::<u32>(nb_max_threads);
             //
             let sketcher_queue = ArrayQueue::<Vec<IdSeq>>::new(request_block_size);
             let mut nb_sketched = 0;
@@ -222,24 +225,29 @@ fn sketch_and_request_dir_compressedkmer<Kmer:CompressedKmerT + KmerBuilder<Kmer
                 // we will spawn a thread that must do sketching of request and send request singature to hnsw dedicated thread
                 //
                 if nb_base_in_queue > nb_bases_thread_threshold || sketcher_queue.is_full() {
+                    let nb_free_thread = thread_token_sender.capacity().unwrap() as i32 - thread_token_sender.len() as i32;
+                    log::debug!("nb_free_thread : {}",nb_free_thread);
                     let request_sender_clone = request_sender.clone();
                     let sketcher_clone = sketcher.clone();
                     // transfer from  sketcher_queue to a local queue that will be move to spawn task
                     let q_len = sketcher_queue.len();
                     assert!(q_len > 0);
-                    let mut local_queue = Vec::<Vec<IdSeq> >::with_capacity(q_len);
-                    for _ in 0..q_len {
+                    let to_pop = q_len;
+                    log::debug!("popping to local_queue {}, sketching_queue.len() : {}", to_pop, sketcher_queue.len());
+                    let mut local_queue = Vec::<Vec<IdSeq> >::with_capacity(to_pop);
+                    for _ in 0..to_pop {
                         let res_pop = sketcher_queue.pop();
                         if res_pop.is_some() {
                             local_queue.push(res_pop.unwrap());
                         }
                     }
-                    assert_eq!(local_queue.len(), q_len);
+                    let q_len = local_queue.len();
+                    assert!(q_len > 0);
                     nb_base_in_queue = 0;
                     nb_sketched += q_len;
                     //
                     let _ = thread_token_sender.send(1);
-                    log::debug!("nb running threads = {:?}", thread_token_sender.len());
+                    log::debug!("sending token sender tokens = {:?}, nb_token_reciever : {}", thread_token_sender.len(), thread_token_receiver.len());
                     let thread_token_receiver_cloned = thread_token_receiver.clone();
                     //
                     scope.spawn(move |_|  {

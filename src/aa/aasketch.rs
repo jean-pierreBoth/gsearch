@@ -78,8 +78,8 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT+KmerBuilder<Kmer>, Ske
     // and not too large to spare memory. If parallel_io is set dimension message queue to size of group
     // for files of size more than Gb we must use pario to limit memory, but leave enough msg in queue to get // sketch and insertion 
     let insertion_block_size = match other_params.get_parallel_io() {
-        true => { 5000.min(1 + other_params.get_nb_files_par()) },
-        _    => { 5000 },
+        true => { 2000.min(1 + other_params.get_nb_files_par()) },
+        _    => { 2000 },
     };
     log::debug!("insertion_block_size : {}", insertion_block_size);
     //
@@ -154,7 +154,8 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT+KmerBuilder<Kmer>, Ske
     //
     let pool: rayon::ThreadPool = rayon::ThreadPoolBuilder::new().build().unwrap();
     let pool_nb_thread = pool.current_num_threads();
-    log::info!("nb threads in pool : {:?}", pool_nb_thread);
+    let nb_max_threads = insertion_block_size.min(pool_nb_thread);
+    log::info!("nb threads in pool : {:?}, using nb threads : {}", pool_nb_thread, nb_max_threads);
 
     // launch process_dir in a thread or async
     pool.scope(|scope| {
@@ -221,12 +222,12 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT+KmerBuilder<Kmer>, Ske
             let sketching_start_time = SystemTime::now();
             let sketching_start_cpu = ThreadTime::now();
             // we can create a new thread for at least nb_bases_thread_threshold bases.
-            let nb_bases_thread_threshold : usize = 1_000_000;
+            let nb_bases_thread_threshold : usize = 10_000_000;
             log::info!("threshold number of bases for thread cretaion : {:?}", nb_bases_thread_threshold);
             // a bounded blocking queue to limit the number of threads to pool_nb_thread.
             // at thread creation we send a msg into queue, at thread end we receive a msg.
             // So the length of the channel is number of active thread
-            let (thread_token_sender, thread_token_receiver) = crossbeam_channel::bounded::<u32>(pool_nb_thread);
+            let (thread_token_sender, thread_token_receiver) = crossbeam_channel::bounded::<u32>(nb_max_threads);
             // how many msg we received
             let mut nb_msg_received = 0;
             // we must read messages, sketch and insert into hnsw
@@ -263,7 +264,7 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT+KmerBuilder<Kmer>, Ske
                     break;
                 }
                 // if insertion_queue is beyond threshold size in number of bases we can go to threaded sketching and threading insertion
-                if nb_base_in_queue > nb_bases_thread_threshold || insertion_queue.is_full() {
+                if !thread_token_sender.is_full() && (nb_base_in_queue > nb_bases_thread_threshold || insertion_queue.is_full()) {
                     let collect_sender_clone = collect_sender.clone();
                     let sketcher_clone = sketcher.clone();
                     let mut local_queue = Vec::<Vec<IdSeq> >::with_capacity(insertion_queue.len());
@@ -307,11 +308,11 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT+KmerBuilder<Kmer>, Ske
                                     // as we treat the file globally, the signature is indexed by filerank!
                                     let seq_rank :  Vec<usize> = local_queue[i].iter().map(|v| v.get_filerank()).collect();
                                     let signatures = sketcher_clone.sketch_compressedkmeraa_seqs(&sequencegroup_ref, kmer_hash_fn);
-                                    log::debug!("msg num : {}, nb sub seq : {}, path : {:?}, file rank : {}", i, local_queue[i].len(), local_queue[i][0].get_path(), seq_rank[i]);
+                                    log::debug!("msg num : {}, nb sub seq : {}, path : {:?}, file rank : {}", i, local_queue[i].len(), local_queue[i][0].get_path(), seq_rank[0]);
                                     assert_eq!(signatures.len(), 1);
                                     // we get the item for the first seq (all sub sequences have same identity)
                                     let item: ItemDict = ItemDict::new(Id::new(local_queue[i][0].get_path(), local_queue[i][0].get_fasta_id()), seq_len);
-                                    let msg = CollectMsg::new((signatures[i].clone(), seq_rank[i]), item);
+                                    let msg = CollectMsg::new((signatures[0].clone(), seq_rank[0]), item);
                                     let _ = collect_sender_clone.send(msg);
                                 }
                             }

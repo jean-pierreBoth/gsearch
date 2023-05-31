@@ -42,6 +42,9 @@ pub fn process_file_by_sequence(pathb : &PathBuf, filter_params : &FilterParams)
     let mut to_sketch = Vec::<IdSeq>::new();
     //
     log::debug!("processing file {}", pathb.to_str().unwrap());
+    let mut nb_bases_file = 0;
+    let mut nb_bases_encoded = 0;
+    let mut nb_record : usize = 0;
     let alphabet2b = Alphabet2b::new();
     //
     let mut reader = needletail::parse_fastx_file(&pathb).expect("expecting valid filename");
@@ -50,15 +53,18 @@ pub fn process_file_by_sequence(pathb : &PathBuf, filter_params : &FilterParams)
             println!("got bd record in file {:?}", pathb.file_name().unwrap());
             std::process::exit(1);
         }
+        nb_record += 1;
         // do we keep record ? we must get its id
         let seqrec = record.expect("invalid record");
         let id = seqrec.id();
         let strid = String::from_utf8(Vec::from(id)).unwrap();
         // process sequence if not capsid and not filtered out
         if strid.find("capsid").is_none() && !filter_params.filter(&seqrec.seq()) {
-            let nb_bases = seqrec.seq().len();
+            let nb_bases = seqrec.num_bases();
+            nb_bases_file += nb_bases;
             let mut new_seq = Sequence::with_capacity(2, nb_bases);
             new_seq.encode_and_add(&seqrec.seq(), &alphabet2b);
+            nb_bases_encoded += new_seq.size();
             drop(seqrec);
             // we have DNA seq for now
             let nullid = String::from(""); // we will sketch the whole and loose id, so we spare memory
@@ -69,6 +75,11 @@ pub fn process_file_by_sequence(pathb : &PathBuf, filter_params : &FilterParams)
             }
         }
     }
+    //
+    log::debug!("process_buffer_by_sequence file : {:?}, nb_bases_encoded : {}, nb_record : {}", 
+                        pathb, nb_bases_encoded, nb_record);
+    log::debug!("nb total bases in file (with non ATCG) : {}", nb_bases_file);
+    assert!(nb_bases_file >= nb_bases_encoded);
     // we must send to_sketch to some sketcher
     return to_sketch;
 } // end of process_file_by_sequence
@@ -87,6 +98,9 @@ pub fn process_buffer_by_sequence(pathb : &PathBuf, bufread : &[u8], filter_para
     //
     let mut to_sketch = Vec::<IdSeq>::new();
     let alphabet2b = Alphabet2b::new();
+    let mut nb_bases_file = 0;
+    let mut nb_bases_encoded = 0;
+    let mut nb_record : usize = 0;
     //
     let mut reader = needletail::parse_fastx_reader(bufread).expect("expecting valid filename");
     // 
@@ -95,22 +109,34 @@ pub fn process_buffer_by_sequence(pathb : &PathBuf, bufread : &[u8], filter_para
             println!("got bd record in file {:?}", pathb.file_name().unwrap());
             std::process::exit(1);
         }
+        nb_record += 1;
         // do we keep record ? we must get its id
         let seqrec = record.expect("invalid record");
         let id = seqrec.id();
         let strid = String::from_utf8(Vec::from(id)).unwrap();
         // process sequence if not capsid and not filtered out, in block mode we do not filter any at the moment
         if strid.find("capsid").is_none()  && !filter_params.filter(&seqrec.seq()) {
-            let nb_bases = seqrec.seq().len();
+            let nb_bases = seqrec.num_bases();
+            nb_bases_file += nb_bases;
             let mut new_seq = Sequence::with_capacity(2, nb_bases);
             new_seq.encode_and_add(&seqrec.seq(), &alphabet2b);
+            // some checks , we filter non ACGT so length is less than record
+            assert!(new_seq.size() <= nb_bases);
+            assert_eq!(nb_bases, seqrec.seq().len());
             drop(seqrec);
             // we have DNA seq for now
             let nullid = String::from(""); // we will sketch the whole and loose id, so we spare memory
+            nb_bases_encoded += new_seq.size();
             let seqwithid = IdSeq::new(pathb.to_str().unwrap().to_string(), nullid,SequenceType::SequenceDNA(new_seq));
             to_sketch.push(seqwithid);
         }
     }
+    //
+    log::debug!("process_buffer_by_sequence file : {:?}, nb_bases_file : {} nb_bases_encoded : {}, nb_record : {}", 
+                        pathb, nb_bases_file, nb_bases_encoded, nb_record);
+    log::debug!("nb total bases in file (with non ATCG) : {}", nb_bases_file);
+    assert!(nb_bases_file >= nb_bases_encoded);
+    //
     if log::log_enabled!(log::Level::Trace) {
         log::trace!("process_file, nb_sketched {} ", to_sketch.len());
     }
@@ -130,6 +156,7 @@ pub fn process_file_in_one_block(pathb : &PathBuf, filter_params : &FilterParams
     log::debug!("process_file_in_one_block , file : {:?}", pathb);
     //
     let mut to_sketch = Vec::<IdSeq>::new();
+    let mut nb_bases_file = 0;
     //
     let metadata = std::fs::metadata(pathb.clone());
     let nb_bases : usize;
@@ -170,6 +197,7 @@ pub fn process_file_in_one_block(pathb : &PathBuf, filter_params : &FilterParams
         // process sequence if not capsid and not filtered out, in block mode we do not filter any at the moment
         let _filter = filter_params.filter(&seqrec.seq());
         if strid.find("capsid").is_none() {
+            nb_bases_file += seqrec.seq().len();
             new_seq.encode_and_add(&seqrec.seq(), &alphabet2b);
             // recall rank is set in process_dir beccause we should a have struct gatheing the 2 functions process_dir and process_file
             if log::log_enabled!(log::Level::Trace) {
@@ -177,6 +205,10 @@ pub fn process_file_in_one_block(pathb : &PathBuf, filter_params : &FilterParams
             }
         }
     }
+    log::debug!("process_file_in_one_block file : {:?}, nb_bases : {}, seq len {}", pathb, nb_bases_file, new_seq.size());
+    log::debug!("nb total bases in file (with non ATCG) : {}", nb_bases_file);
+    // should have equality except for non ACTG
+    assert!(nb_bases_file >=  new_seq.size());
     // we are at end of file, we have one large sequence for the whole file
     // we have DNA seq for now
     let seqwithid = IdSeq::new(pathb.to_str().unwrap().to_string(), String::from("total sequence"), SequenceType::SequenceDNA(new_seq));
@@ -199,6 +231,8 @@ pub fn process_buffer_in_one_block(pathb : &PathBuf, bufread : &[u8], filter_par
     log::trace!("process_buffer_in_one_block , file : {:?}", pathb);
     //
     let mut to_sketch = Vec::<IdSeq>::new();
+    let mut nb_bases_file = 0;
+    let mut nb_record : usize = 0;
     //
     let mut reader = needletail::parse_fastx_reader(bufread).expect("expecting valid filename");
     // We allocate one large block tht will contain the whole filtered genome. 
@@ -221,6 +255,7 @@ pub fn process_buffer_in_one_block(pathb : &PathBuf, bufread : &[u8], filter_par
             println!("process_buffer_in_one_block : got bad record in buffer : {:?}", pathb);
             std::process::exit(1);
         }
+        nb_record += 1;
         // do we keep record ? we must get its id
         let seqrec = record.expect("invalid record");
         let id = seqrec.id();
@@ -230,15 +265,19 @@ pub fn process_buffer_in_one_block(pathb : &PathBuf, bufread : &[u8], filter_par
         if strid.find("capsid").is_none() {
             // Our Kmers are 2bits encoded so we need to be able to encode sequence in 2 bits, so there is 
             // this hack,  causing reallocation. seqrec.seq is Cow so drain does not seem an option.
+            nb_bases_file += seqrec.seq().len();
             new_seq.encode_and_add(&seqrec.seq(), &alphabet2b);
             if log::log_enabled!(log::Level::Trace) {
                 log::trace!("process_file, nb_sketched {} ", to_sketch.len());
             }
         }
     }
+    //
     new_seq.shrink_to_fit();
     // we are at end of file, we have one large sequence for the whole file
-    log::debug!("decompressed seq for file : {:?}, nb bases : {}, estimated nb bases : {}", pathb.file_name().unwrap_or_default(), new_seq.size(), nb_bases);
+    log::debug!("decompressed seq for file : {:?}, nb bases encoded : {}, estimated nb bases : {}, nb_record : {}", pathb.file_name().unwrap_or_default(), new_seq.size(), nb_bases, nb_record);
+    log::debug!("nb total bases in file (with non ATCG) : {}", nb_bases_file);
+    assert!(nb_bases_file >= new_seq.size());
     // we have DNA seq for now
     let seqwithid = IdSeq::new(pathb.to_str().unwrap().to_string(), String::from("total sequence"), SequenceType::SequenceDNA(new_seq));
     to_sketch.push(seqwithid);

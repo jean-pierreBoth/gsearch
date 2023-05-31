@@ -84,8 +84,8 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT+KmerBuilder<Kmer>, Ske
     // and not too large to spare memory. If parallel_io is set dimension message queue to size of group
     // for files of size more than Gb we must use pario to limit memory, but leave enough msg in queue to get // sketch and insertion 
     let insertion_block_size = match other_params.get_parallel_io() {
-        true => { 5000.min(1 + other_params.get_nb_files_par()) },
-        _    => { 5000 },
+        true => { 2000.min(other_params.get_nb_files_par()) },
+        _    => { 2000 },
     };
     log::debug!("insertion_block_size : {}", insertion_block_size);
     //
@@ -160,7 +160,8 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT+KmerBuilder<Kmer>, Ske
     //
     let pool: rayon::ThreadPool = rayon::ThreadPoolBuilder::new().build().unwrap();
     let pool_nb_thread = pool.current_num_threads();
-    log::info!("nb threads in pool : {:?}", pool_nb_thread);
+    let nb_max_threads = 2 * insertion_block_size.min(pool_nb_thread);
+    log::info!("nb threads in pool : {:?}, using nb threads : {}", pool_nb_thread, nb_max_threads);
 
     // launch process_dir in a thread or async
     pool.scope(|scope| {
@@ -223,36 +224,41 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT+KmerBuilder<Kmer>, Ske
         //
         scope.spawn( |scope| {
             // we need a bounded queue (no need for a concurrent queue yet) to be able to block the thread if max number of thread is reached
-            let insertion_queue = Arc::new(ConcurrentQueue::bounded( insertion_block_size));
+            let sketcher_queue = Arc::new(ConcurrentQueue::bounded( insertion_block_size));
             let sketching_start_time = SystemTime::now();
             let sketching_start_cpu = ThreadTime::now();
             // we can create a new thread for at least nb_bases_thread_threshold bases.
-            let nb_bases_thread_threshold : usize = 1_000_000;
-            log::info!("threshold number of bases for thread cretaion : {:?}", nb_bases_thread_threshold);
-            // a bounded blocking queue to limit the number of threads to pool_nb_thread.
+            let nb_bases_thread_threshold : usize = 10_000_000;
+            log::info!("threshold number of bases for thread creation : {:?}", nb_bases_thread_threshold);
+            // a bounded blocking queue to limit the number of threads to nb_max_threads
             // at thread creation we send a msg into queue, at thread end we receive a msg.
             // So the length of the channel is number of active thread
-            let (thread_token_sender, thread_token_receiver) = crossbeam_channel::bounded::<u32>(pool_nb_thread);
+            let (thread_token_sender, thread_token_receiver) = crossbeam_channel::bounded::<u32>(nb_max_threads);
             // how many msg we received
             let mut nb_msg_received = 0;
             // we must read messages, sketch and insert into hnsw
+            let more = true;
             let mut read_more = true;
-            let mut nb_base_in_queue = 0;
-            while read_more {
+            let mut nb_base_in_queue= 0;
+            while more {
                 // try read, if error is Disconnected we stop read and both threads are finished.
-                if !insertion_queue.is_full() {
+                if !sketcher_queue.is_full() {
                     let res_receive = receive.recv();
                     match res_receive {
-                        Err(RecvError) =>   {   read_more = false;
-                                                log::debug!("end of collector reception");
+                        Err(RecvError) =>   {  
+                                if read_more {
+                                    // first time we reach that state we log it
+                                    log::info!("end of file reception");
+                                }
+                                read_more = false;
                         }
                         Ok(idsequences) => {
                             // concat the new idsketch in insertion queue.
                             nb_msg_received += 1;
-                            nb_base_in_queue = idsequences.iter().fold(0, |acc, s| acc + s.get_seq_len());
+                            nb_base_in_queue += idsequences.iter().fold(0, |acc, s| acc + s.get_seq_len());
                             log::debug!("nb_base_in_queue : {}", nb_base_in_queue);
                             log::debug!("read received nb seq : {}, total nb msg received : {}", idsequences.len(), nb_msg_received);
-                            let p_res = insertion_queue.push(idsequences);
+                            let p_res = sketcher_queue.push(idsequences);
                             if let Err(e) = p_res {
                                 match e {
                                     PushError::Full(_)   => { log::error!("queue is full"); },
@@ -265,31 +271,42 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT+KmerBuilder<Kmer>, Ske
                         }
                     }
                 }
-                if read_more == false && insertion_queue.len() == 0 {
+                //
+                if read_more == false && sketcher_queue.len() == 0 && thread_token_sender.len() == 0 {
+                    log::info!("no more read to come, no more data to sketch, no more sketcher running ...");
                     break;
                 }
-                // if insertion_queue is beyond threshold size in number of bases we can go to threaded sketching and threading insertion
-                if nb_base_in_queue > nb_bases_thread_threshold || insertion_queue.is_full() {
+                // if sketching_queue is beyond threshold size in number of bases we can go to threaded sketching and threading insertion
+                if nb_base_in_queue >= nb_bases_thread_threshold || sketcher_queue.is_full() || (!read_more && !sketcher_queue.is_empty()) {
+                    let nb_free_thread = thread_token_sender.capacity().unwrap() as i32 - thread_token_sender.len() as i32;
+                    log::debug!("nb_free_thread : {}",nb_free_thread);
+                    log::debug!("thread_token_sender.len() = {}, thread_token_receiver.len() : {}", thread_token_sender.len(), thread_token_receiver.len());
                     let collect_sender_clone = collect_sender.clone();
                     let sketcher_clone = sketcher.clone();
-                    let mut local_queue = Vec::<Vec<IdSeq> >::with_capacity(insertion_queue.len());
-                    let q_len = insertion_queue.len();
-                    log::debug!("insertion_queue.len() : {}", q_len);
-                    for _ in 0..q_len {
-                        let res_pop = insertion_queue.pop();
+                    let mut local_queue = Vec::<Vec<IdSeq> >::with_capacity(sketcher_queue.len());
+                    let to_pop = sketcher_queue.len();
+                    log::debug!("popping to local_queue {}, sketching_queue.len() : {}", to_pop, sketcher_queue.len());
+                    for _ in 0..to_pop {
+                        let res_pop = sketcher_queue.pop();
+                        let mut nb_popped_bases = 0;
                         if res_pop.is_ok() {
+                            nb_popped_bases += res_pop.as_ref().unwrap().iter().fold(0, |acc, s| acc + s.get_seq_len());
                             local_queue.push(res_pop.unwrap());
                         }
+                        assert!(nb_base_in_queue >= nb_popped_bases);
+                        nb_base_in_queue -= nb_popped_bases; 
                     }
-                    nb_base_in_queue = 0; 
+                    log::debug!("after popping , nb_base_in_queue : {}", nb_base_in_queue);
                     assert!(local_queue.len() > 0);
+                    // recall this will thread creation if too many threads already
                     let _ = thread_token_sender.send(1);
-                    log::debug!("nb sketching threads running = {:?}", thread_token_sender.len());
+                    log::debug!("sending token sender tokens = {:?}, nb_token_reciever : {}", thread_token_sender.len(), thread_token_receiver.len());
                     let thread_token_receiver_cloned = thread_token_receiver.clone();
                     scope.spawn(  move |_|  {
                         log::trace!("spawning thread on nb files : {}", local_queue.len());
                         match block_processing {
                             true => {
+                                // each msg is a concatenated seq, so unit length
                                 for v in &local_queue {
                                     assert_eq!(v.len(), 1);
                                 }
@@ -311,25 +328,32 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT+KmerBuilder<Kmer>, Ske
                                     let sequencegroup_ref : Vec<&Sequence> = local_queue[i].iter().map(|v| v.get_sequence_dna().unwrap()).collect();
                                     let seq_len = sequencegroup_ref.iter().fold(0, | acc, s | acc + s.size());
                                     // as we treat the file globally, the signature is indexed by filerank!
-                                    let seq_rank :  Vec<usize> = local_queue[i].iter().map(|v| v.get_filerank()).collect();
+                                    // seq_rank has size of sequencegroup_ref but all values in seq_rank should be equal to filerank
+                                    let seq_rank = local_queue[i][0].get_filerank();
+                                    if local_queue[i].len() > 1 {
+                                        assert_eq!(seq_rank, local_queue[i][1].get_filerank());
+                                    }
                                     let signatures = sketcher_clone.sketch_compressedkmer_seqs(&sequencegroup_ref, kmer_hash_fn);
-                                    log::debug!("msg num : {}, nb sub seq : {}, path : {:?}, file rank : {}", i, local_queue[i].len(), local_queue[i][0].get_path(), seq_rank[i]);
+                                    log::debug!("sketched msg num : {}, nb sub seq : {}, path : {:?}, file rank : {}", i, local_queue[i].len(), local_queue[i][0].get_path(), seq_rank);
                                     assert_eq!(signatures.len(), 1);
                                     // we get the item for the first seq (all sub sequences have same identity)
                                     let item: ItemDict = ItemDict::new(Id::new(local_queue[i][0].get_path(), local_queue[i][0].get_fasta_id()), seq_len);
-                                    let msg = CollectMsg::new((signatures[i].clone(), seq_rank[i]), item);
+                                    let msg = CollectMsg::new((signatures[0].clone(), seq_rank), item);
                                     let _ = collect_sender_clone.send(msg);
                                 }
                             }
                         }
                         // cleaning
-                        local_queue.clear();
+                        while let Some(v) = local_queue.pop() {
+                            drop(v);
+                        }
                         drop(local_queue); // a precaution as  local_queue has been moved into the thread 
+                        drop(collect_sender_clone);
                         // we free a token in queue
                         let res = thread_token_receiver_cloned.recv();
                         log::debug!("thread_token_receiver_cloned.len = {:?}", thread_token_receiver_cloned.len());
                         match res {
-                            Ok(_)   => { log::debug!("thread ending OK");},
+                            Ok(_)   => { log::debug!("internal sketching thread ending OK");},
                             Err(_)  => { log::error!("thread exit with a token error, aborting");
                                         std::process::abort();
                                     },
@@ -346,7 +370,7 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT+KmerBuilder<Kmer>, Ske
             //
             drop(receive);
             drop(collect_sender);
-        }); // end of receptor thread
+        }); // end of sketcher thread
 
         // a collector task to synchronize access to hnsw and SeqDict
         scope.spawn(|_| {
@@ -367,9 +391,6 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT+KmerBuilder<Kmer>, Ske
                         nb_received += 1;
                         log::debug!("collector received nb_received : {}", nb_received);
                     }
-                }
-                if read_more == false && msg_store.len() == 0 {
-                    break;
                 }
                 if read_more == false || msg_store.len() >= insertion_block_size {
                     log::debug!("inserting block in hnsw, nb new points : {:?}", msg_store.len());
@@ -398,7 +419,10 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT+KmerBuilder<Kmer>, Ske
     //
     log::info!("sketchandstore, nb_sent = {}, nb_received = {}", nb_sent, nb_received);
     if nb_sent != nb_received {
-        log::warn!("an error occurred  nb msg sent : {}, nb msg received : {}", nb_sent, nb_received);
+        log::error!("==============================================================================");
+        log::error!("an error occurred  nb msg sent : {}, nb msg received : {}", nb_sent, nb_received);
+        log::error!("==============================================================================");
+        std::process::exit(1);
     }
     // get total time 
     let cpu_time = cpu_start.elapsed().as_secs();

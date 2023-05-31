@@ -123,8 +123,11 @@ fn sketch_and_request_dir_compressedkmer<Kmer:CompressedKmerT + KmerBuilder<Kmer
     //
     let pool: rayon::ThreadPool = rayon::ThreadPoolBuilder::new().build().unwrap();
     let pool_nb_thread = pool.current_num_threads();
-    log::info!("nb threads in pool : {:?}", pool_nb_thread);
+    let nb_max_threads = request_block_size.min(pool_nb_thread);
+    log::info!("nb threads in pool : {:?}, using nb threads : {}", pool_nb_thread, nb_max_threads);
+    //
     // launch process_dir in a thread or async
+    //
     pool.scope(|scope| {
         // sequence sending, productor thread
         scope.spawn(|_|   {
@@ -177,11 +180,11 @@ fn sketch_and_request_dir_compressedkmer<Kmer:CompressedKmerT + KmerBuilder<Kmer
         scope.spawn( |scope| {
             // we must read messages, sketch and insert into hnsw
             // we can create a new thread for at least nb_bases_thread_threshold bases.
-            let nb_bases_thread_threshold : usize = 1_000_000;
+            let nb_bases_thread_threshold : usize = 10_000_000;
             // a bounded blocking channel to limit the number of threads to pool_nb_thread.
             // at thread creation we send a msg into queue, at thread end we receive a msg.
             // So the length of the channel is number of active thread
-            let (thread_token_sender, thread_token_receiver) = crossbeam_channel::bounded::<u32>(pool_nb_thread);
+            let (thread_token_sender, thread_token_receiver) = crossbeam_channel::bounded::<u32>(nb_max_threads);
             //
             let sketcher_queue = ArrayQueue::<Vec<IdSeq>>::new(request_block_size);
             let mut nb_sketched = 0;
