@@ -59,6 +59,7 @@ For UMAP-like algorithm to do dimension reduction and then visuzlizing genome da
 ```bash
     conda config --add channels bioconda
     conda install gsearch -c bioconda
+    gsearchbin -h
 ```
 
 Otherwise it is possible to install/compile by yourself (see install section)
