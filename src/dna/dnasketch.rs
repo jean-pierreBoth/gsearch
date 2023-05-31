@@ -5,13 +5,14 @@
 
 use std::time::{SystemTime};
 use cpu_time::{ProcessTime,ThreadTime};
-
+use std::time::Duration;
 
 use std::path::{PathBuf};
 
 // for multithreading
 use std::sync::Arc;
 use crossbeam_channel::*;
+use crossbeam::sync::{Parker};
 use concurrent_queue::{ConcurrentQueue, PushError};
 
 
@@ -227,6 +228,7 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT+KmerBuilder<Kmer>, Ske
             let sketcher_queue = Arc::new(ConcurrentQueue::bounded( insertion_block_size));
             let sketching_start_time = SystemTime::now();
             let sketching_start_cpu = ThreadTime::now();
+            let parker = Parker::new();
             // we can create a new thread for at least nb_bases_thread_threshold bases.
             let nb_bases_thread_threshold : usize = 10_000_000;
             log::info!("threshold number of bases for thread creation : {:?}", nb_bases_thread_threshold);
@@ -271,10 +273,14 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT+KmerBuilder<Kmer>, Ske
                         }
                     }
                 }
-                //
+                // 
                 if read_more == false && sketcher_queue.len() == 0 && thread_token_sender.len() == 0 {
                     log::info!("no more read to come, no more data to sketch, no more sketcher running ...");
                     break;
+                }
+                else if read_more == false && sketcher_queue.len() == 0 {
+                    // TODO here we just have to wait all thread end, should use a condvar, now we check every second
+                    parker.park_timeout(Duration::from_millis(1000));
                 }
                 // if sketching_queue is beyond threshold size in number of bases we can go to threaded sketching and threading insertion
                 if nb_base_in_queue >= nb_bases_thread_threshold || sketcher_queue.is_full() || (!read_more && !sketcher_queue.is_empty()) {
