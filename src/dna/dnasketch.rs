@@ -154,14 +154,14 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT+KmerBuilder<Kmer>, Ske
     let mut nb_sent : usize = 0;       // this variable is moved in sender  io thread
     let mut nb_received : usize = 0;   // this variable is moved in collector thread!
     // to send IdSeq to sketch from reading thread to sketcher thread
-    let (send, receive) = crossbeam_channel::bounded::<Vec<IdSeq>>(insertion_block_size+1);
+    let (send, receive) = crossbeam_channel::bounded::<Vec<IdSeq>>(insertion_block_size);
     // to send sketch result to a collector task
     let (collect_sender , collect_receiver) = 
             crossbeam_channel::bounded::<CollectMsg<<Sketcher as SeqSketcherT<Kmer>>::Sig>>(insertion_block_size+1);
     //
     let pool: rayon::ThreadPool = rayon::ThreadPoolBuilder::new().build().unwrap();
     let pool_nb_thread = pool.current_num_threads();
-    let nb_max_threads = 2 * insertion_block_size.min(pool_nb_thread);
+    let nb_max_threads = 1 + insertion_block_size.min(pool_nb_thread);
     log::info!("nb threads in pool : {:?}, using nb threads : {}", pool_nb_thread, nb_max_threads);
 
     // launch process_dir in a thread or async
@@ -228,7 +228,7 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT+KmerBuilder<Kmer>, Ske
             let sketcher_queue = Arc::new(ConcurrentQueue::bounded( insertion_block_size));
             let sketching_start_time = SystemTime::now();
             let sketching_start_cpu = ThreadTime::now();
-            let parker = Parker::new();
+            let parker: Parker = Parker::new();
             // we can create a new thread for at least nb_bases_thread_threshold bases.
             let nb_bases_thread_threshold : usize = 10_000_000;
             log::info!("threshold number of bases for thread creation : {:?}", nb_bases_thread_threshold);
@@ -293,8 +293,8 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT+KmerBuilder<Kmer>, Ske
                     let to_pop = sketcher_queue.len();
                     log::debug!("popping to local_queue {}, sketching_queue.len() : {}", to_pop, sketcher_queue.len());
                     for _ in 0..to_pop {
+                        let mut nb_popped_bases : usize = 0;
                         let res_pop = sketcher_queue.pop();
-                        let mut nb_popped_bases = 0;
                         if res_pop.is_ok() {
                             nb_popped_bases += res_pop.as_ref().unwrap().iter().fold(0, |acc, s| acc + s.get_seq_len());
                             local_queue.push(res_pop.unwrap());

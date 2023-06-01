@@ -9,9 +9,11 @@ use std::io::{BufWriter, Write};
 
 use std::time::{SystemTime};
 use cpu_time::ProcessTime;
+use std::time::Duration;
 
 // for parallellism
 use crossbeam::queue::{ArrayQueue};
+use crossbeam::sync::{Parker};
 
 use serde::{Serialize, de::DeserializeOwned};
 use std::fmt::{Debug};
@@ -178,6 +180,7 @@ fn sketch_and_request_dir_compressedkmer<Kmer:CompressedKmerT + KmerBuilder<Kmer
 
         // sequence reception, sketching/request consumer thread. The real hnsw request is delegated to a special thread
         scope.spawn( |scope| {
+            let parker: Parker = Parker::new();
             // we must read messages, sketch and insert into hnsw
             // we can create a new thread for at least nb_bases_thread_threshold bases.
             let nb_bases_thread_threshold : usize = 10_000_000;
@@ -187,7 +190,6 @@ fn sketch_and_request_dir_compressedkmer<Kmer:CompressedKmerT + KmerBuilder<Kmer
             let (thread_token_sender, thread_token_receiver) = crossbeam_channel::bounded::<u32>(nb_max_threads);
             //
             let sketcher_queue = ArrayQueue::<Vec<IdSeq>>::new(request_block_size);
-            let mut nb_sketched = 0;
             let mut read_more = true;
             let mut nb_base_in_queue = 0;
             while read_more {
@@ -211,15 +213,19 @@ fn sketch_and_request_dir_compressedkmer<Kmer:CompressedKmerT + KmerBuilder<Kmer
                         }
                     };
                 }
-                // no more thing to receive no more work to do
-                if read_more == false && sketcher_queue.is_empty() {
+                if read_more == false && sketcher_queue.len() == 0 && thread_token_sender.len() == 0 {
+                    log::info!("no more read to come, no more data to sketch, no more sketcher running ...");
                     break;
+                }
+                else if read_more == false && sketcher_queue.len() == 0 {
+                    // TODO here we just have to wait all thread end, should use a condvar, now we check every second
+                    parker.park_timeout(Duration::from_millis(1000));
                 }
                 //
                 // if request_queue is beyond threshold size we can go to threaded sketching and threading insertion
                 // we will spawn a thread that must do sketching of request and send request singature to hnsw dedicated thread
                 //
-                if nb_base_in_queue > nb_bases_thread_threshold || sketcher_queue.is_full() {
+                if nb_base_in_queue >= nb_bases_thread_threshold || sketcher_queue.is_full() || (!read_more && !sketcher_queue.is_empty()) {
                     let request_sender_clone = request_sender.clone();
                     let sketcher_clone = sketcher.clone();
                     // transfer from  sketcher_queue to a local queue that will be move to spawn task
@@ -227,14 +233,16 @@ fn sketch_and_request_dir_compressedkmer<Kmer:CompressedKmerT + KmerBuilder<Kmer
                     assert!(q_len > 0);
                     let mut local_queue = Vec::<Vec<IdSeq> >::with_capacity(q_len);
                     for _ in 0..q_len {
+                        let mut nb_popped_bases : usize = 0;
                         let res_pop = sketcher_queue.pop();
                         if res_pop.is_some() {
+                            nb_popped_bases += res_pop.as_ref().unwrap().iter().fold(0, |acc, s| acc + s.get_seq_len());
                             local_queue.push(res_pop.unwrap());
                         }
+                        assert!(nb_base_in_queue >= nb_popped_bases);
+                        nb_base_in_queue -= nb_popped_bases; 
                     }
                     assert_eq!(local_queue.len(), q_len);
-                    nb_base_in_queue = 0;
-                    nb_sketched += q_len;
                     //
                     let _ = thread_token_sender.send(1);
                     log::debug!("nb running threads = {:?}", thread_token_sender.len());
@@ -290,7 +298,6 @@ fn sketch_and_request_dir_compressedkmer<Kmer:CompressedKmerT + KmerBuilder<Kmer
                 }
             } // end while 
             //
-            log::info!("nb request received for sketching : {}", nb_sketched);
             drop(receive);
             drop(request_sender);
         }); // end of receptor sketcher thread

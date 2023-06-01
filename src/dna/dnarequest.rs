@@ -9,7 +9,9 @@
 use std::path::{Path, PathBuf};
 use std::fs::{OpenOptions};
 use std::io::{BufWriter, Write};
+use crossbeam::sync::{Parker};
 
+use std::time::Duration;
 use std::time::{SystemTime};
 use cpu_time::ProcessTime;
 
@@ -121,14 +123,14 @@ fn sketch_and_request_dir_compressedkmer<Kmer:CompressedKmerT + KmerBuilder<Kmer
     let mut nb_received = 0;
     //
     // to send IdSeq to sketch from reading thread to sketcher thread
-    let (send, receive) = crossbeam_channel::bounded::<Vec<IdSeq>>(request_block_size + 10);
+    let (send, receive) = crossbeam_channel::bounded::<Vec<IdSeq>>(request_block_size);
     // to send sketch result to a collector task
     let (request_sender , request_receiver) = 
         crossbeam_channel::bounded::<RequestMsg<<Sketcher as SeqSketcherT<Kmer>>::Sig>>(request_block_size+1);
     //
     let pool: rayon::ThreadPool = rayon::ThreadPoolBuilder::new().build().unwrap();
     let pool_nb_thread = pool.current_num_threads();
-    let nb_max_threads = request_block_size.min(pool_nb_thread);
+    let nb_max_threads = 1 + request_block_size.min(pool_nb_thread);
     log::info!("nb threads in pool : {:?}, using nb threads : {}", pool_nb_thread, nb_max_threads);
     //
     // launch process_dir in a thread or async
@@ -184,6 +186,7 @@ fn sketch_and_request_dir_compressedkmer<Kmer:CompressedKmerT + KmerBuilder<Kmer
         // sequence reception, sketching/request consumer thread. The real hnsw request is delegated to a special thread
         scope.spawn( |scope| {
             // we must read messages, sketch and insert into hnsw
+            let parker: Parker = Parker::new();
             // we can create a new thread for at least nb_bases_thread_threshold bases.
             let nb_bases_thread_threshold : usize = 10_000_000;
             // a bounded blocking channel to limit the number of threads to pool_nb_thread.
@@ -192,7 +195,6 @@ fn sketch_and_request_dir_compressedkmer<Kmer:CompressedKmerT + KmerBuilder<Kmer
             let (thread_token_sender, thread_token_receiver) = crossbeam_channel::bounded::<u32>(nb_max_threads);
             //
             let sketcher_queue = ArrayQueue::<Vec<IdSeq>>::new(request_block_size);
-            let mut nb_sketched = 0;
             let mut read_more = true;
             let mut nb_base_in_queue = 0;
             while read_more {
@@ -216,15 +218,20 @@ fn sketch_and_request_dir_compressedkmer<Kmer:CompressedKmerT + KmerBuilder<Kmer
                         }
                     };
                 }
-                // no more thing to receive no more work to do
-                if read_more == false && sketcher_queue.is_empty() {
+                //
+                if read_more == false && sketcher_queue.len() == 0 && thread_token_sender.len() == 0 {
+                    log::info!("no more read to come, no more data to sketch, no more sketcher running ...");
                     break;
+                }
+                else if read_more == false && sketcher_queue.len() == 0 {
+                    // TODO here we just have to wait all thread end, should use a condvar, now we check every second
+                    parker.park_timeout(Duration::from_millis(1000));
                 }
                 //
                 // if request_queue is beyond threshold size we can go to threaded sketching and threading insertion
                 // we will spawn a thread that must do sketching of request and send request singature to hnsw dedicated thread
                 //
-                if nb_base_in_queue > nb_bases_thread_threshold || sketcher_queue.is_full() {
+                if nb_base_in_queue >= nb_bases_thread_threshold || sketcher_queue.is_full() || (!read_more && !sketcher_queue.is_empty()) {
                     let nb_free_thread = thread_token_sender.capacity().unwrap() as i32 - thread_token_sender.len() as i32;
                     log::debug!("nb_free_thread : {}",nb_free_thread);
                     let request_sender_clone = request_sender.clone();
@@ -237,14 +244,17 @@ fn sketch_and_request_dir_compressedkmer<Kmer:CompressedKmerT + KmerBuilder<Kmer
                     let mut local_queue = Vec::<Vec<IdSeq> >::with_capacity(to_pop);
                     for _ in 0..to_pop {
                         let res_pop = sketcher_queue.pop();
+                        let mut nb_popped_bases : usize = 0;
                         if res_pop.is_some() {
+                            nb_popped_bases += res_pop.as_ref().unwrap().iter().fold(0, |acc, s| acc + s.get_seq_len());
                             local_queue.push(res_pop.unwrap());
                         }
+                        assert!(nb_base_in_queue >= nb_popped_bases);
+                        nb_base_in_queue -= nb_popped_bases; 
                     }
+                    log::debug!("after popping , nb_base_in_queue : {}", nb_base_in_queue);
                     let q_len = local_queue.len();
                     assert!(q_len > 0);
-                    nb_base_in_queue = 0;
-                    nb_sketched += q_len;
                     //
                     let _ = thread_token_sender.send(1);
                     log::debug!("sending token sender tokens = {:?}, nb_token_reciever : {}", thread_token_sender.len(), thread_token_receiver.len());
@@ -285,6 +295,10 @@ fn sketch_and_request_dir_compressedkmer<Kmer:CompressedKmerT + KmerBuilder<Kmer
                                 }
                             },  // end by seq case
                         }; // end match
+                        // cleaning
+                        while let Some(v) = local_queue.pop() {
+                            drop(v);
+                        }
                         local_queue.clear();  
                         drop(local_queue); 
                         // we free a token in queue
@@ -300,7 +314,6 @@ fn sketch_and_request_dir_compressedkmer<Kmer:CompressedKmerT + KmerBuilder<Kmer
                 }
             } // end while 
             //
-            log::info!("nb request received for sketching : {}", nb_sketched);
             drop(receive);
             drop(request_sender);
         }); // end of receptor sketcher thread

@@ -3,11 +3,13 @@
 
 use std::time::{SystemTime};
 use cpu_time::ProcessTime;
+use std::time::Duration;
 
 // for multithreading
 use std::sync::Arc;
 use crossbeam_channel::*;
 use concurrent_queue::{ConcurrentQueue, PushError};
+use crossbeam::sync::{Parker};
 
 use serde::{de::DeserializeOwned, Serialize};
 
@@ -221,6 +223,7 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT+KmerBuilder<Kmer>, Ske
             let insertion_queue = Arc::new(ConcurrentQueue::bounded( insertion_block_size));
             let sketching_start_time = SystemTime::now();
             let sketching_start_cpu = ThreadTime::now();
+            let parker: Parker = Parker::new();
             // we can create a new thread for at least nb_bases_thread_threshold bases.
             let nb_bases_thread_threshold : usize = 10_000_000;
             log::info!("threshold number of bases for thread cretaion : {:?}", nb_bases_thread_threshold);
@@ -260,23 +263,32 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT+KmerBuilder<Kmer>, Ske
                         }
                     }
                 }
-                if read_more == false && insertion_queue.len() == 0 {
+                if read_more == false && insertion_queue.len() == 0 && thread_token_sender.len() == 0 {
+                    log::info!("no more read to come, no more data to sketch, no more sketcher running ...");
                     break;
                 }
+                else if read_more == false && insertion_queue.len() == 0 {
+                    // TODO here we just have to wait all thread end, should use a condvar, now we check every second
+                    parker.park_timeout(Duration::from_millis(1000));
+                }
+                //
                 // if insertion_queue is beyond threshold size in number of bases we can go to threaded sketching and threading insertion
-                if !thread_token_sender.is_full() && (nb_base_in_queue > nb_bases_thread_threshold || insertion_queue.is_full()) {
+                if nb_base_in_queue >= nb_bases_thread_threshold || insertion_queue.is_full() || (!read_more && !insertion_queue.is_empty()) {
                     let collect_sender_clone = collect_sender.clone();
                     let sketcher_clone = sketcher.clone();
                     let mut local_queue = Vec::<Vec<IdSeq> >::with_capacity(insertion_queue.len());
                     let q_len = insertion_queue.len();
                     log::debug!("insertion_queue.len() : {}", q_len);
                     for _ in 0..q_len {
+                        let mut nb_popped_bases : usize = 0;
                         let res_pop = insertion_queue.pop();
                         if res_pop.is_ok() {
+                            nb_popped_bases += res_pop.as_ref().unwrap().iter().fold(0, |acc, s| acc + s.get_seq_len());
                             local_queue.push(res_pop.unwrap());
                         }
+                        assert!(nb_base_in_queue >= nb_popped_bases);
+                        nb_base_in_queue -= nb_popped_bases; 
                     }
-                    nb_base_in_queue = 0; 
                     assert!(local_queue.len() > 0);
                     let _ = thread_token_sender.send(1);
                     log::debug!("nb sketching threads running = {:?}", thread_token_sender.len());
@@ -318,8 +330,12 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT+KmerBuilder<Kmer>, Ske
                             }
                         }
                         // cleaning
+                        while let Some(v) = local_queue.pop() {
+                            drop(v);
+                        }
                         local_queue.clear();
                         drop(local_queue); // a precaution as  local_queue has been moved into the thread 
+                        drop(collect_sender_clone);
                         // we free a token in queue
                         let res = thread_token_receiver_cloned.recv();
                         log::debug!("thread_token_receiver_cloned.len = {:?}", thread_token_receiver_cloned.len());
@@ -363,10 +379,8 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT+KmerBuilder<Kmer>, Ske
                         log::debug!("collector received nb_received : {}", nb_received);
                     }
                 }
-                if read_more == false && msg_store.len() == 0 {
-                    break;
-                }
-                if read_more == false || msg_store.len() > insertion_block_size {
+                //
+                if read_more == false || msg_store.len() >= insertion_block_size {
                     log::debug!("inserting block in hnsw, nb new points : {:?}", msg_store.len());
                     let mut data_for_hnsw = Vec::<(&VecSig<Sketcher,Kmer>, usize)>::with_capacity(msg_store.len());
                     for i in 0..msg_store.len() {
