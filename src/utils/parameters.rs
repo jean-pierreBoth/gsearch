@@ -227,8 +227,10 @@ impl ProcessingParams {
 
 /// Some others parameters or io optimization not necessary for reload
 pub struct ComputingParams {
-    /// if nb_files_par is > 0, then we uncopress fasta files in // by blocks of size nb_files_par files
+    /// if nb_files_par is > 1, then we uncopress fasta files in // by blocks of size nb_files_par files
     nb_files_par : usize,
+    /// number of explicit threads for sketcing
+    nb_threads : usize,
     /// set to true when we increase a hnsw database
     adding_mode : bool,
     /// directory containing files to add
@@ -238,18 +240,18 @@ pub struct ComputingParams {
 
 impl Default for ComputingParams {
     fn default() -> Self {
-        ComputingParams{nb_files_par: 0 , adding_mode: false, add_dir : String::from("")}
+        ComputingParams{nb_files_par: 1 , nb_threads : 1, adding_mode: false, add_dir : String::from("")}
     }
 }
 
 
 impl ComputingParams {
-    pub fn new(nb_files_par : usize, adding_mode : bool, add_dir : String) -> Self {
-        ComputingParams{nb_files_par, adding_mode, add_dir}
+    pub fn new(nb_files_par : usize, nb_threads : usize, adding_mode : bool, add_dir : String) -> Self {
+        ComputingParams{nb_files_par, nb_threads, adding_mode, add_dir}
     }
 
     pub fn get_parallel_io(&self) -> bool {
-        let par = if self.nb_files_par > 0 {
+        let par = if self.nb_files_par > 1 {
             true
         }
         else {
@@ -264,6 +266,11 @@ impl ComputingParams {
         self.nb_files_par
     }
 
+    /// returns the number of explicit threads for sketching
+    pub fn get_sketching_nbthread(&self) -> usize {
+        self.nb_threads
+    }
+    
     /// returns true if we are in adding mode
     pub fn get_adding_mode(&self) -> bool {
         self.adding_mode

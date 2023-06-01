@@ -553,6 +553,11 @@ fn main() {
                 .value_name("pio")
                 .value_parser(clap::value_parser!(usize))
                 .help("Parallel IO processing"))
+            .arg(Arg::new("nbthreads")
+                .long("nbthreads")
+                .value_name("nbthreads")
+                .value_parser(clap::value_parser!(usize))
+                .help("nb thread for sketching"))
         .subcommand(tohnsw_cmd)
         .subcommand(add_cmd)
         .subcommand(request_cmd)
@@ -560,8 +565,11 @@ fn main() {
     .get_matches();
 
     // now we fill other parameters : parallel fasta parsing and adding mode in hnsw
-    let nb_files_par: usize = *matches.get_one("pario").unwrap_or(&0usize);
+    let nb_files_par: usize = *matches.get_one("pario").unwrap_or(&1usize);
     println!("parallel io, nb_files_par : {}", nb_files_par);
+
+    let nb_threads: usize = *matches.get_one("nbthreads").unwrap_or(&1usize);
+    println!("parallel sketching, nb_files_par : {}", nb_threads);
 
     //
     let hnsw_dir : String;
@@ -657,7 +665,7 @@ fn main() {
     if  addseq {
         log::info!("adding data from directory : {:?}", add_dir);
     }
-    let computing_params = ComputingParams::new(nb_files_par, addseq, add_dir);
+    let computing_params = ComputingParams::new(nb_files_par, nb_threads, addseq, add_dir);
 
     match cmd {
         CmdType::TOHNSW => {  // nothing to do we must have parsed before
