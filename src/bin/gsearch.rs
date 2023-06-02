@@ -565,11 +565,11 @@ fn main() {
     .get_matches();
 
     // now we fill other parameters : parallel fasta parsing and adding mode in hnsw
-    let nb_files_par: usize = *matches.get_one("pario").unwrap_or(&1usize);
+    let nb_files_par: usize = *matches.get_one("pario").unwrap_or(&0usize);
     println!("parallel io, nb_files_par : {}", nb_files_par);
 
     let nb_threads: usize = *matches.get_one("nbthreads").unwrap_or(&1usize);
-    println!("parallel sketching, nb_files_par : {}", nb_threads);
+    println!("parallel sketching, nb_threads : {}", nb_threads);
 
     //
     let hnsw_dir : String;

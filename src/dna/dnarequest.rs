@@ -68,7 +68,7 @@ fn sketch_and_request_dir_compressedkmer<Kmer:CompressedKmerT + KmerBuilder<Kmer
                 sketcher : Sketcher,
                 filter_params: &FilterParams, seqdict : &SeqDict, 
                 processing_parameters : &ProcessingParams,
-                other_params : &ComputingParams, 
+                computing_params : &ComputingParams, 
                 hnsw : &Hnsw< <Sketcher as SeqSketcherT<Kmer>>::Sig ,DistHamming>, 
                 knbn : usize, ef_search : usize) -> Matcher
 
@@ -101,13 +101,20 @@ fn sketch_and_request_dir_compressedkmer<Kmer:CompressedKmerT + KmerBuilder<Kmer
     // a queue of signature request , size must be sufficient to benefit from threaded probminhash and search
     // but if request files are very large we must not have too many files in memory
     // pario is used also to limit the number of file loaded simultanuously.
-    let request_block_size = match other_params.get_parallel_io() {
-        true => { 2000.min(other_params.get_nb_files_par()) },
+    let request_block_size = match computing_params.get_parallel_io() {
+        true => { 2000.min(computing_params.get_nb_files_par()) },
         _    => { 20 },
     };
+    let pool: rayon::ThreadPool = rayon::ThreadPoolBuilder::new().build().unwrap();
+    let pool_nb_thread = pool.current_num_threads();
+    let mut nb_max_threads = computing_params.get_sketching_nbthread();
+    if nb_max_threads == 0 {
+        nb_max_threads = 1 + request_block_size.min(pool_nb_thread);
+    }
+    log::info!("nb threads in pool : {:?}, using nb threads : {}", pool_nb_thread, nb_max_threads);
     log::debug!("request_block_size : {}", request_block_size);
+    //
     let mut state = ProcessingState::new();
-    
     //
     // Sketcher allocation, we do need reverse complement
     //
@@ -128,11 +135,6 @@ fn sketch_and_request_dir_compressedkmer<Kmer:CompressedKmerT + KmerBuilder<Kmer
     let (request_sender , request_receiver) = 
         crossbeam_channel::bounded::<RequestMsg<<Sketcher as SeqSketcherT<Kmer>>::Sig>>(request_block_size+1);
     //
-    let pool: rayon::ThreadPool = rayon::ThreadPoolBuilder::new().build().unwrap();
-    let pool_nb_thread = pool.current_num_threads();
-    let nb_max_threads = 1 + request_block_size.min(pool_nb_thread);
-    log::info!("nb threads in pool : {:?}, using nb threads : {}", pool_nb_thread, nb_max_threads);
-    //
     // launch process_dir in a thread or async
     //
     pool.scope(|scope| {
@@ -142,8 +144,8 @@ fn sketch_and_request_dir_compressedkmer<Kmer:CompressedKmerT + KmerBuilder<Kmer
             match block_processing {
                 true => {
                     log::info!("dnarequest::sketchandstore_dir_compressedkmer : block processing");
-                    if other_params.get_parallel_io() {
-                        let nb_files_by_group = other_params.get_nb_files_par();
+                    if computing_params.get_parallel_io() {
+                        let nb_files_by_group = computing_params.get_nb_files_par();
                         log::info!("dnarequest::sketchandstore_dir_compressedkmer : calling process_dir_parallel, nb_files in parallel : {}", nb_files_by_group);
                         res_nb_sent = process_dir_parallel(&mut state, &DataType::DNA, request_dirpath, filter_params, 
                                         nb_files_by_group, &process_buffer_in_one_block, &send);
@@ -154,8 +156,8 @@ fn sketch_and_request_dir_compressedkmer<Kmer:CompressedKmerT + KmerBuilder<Kmer
                 },
                 false => {
                     log::info!("request::sketchandstore_dir_compressedkmer : seq by seq processing");
-                    if other_params.get_parallel_io() {
-                        let nb_files_by_group = other_params.get_nb_files_par();
+                    if computing_params.get_parallel_io() {
+                        let nb_files_by_group = computing_params.get_nb_files_par();
                         log::info!("dnarequest::sketchandstore_dir_compressedkmer : calling process_dir_parallel, nb_files in parallel : {}", nb_files_by_group);
                         res_nb_sent = process_dir_parallel(&mut state, &DataType::DNA,  &request_dirpath, filter_params, 
                                 nb_files_by_group, &process_buffer_by_sequence, &send);
