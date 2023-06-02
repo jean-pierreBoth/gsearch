@@ -67,7 +67,7 @@ impl <Sig> CollectMsg<Sig> {
 fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT+KmerBuilder<Kmer>, Sketcher : SeqSketcherT<Kmer>>(hnsw_pb : &PathBuf, sketcher : Sketcher ,
                     filter_params: &FilterParams, 
                     processing_params : &ProcessingParams, 
-                    other_params : &ComputingParams) 
+                    computing_params : &ComputingParams) 
 
         where   Sketcher : SeqSketcherT<Kmer> + Clone + Send + Sync,
                 <Sketcher as SeqSketcherT<Kmer>>::Sig : 'static + Clone + Copy + Send + Sync + Serialize + DeserializeOwned + Debug,
@@ -79,24 +79,32 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT+KmerBuilder<Kmer>, Ske
     log::info!("sketchandstore_dir {}", hnsw_pb.to_str().unwrap());
     let start_t = SystemTime::now();
     let cpu_start: ProcessTime = ProcessTime::now();
-    //
-    let block_processing = processing_params.get_block_flag();
+    // processing parameters, blocked or by sequence , threads , parallel io...
     // a queue of signature waiting to be inserted , size must be sufficient to benefit from threaded probminhash and insert
     // and not too large to spare memory. If parallel_io is set dimension message queue to size of group
     // for files of size more than Gb we must use pario to limit memory, but leave enough msg in queue to get // sketch and insertion 
-    let insertion_block_size = match other_params.get_parallel_io() {
-        true => { 2000.min(other_params.get_nb_files_par()) },
+    // The number of threads must be adapted to memory size when sketching files of size tens of giabytes
+    let block_processing = processing_params.get_block_flag();
+    let insertion_block_size = match computing_params.get_parallel_io() {
+        true => { 2000.min(computing_params.get_nb_files_par()) },
         _    => { 2000 },
     };
+    let pool: rayon::ThreadPool = rayon::ThreadPoolBuilder::new().build().unwrap();
+    let pool_nb_thread = pool.current_num_threads();
+    let mut nb_max_threads = computing_params.get_sketching_nbthread();
+    if nb_max_threads == 0 {
+        nb_max_threads = 1 + insertion_block_size.min(pool_nb_thread);
+    }
     log::debug!("insertion_block_size : {}", insertion_block_size);
+    log::info!("nb threads in pool : {:?}, using nb threads : {}", pool_nb_thread, nb_max_threads);
     //
     let mut hnsw : Hnsw::< <Sketcher as SeqSketcherT<Kmer>>::Sig, DistHamming>;
     let mut state :ProcessingState;
     //
     let toprocess_path : PathBuf;
     //
-    if other_params.get_adding_mode() {
-        let toprocess_str = other_params.get_add_dir();
+    if computing_params.get_adding_mode() {
+        let toprocess_str = computing_params.get_add_dir();
         toprocess_path = PathBuf::from(toprocess_str);
         // in this case we must reload
         log::info!("dnasketch::sketchandstore_dir_compressedkmer will add new data from directory {:?} to hnsw dir {:?}", toprocess_path, hnsw_pb);
@@ -126,13 +134,13 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT+KmerBuilder<Kmer>, Ske
     }
     //
     let mut seqdict : SeqDict;
-    seqdict = get_seqdict(&hnsw_pb, other_params).unwrap();
+    seqdict = get_seqdict(&hnsw_pb, computing_params).unwrap();
     //
     // where do we dump hnsw* seqdict and so on
     // If in add mode we dump where is already an hnsw database
     // If creation mode we dump in .
     //
-    let dump_path= if other_params.get_adding_mode() {
+    let dump_path= if computing_params.get_adding_mode() {
         hnsw_pb.clone()
     } else {
         PathBuf::from(".")
@@ -159,10 +167,6 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT+KmerBuilder<Kmer>, Ske
     let (collect_sender , collect_receiver) = 
             crossbeam_channel::bounded::<CollectMsg<<Sketcher as SeqSketcherT<Kmer>>::Sig>>(insertion_block_size+1);
     //
-    let pool: rayon::ThreadPool = rayon::ThreadPoolBuilder::new().build().unwrap();
-    let pool_nb_thread = pool.current_num_threads();
-    let nb_max_threads = 1 + insertion_block_size.min(pool_nb_thread);
-    log::info!("nb threads in pool : {:?}, using nb threads : {}", pool_nb_thread, nb_max_threads);
 
     // launch process_dir in a thread or async
     pool.scope(|scope| {
@@ -174,8 +178,8 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT+KmerBuilder<Kmer>, Ske
             match block_processing {
                 true => {
                     log::info!("dnasketch::sketchandstore_dir_compressedkmer : block processing");
-                    if other_params.get_parallel_io() {
-                        let nb_files_by_group = other_params.get_nb_files_par();
+                    if computing_params.get_parallel_io() {
+                        let nb_files_by_group = computing_params.get_nb_files_par();
                         log::info!("dnasketch::sketchandstore_dir_compressedkmer : calling process_dir_parallel, nb_files in parallel : {}", nb_files_by_group);
                         res_nb_sent = process_dir_parallel(&mut state, &DataType::DNA,  &toprocess_path, filter_params, 
                                         nb_files_by_group, &process_buffer_in_one_block, &send);
@@ -188,8 +192,8 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT+KmerBuilder<Kmer>, Ske
                 }
                 false => {
                     log::info!("dnasketch::sketchandstore_dir_compressedkmer : seq by seq processing");
-                    if other_params.get_parallel_io() {
-                        let nb_files_by_group = other_params.get_nb_files_par();
+                    if computing_params.get_parallel_io() {
+                        let nb_files_by_group = computing_params.get_nb_files_par();
                         log::info!("dnasketch::sketchandstore_dir_compressedkmer : calling process_dir_parallel, nb_files in parallel : {}", nb_files_by_group);
                         res_nb_sent = process_dir_parallel(&mut state, &DataType::DNA,  &toprocess_path, filter_params, 
                                 nb_files_by_group, &process_buffer_by_sequence, &send);

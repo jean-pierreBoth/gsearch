@@ -240,7 +240,7 @@ pub struct ComputingParams {
 
 impl Default for ComputingParams {
     fn default() -> Self {
-        ComputingParams{nb_files_par: 1 , nb_threads : 1, adding_mode: false, add_dir : String::from("")}
+        ComputingParams{nb_files_par: 0 , nb_threads : 0, adding_mode: false, add_dir : String::from("")}
     }
 }
 
@@ -251,7 +251,7 @@ impl ComputingParams {
     }
 
     pub fn get_parallel_io(&self) -> bool {
-        let par = if self.nb_files_par > 1 {
+        let par = if self.nb_files_par > 0 {
             true
         }
         else {
