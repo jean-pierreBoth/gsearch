@@ -58,12 +58,13 @@ pub fn process_file_by_sequence(pathb : &PathBuf, filter_params : &FilterParams)
         let seqrec = record.expect("invalid record");
         let id = seqrec.id();
         let strid = String::from_utf8(Vec::from(id)).unwrap();
+        let file_seq = seqrec.seq();
         // process sequence if not capsid and not filtered out
-        if strid.find("capsid").is_none() && !filter_params.filter(&seqrec.seq()) {
-            let nb_bases = seqrec.num_bases();
+        if strid.find("capsid").is_none() && !filter_params.filter(&file_seq) {
+            let nb_bases = file_seq.len();
             nb_bases_file += nb_bases;
             let mut new_seq = Sequence::with_capacity(2, nb_bases);
-            new_seq.encode_and_add(&seqrec.seq(), &alphabet2b);
+            new_seq.encode_and_add(&file_seq, &alphabet2b);
             nb_bases_encoded += new_seq.size();
             drop(seqrec);
             // we have DNA seq for now
@@ -114,15 +115,15 @@ pub fn process_buffer_by_sequence(pathb : &PathBuf, bufread : &[u8], filter_para
         let seqrec = record.expect("invalid record");
         let id = seqrec.id();
         let strid = String::from_utf8(Vec::from(id)).unwrap();
+        let file_seq = seqrec.seq();
         // process sequence if not capsid and not filtered out, in block mode we do not filter any at the moment
-        if strid.find("capsid").is_none()  && !filter_params.filter(&seqrec.seq()) {
-            let nb_bases = seqrec.num_bases();
+        if strid.find("capsid").is_none()  && !filter_params.filter(&file_seq) {
+            let nb_bases = file_seq.len();
             nb_bases_file += nb_bases;
             let mut new_seq = Sequence::with_capacity(2, nb_bases);
-            new_seq.encode_and_add(&seqrec.seq(), &alphabet2b);
+            new_seq.encode_and_add(&file_seq, &alphabet2b);
             // some checks , we filter non ACGT so length is less than record
             assert!(new_seq.size() <= nb_bases);
-            assert_eq!(nb_bases, seqrec.seq().len());
             drop(seqrec);
             // we have DNA seq for now
             let nullid = String::from(""); // we will sketch the whole and loose id, so we spare memory
@@ -194,11 +195,12 @@ pub fn process_file_in_one_block(pathb : &PathBuf, filter_params : &FilterParams
         let seqrec = record.expect("invalid record");
         let id = seqrec.id();
         let strid = String::from_utf8(Vec::from(id)).unwrap();
+        let file_seq = seqrec.seq();
         // process sequence if not capsid and not filtered out, in block mode we do not filter any at the moment
-        let _filter = filter_params.filter(&seqrec.seq());
+        let _filter = filter_params.filter(&file_seq);
         if strid.find("capsid").is_none() {
-            nb_bases_file += seqrec.seq().len();
-            new_seq.encode_and_add(&seqrec.seq(), &alphabet2b);
+            nb_bases_file += file_seq.len();
+            new_seq.encode_and_add(&file_seq, &alphabet2b);
             // recall rank is set in process_dir beccause we should a have struct gatheing the 2 functions process_dir and process_file
             if log::log_enabled!(log::Level::Trace) {
                 log::trace!("process_file, nb_sketched {} ", to_sketch.len());
@@ -260,13 +262,14 @@ pub fn process_buffer_in_one_block(pathb : &PathBuf, bufread : &[u8], filter_par
         let seqrec = record.expect("invalid record");
         let id = seqrec.id();
         let strid = String::from_utf8(Vec::from(id)).unwrap();
+        let file_seq = seqrec.seq();
         // process sequence if not capsid and not filtered out, in block mode we do not filter any at the moment
-        let _filter = filter_params.filter(&seqrec.seq());
+        let _filter = filter_params.filter(&file_seq);
         if strid.find("capsid").is_none() {
             // Our Kmers are 2bits encoded so we need to be able to encode sequence in 2 bits, so there is 
             // this hack,  causing reallocation. seqrec.seq is Cow so drain does not seem an option.
-            nb_bases_file += seqrec.seq().len();
-            new_seq.encode_and_add(&seqrec.seq(), &alphabet2b);
+            nb_bases_file += file_seq.len();
+            new_seq.encode_and_add(&file_seq, &alphabet2b);
             if log::log_enabled!(log::Level::Trace) {
                 log::trace!("process_file, nb_sketched {} ", to_sketch.len());
             }

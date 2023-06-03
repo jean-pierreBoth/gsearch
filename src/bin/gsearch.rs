@@ -568,7 +568,7 @@ fn main() {
     let nb_files_par: usize = *matches.get_one("pario").unwrap_or(&0usize);
     println!("parallel io, nb_files_par : {}", nb_files_par);
 
-    let nb_threads: usize = *matches.get_one("nbthreads").unwrap_or(&1usize);
+    let nb_threads: usize = *matches.get_one("nbthreads").unwrap_or(&0usize);
     println!("parallel sketching, nb_threads : {}", nb_threads);
 
     //
