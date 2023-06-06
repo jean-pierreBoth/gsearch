@@ -37,8 +37,6 @@ use crate::aa::aafiles::{process_aafile_in_one_block, process_aabuffer_in_one_bl
 
 use crate::utils::parameters::*;
 
-// Sig is basic item of a signature , VecSig is a vector of such items
-type VecSig<Sketcher, Kmer>  = Vec< <Sketcher as SeqSketcherAAT<Kmer>>::Sig>;
 
 // a type to describe msessage to collector task
 struct CollectMsg<Sig> {
@@ -368,8 +366,6 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT+KmerBuilder<Kmer>, Ske
 
         // a collector task to synchronize access to hnsw and SeqDict
         scope.spawn(|_| {
-            let mut msg_store = Vec::<(VecSig<Sketcher,Kmer>, usize)>::with_capacity(3 * insertion_block_size);
-            let mut itemv =  Vec::<ItemDict>::with_capacity(3 * insertion_block_size);
             let mut dict_size = seqdict.get_nb_entries();
             let mut read_more = true;
             while read_more {
@@ -380,32 +376,16 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT+KmerBuilder<Kmer>, Ske
                                             log::debug!("end of collector reception");
                     }
                     Ok(to_insert) => {
-                        msg_store.push(to_insert.skecth_and_rank);
-                        itemv.push(to_insert.item);
-                        nb_received += 1;
-                        log::debug!("collector received nb_received : {}", nb_received);
-                    }
-                }
-                //
-                if read_more == false || msg_store.len() >= insertion_block_size {
-                    log::debug!("inserting block in hnsw, nb new points : {:?}", msg_store.len());
-                    let mut data_for_hnsw = Vec::<(&VecSig<Sketcher,Kmer>, usize)>::with_capacity(msg_store.len());
-                    for i in 0..msg_store.len() {
-                        log::debug!("inserting data id(filerank) : {}, itemdict : {}", msg_store[i].1, itemv[i].get_id().get_path());
-                        // due to threading file arrive in random order, so it this thread responsability to affect id in dictionary
-                        // otherwise we must introduce an indexmap in SeqDict
-                        data_for_hnsw.push((&msg_store[i].0, dict_size));
+                        hnsw.insert((&to_insert.skecth_and_rank.0, dict_size));
+                        seqdict.0.push(to_insert.item);
                         dict_size += 1;
+                        nb_received += 1;
+                        log::debug!("collector received nb_received : {}, receiver len : {}", nb_received, collect_receiver.len());
                     }
-                    hnsw.parallel_insert(&data_for_hnsw);  
-                    seqdict.0.append(&mut itemv); 
-                    assert_eq!( seqdict.get_nb_entries(), hnsw.get_nb_point());
-                    log::debug!(" dictionary size : {} hnsw nb points : {}", seqdict.get_nb_entries(), hnsw.get_nb_point());
-                    msg_store.clear();
-                    itemv.clear();
                 }
             }
             //
+            assert_eq!(seqdict.get_nb_entries(), hnsw.get_nb_point());
             log::debug!("collector thread dumping hnsw , received nb_received : {}", nb_received);
             let _ = dumpall(dump_path_ref, &hnsw, &seqdict, &processing_params);
         }); // end of collector thread
