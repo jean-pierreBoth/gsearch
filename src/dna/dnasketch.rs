@@ -39,9 +39,6 @@ use crate::dna::dnafiles::{process_file_in_one_block, process_file_by_sequence, 
 use crate::utils::parameters::*;
 
 
-// Sig is basic item of a signature , VecSig is a vector of such items
-type VecSig<Sketcher, Kmer>  = Vec< <Sketcher as SeqSketcherT<Kmer>>::Sig>;
-
 
 // a type to describe msessage to collector task
 
@@ -384,9 +381,9 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT+KmerBuilder<Kmer>, Ske
         }); // end of sketcher thread
 
         // a collector task to synchronize access to hnsw and SeqDict
+        // Note that doing parallel insertion requires a new thread that put us on scheduling dependance and can cause deadlock!!!
+        // so we insert at each msh received!
         scope.spawn(|_| {
-//            let mut msg_store = Vec::<(VecSig<Sketcher,Kmer>, usize)>::with_capacity(2 * insertion_block_size);
-//            let mut itemv =  Vec::<ItemDict>::with_capacity(2 * insertion_block_size);
             let mut dict_size = seqdict.get_nb_entries();
             let mut read_more = true;
             while read_more {
@@ -404,27 +401,9 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT+KmerBuilder<Kmer>, Ske
                         log::debug!("collector received nb_received : {}, receiver len : {}", nb_received, collect_receiver.len());
                     }
                 }
-                /* 
-                if read_more == false || msg_store.len() >= insertion_block_size {
-                    log::debug!("inserting block in hnsw, nb new points : {:?}", msg_store.len());
-                    let mut data_for_hnsw = Vec::<(&VecSig<Sketcher,Kmer>, usize)>::with_capacity(msg_store.len());
-                    for i in 0..msg_store.len() {
-                        log::debug!("inserting data id(filerank) : {}, itemdict : {}", msg_store[i].1, itemv[i].get_id().get_path());
-                        // due to threading file arrive in random order, so it this thread responsability to affect id in dictionary
-                        // otherwise we must introduce an indexmap in SeqDict
-                        data_for_hnsw.push((&msg_store[i].0, dict_size));
-                        dict_size += 1;
-                    }
-                    hnsw.parallel_insert(&data_for_hnsw);  
-                    seqdict.0.append(&mut itemv); 
-                    assert_eq!( seqdict.get_nb_entries(), hnsw.get_nb_point());
-                    log::debug!(" dictionary size : {} hnsw nb points : {}", seqdict.get_nb_entries(), hnsw.get_nb_point());
-                    msg_store.clear();
-                    itemv.clear();
-                }
-                */
             }
             //
+            assert_eq!(seqdict.get_nb_entries(), hnsw.get_nb_point());
             log::debug!("collector thread dumping hnsw , received nb_received : {}", nb_received);
             let _ = dumpall(dump_path_ref, &hnsw, &seqdict, &processing_params);
         }); // end of collector thread
