@@ -326,6 +326,7 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT+KmerBuilder<Kmer>, Ske
                                 let signatures = sketcher_clone.sketch_compressedkmer(&sequencegroup_ref, kmer_hash_fn);
                                 let seq_rank :  Vec<usize> = local_queue.iter().map(|v| v[0].get_filerank()).collect();
                                 assert_eq!(signatures.len(), seq_rank.len(), "signatures len != seq rank len");
+                                log::debug!("sending signatures : {}", signatures.len());
                                 for i in 0..signatures.len() {
                                     let item: ItemDict = ItemDict::new(Id::new(local_queue[i][0].get_path(), local_queue[i][0].get_fasta_id()), local_queue[i][0].get_seq_len());
                                     let msg = CollectMsg::new((signatures[i].clone(), seq_rank[i]), item);
@@ -384,8 +385,8 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT+KmerBuilder<Kmer>, Ske
 
         // a collector task to synchronize access to hnsw and SeqDict
         scope.spawn(|_| {
-            let mut msg_store = Vec::<(VecSig<Sketcher,Kmer>, usize)>::with_capacity(2 * insertion_block_size);
-            let mut itemv =  Vec::<ItemDict>::with_capacity(2 * insertion_block_size);
+//            let mut msg_store = Vec::<(VecSig<Sketcher,Kmer>, usize)>::with_capacity(2 * insertion_block_size);
+//            let mut itemv =  Vec::<ItemDict>::with_capacity(2 * insertion_block_size);
             let mut dict_size = seqdict.get_nb_entries();
             let mut read_more = true;
             while read_more {
@@ -396,12 +397,14 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT+KmerBuilder<Kmer>, Ske
                                             log::debug!("end of collector reception");
                     }
                     Ok(to_insert) => {
-                        msg_store.push(to_insert.skecth_and_rank);
-                        itemv.push(to_insert.item);
+                        hnsw.insert((&to_insert.skecth_and_rank.0, dict_size));
+                        seqdict.0.push(to_insert.item);
+                        dict_size += 1;
                         nb_received += 1;
-                        log::debug!("collector received nb_received : {}", nb_received);
+                        log::debug!("collector received nb_received : {}, receiver len : {}", nb_received, collect_receiver.len());
                     }
                 }
+                /* 
                 if read_more == false || msg_store.len() >= insertion_block_size {
                     log::debug!("inserting block in hnsw, nb new points : {:?}", msg_store.len());
                     let mut data_for_hnsw = Vec::<(&VecSig<Sketcher,Kmer>, usize)>::with_capacity(msg_store.len());
@@ -419,6 +422,7 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT+KmerBuilder<Kmer>, Ske
                     msg_store.clear();
                     itemv.clear();
                 }
+                */
             }
             //
             log::debug!("collector thread dumping hnsw , received nb_received : {}", nb_received);
