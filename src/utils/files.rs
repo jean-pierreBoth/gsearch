@@ -178,8 +178,6 @@ pub fn process_dir(state : &mut ProcessingState, datatype: &DataType, dir: &Path
         } // end of check on datatype
     } // end of for 
     //
-    drop(sender);
-    //
     Ok(nb_sent + state.nb_file - nb_files_at_entry)
 }  // end of process_dirs
 
@@ -349,8 +347,6 @@ pub(crate) fn process_dir_parallel_rec(state : &mut ProcessingState, datatype: &
     // in fact in gtdb we have only one pure file in bottom directories!!! so this is useful only to realize it or in other cases.
     log::debug!("process_dir_parallel got nb entries dir : {:?} nb_entries : {}", dir, nb_entries);
     //
-    drop(sender);
-    //    
     Ok(nb_sent)
 }  // end of process_dir_parallel_rec
 
