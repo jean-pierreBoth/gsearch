@@ -44,8 +44,7 @@
 //! 
 //!     * \--ef optional integer value to optimize hnsw structure creation (default to 400)  
 //! 
-//!     * \--seq if we want a processing by sequences. Default is to concatenate all sequences in a file
-//!             in a large sequence.
+//!     * \--block if we want a processing by concatenating sequences each file will be concatenating in a large sequence.(default is seq by seq)
 //!  
 //! 
 //! 2. ### sub command **add**  --hnsw \[-b\] hnsw_dir --new \[-n\] directory
@@ -235,14 +234,13 @@ fn parse_tohnsw_cmd(matches : &ArgMatches) -> Result<(String, ProcessingParams),
     let ef_construction = matches.get_one("ef_construct").unwrap_or(&ef_construction_default);      
     println!("ef construction parameters in hnsw construction {}", ef_construction);
     
-    let seq_flag = matches.get_flag("seq");
-    if seq_flag {
-        log::info!("setting seq flag true, block = false, will process files seq by seq");
+    let block_processing = matches.get_flag("block");
+    if block_processing {
+        log::info!("setting block flag true, block = true, will process files by concatenating seqs of file");
     }
     else {
-        log::info!("setting seq flag false, block = true, will process by concatenating seqs of file");
+        log::info!("no block flag , will process file sequence by sequences");
     }
-    let block_processing = !seq_flag;
     //
     let data_t = if matches.contains_id("aa_opt") {
         println!("aa option , processing of AA sequences");
@@ -462,10 +460,10 @@ fn main() {
             .default_missing_value("true")
             .help("Specificy amino acid processing, require no value")
         )
-        .arg(Arg::new("seq")
-            .long("seq")
+        .arg(Arg::new("block")
+            .long("block")
             .action(clap::ArgAction::SetTrue)
-            .help("--seq : sketching is done without concatenating sequences")
+            .help("--block : sketching is done concatenating sequences")
     );
 
 
@@ -566,10 +564,14 @@ fn main() {
 
     // now we fill other parameters : parallel fasta parsing and adding mode in hnsw
     let nb_files_par: usize = *matches.get_one("pario").unwrap_or(&0usize);
-    println!("parallel io, nb_files_par : {}", nb_files_par);
+    if nb_files_par > 0 {
+        println!("command got : parallel io, nb_files_par : {}", nb_files_par);
+    }
 
     let nb_threads: usize = *matches.get_one("nbthreads").unwrap_or(&0usize);
-    println!("parallel sketching, nb_threads : {}", nb_threads);
+    if nb_threads > 0 {
+        println!("command got : parallel sketching, nb_threads : {}", nb_threads);
+    }
 
     //
     let hnsw_dir : String;
