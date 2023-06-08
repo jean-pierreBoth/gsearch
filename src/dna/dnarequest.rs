@@ -452,24 +452,27 @@ pub fn get_sequence_matcher(request_params : &RequestParams, processing_params :
             }
             hll_params.set_m(sketch_params.get_sketch_size());
             //
+            let hll_seqs_threading = HllSeqsThreading::default();
+            log::info!("HllSeqsThreading : {:?}", hll_seqs_threading);
+            //
             match sketch_params.get_kmer_size() {
                 0..=14 => {
                     let hnsw = reloadhnsw::reload_hnsw::< <HyperLogLogSketch<Kmer32bit, u16> as SeqSketcherT<Kmer32bit> >::Sig >(database_dirpath)?;
-                    let sketcher = HyperLogLogSketch::<Kmer32bit, u16>::new(sketch_params, hll_params);
+                    let sketcher = HyperLogLogSketch::<Kmer32bit, u16>::new(sketch_params, hll_params, hll_seqs_threading);
                     matcher = sketch_and_request_dir_compressedkmer::<Kmer32bit, HyperLogLogSketch::<Kmer32bit, u16> >(&request_dirpath, sketcher, 
                         &filter_params, &seqdict, &processing_params, &computing_params,
                         &hnsw, nbng as usize, ef_search);
                 }
                 17..=32 => {
                     let hnsw = reloadhnsw::reload_hnsw::< <HyperLogLogSketch<Kmer64bit, u16> as SeqSketcherT<Kmer64bit> >::Sig >(database_dirpath)?;
-                    let sketcher = HyperLogLogSketch::<Kmer64bit, u16>::new(sketch_params, hll_params);
+                    let sketcher = HyperLogLogSketch::<Kmer64bit, u16>::new(sketch_params, hll_params, hll_seqs_threading);
                     matcher = sketch_and_request_dir_compressedkmer::<Kmer64bit, HyperLogLogSketch::<Kmer64bit, u16> >(&request_dirpath, sketcher, 
                         &filter_params, &seqdict, &processing_params, &computing_params,
                         &hnsw, nbng as usize, ef_search);
                 }
                 16 => {
                     let hnsw = reloadhnsw::reload_hnsw::< <HyperLogLogSketch<Kmer16b32bit, u16> as SeqSketcherT<Kmer16b32bit> >::Sig >(database_dirpath)?;
-                    let sketcher = HyperLogLogSketch::<Kmer16b32bit, u16>::new(sketch_params, hll_params);
+                    let sketcher = HyperLogLogSketch::<Kmer16b32bit, u16>::new(sketch_params, hll_params, hll_seqs_threading);
                     matcher = sketch_and_request_dir_compressedkmer::<Kmer16b32bit, HyperLogLogSketch::<Kmer16b32bit, u16> >(&request_dirpath, sketcher, 
                         &filter_params, &seqdict, &processing_params, &computing_params,
                         &hnsw, nbng as usize, ef_search); 

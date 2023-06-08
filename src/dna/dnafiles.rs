@@ -68,8 +68,16 @@ pub fn process_file_by_sequence(pathb : &PathBuf, filter_params : &FilterParams)
             nb_bases_encoded += new_seq.size();
             drop(seqrec);
             // we have DNA seq for now
-            let nullid = String::from(""); // we will sketch the whole and loose id, so we spare memory
-            let seqwithid = IdSeq::new(pathb.to_str().unwrap().to_string(), nullid,SequenceType::SequenceDNA(new_seq));
+            // we encode path only fo the first seq. For files with hundreds millions of seq , memory 
+            let nullstr = String::from(""); // we will sketch the whole and loose id, so we spare memory
+            let path = if to_sketch.len() == 0 {
+                pathb.to_str().unwrap().to_string()
+            }
+            else {
+                nullstr.clone()
+            };            
+            // we will sketch the whole and loose fasta id, so we spare memory
+            let seqwithid = IdSeq::new(path, nullstr,SequenceType::SequenceDNA(new_seq));
             to_sketch.push(seqwithid);
             if log::log_enabled!(log::Level::Trace) {
                 log::trace!("process_file, nb_sketched {} ", to_sketch.len());
@@ -126,9 +134,17 @@ pub fn process_buffer_by_sequence(pathb : &PathBuf, bufread : &[u8], filter_para
             assert!(new_seq.size() <= nb_bases);
             drop(seqrec);
             // we have DNA seq for now
-            let nullid = String::from(""); // we will sketch the whole and loose id, so we spare memory
             nb_bases_encoded += new_seq.size();
-            let seqwithid = IdSeq::new(pathb.to_str().unwrap().to_string(), nullid,SequenceType::SequenceDNA(new_seq));
+            // we encode path only fo the first seq. For files with hundreds millions of seq , memory 
+            let nullstr = String::from(""); 
+            let path = if to_sketch.len() == 0 {
+                pathb.to_str().unwrap().to_string()
+            }
+            else {
+                nullstr.clone()
+            };
+            // we will sketch the whole and loose fasta id, so we spare memory
+            let seqwithid = IdSeq::new(path, nullstr,SequenceType::SequenceDNA(new_seq));
             to_sketch.push(seqwithid);
         }
     }

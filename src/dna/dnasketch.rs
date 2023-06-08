@@ -25,7 +25,7 @@ use hnsw_rs::prelude::*;
 
 
 use kmerutils::base::{kmergenerator::*, Kmer32bit, Kmer64bit, CompressedKmerT};
-use kmerutils::sketching::seqsketchjaccard::{SeqSketcherT, ProbHash3aSketch, SuperHashSketch, HyperLogLogSketch, SuperHash2Sketch};
+use kmerutils::sketching::seqsketchjaccard::*;
 use kmerutils::sketcharg::DataType;
 
 use probminhash::{setsketcher::SetSketchParams};
@@ -159,7 +159,9 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT+KmerBuilder<Kmer>, Ske
     let mut nb_sent : usize = 0;       // this variable is moved in sender  io thread
     let mut nb_received : usize = 0;   // this variable is moved in collector thread!
     // to send IdSeq to sketch from reading thread to sketcher thread
-    let (send, receive) = crossbeam_channel::bounded::<Vec<IdSeq>>(insertion_block_size);
+    // capacity not too large beccause of memory. If data is large cpu takes more time
+    // than reading. The sketching queue is more important 
+    let (send, receive) = crossbeam_channel::bounded::<Vec<IdSeq>>(1.max(insertion_block_size/ 3));
     // to send sketch result to a collector task
     let (collect_sender , collect_receiver) = 
             crossbeam_channel::bounded::<CollectMsg<<Sketcher as SeqSketcherT<Kmer>>::Sig>>(insertion_block_size+1);
@@ -499,20 +501,25 @@ pub fn dna_process_tohnsw(dirpath : &PathBuf, filter_params : &FilterParams, pro
             if hll_params.get_m() < sketchparams.get_sketch_size() as u64 {
                 log::warn!("!!!!!!!!!!!!!!!!!!!  need to adjust hll parameters!");
             }
+            // to be computed we need thread_pool size but we have the sketching thread parameter in ComputingParams
+            let nb_iter_thtreads = 5;
             hll_params.set_m(sketchparams.get_sketch_size());
+            let hll_seqs_threading = HllSeqsThreading::new(nb_iter_thtreads, 10_000_000);
+            log::debug!("rayon max number of threads : {}", nb_max_thread);
+            log::info!("HllSeqsThreading : {:?}", hll_seqs_threading);
             if kmer_size <= 14 {
                 // allocated the correct sketcher
-                let sketcher = HyperLogLogSketch::<Kmer32bit, u16>::new(sketchparams, hll_params);
+                let sketcher = HyperLogLogSketch::<Kmer32bit, u16>::new(sketchparams, hll_params, hll_seqs_threading);
                 sketchandstore_dir_compressedkmer::<Kmer32bit, HyperLogLogSketch::<Kmer32bit, u16> >(&dirpath, sketcher, 
                             &filter_params, &processing_parameters, others_params);
             }
             else if kmer_size == 16 {
-                let sketcher = HyperLogLogSketch::<Kmer16b32bit, u16>::new(sketchparams, hll_params);
+                let sketcher = HyperLogLogSketch::<Kmer16b32bit, u16>::new(sketchparams, hll_params, hll_seqs_threading);
                 sketchandstore_dir_compressedkmer::<Kmer16b32bit, HyperLogLogSketch::<Kmer16b32bit, u16>>(&dirpath, sketcher, 
                             &filter_params, &processing_parameters, others_params);
             }
             else if  kmer_size <= 32 {
-                let sketcher = HyperLogLogSketch::<Kmer64bit, u16>::new(sketchparams, hll_params);
+                let sketcher = HyperLogLogSketch::<Kmer64bit, u16>::new(sketchparams, hll_params, hll_seqs_threading);
                 sketchandstore_dir_compressedkmer::<Kmer64bit, HyperLogLogSketch::<Kmer64bit, u16>>(&dirpath, sketcher, 
                             &filter_params, &processing_parameters, others_params);
             }
