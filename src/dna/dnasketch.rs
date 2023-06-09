@@ -25,7 +25,7 @@ use hnsw_rs::prelude::*;
 
 
 use kmerutils::base::{kmergenerator::*, Kmer32bit, Kmer64bit, CompressedKmerT};
-use kmerutils::sketching::seqsketchjaccard::*;
+use kmerutils::sketching::{setsketchert::*};
 use kmerutils::sketcharg::DataType;
 
 use probminhash::{setsketcher::SetSketchParams};
@@ -501,11 +501,13 @@ pub fn dna_process_tohnsw(dirpath : &PathBuf, filter_params : &FilterParams, pro
             if hll_params.get_m() < sketchparams.get_sketch_size() as u64 {
                 log::warn!("!!!!!!!!!!!!!!!!!!!  need to adjust hll parameters!");
             }
-            // to be computed we need thread_pool size but we have the sketching thread parameter in ComputingParams
-            let nb_iter_thtreads = 5;
             hll_params.set_m(sketchparams.get_sketch_size());
+            // we need number of threads of cpu and we have the sketching thread parameter in ComputingParams
+            // if memory limits the number of sketching threads, we will use more in iterators.
+            let nb_cpus = num_cpus::get();
+            log::info!("nb cpus : {}", nb_cpus);
+            let nb_iter_thtreads = ((nb_cpus.max(4) - 4) / others_params.get_sketching_nbthread()).max(1);
             let hll_seqs_threading = HllSeqsThreading::new(nb_iter_thtreads, 10_000_000);
-            log::debug!("rayon max number of threads : {}", nb_max_thread);
             log::info!("HllSeqsThreading : {:?}", hll_seqs_threading);
             if kmer_size <= 14 {
                 // allocated the correct sketcher

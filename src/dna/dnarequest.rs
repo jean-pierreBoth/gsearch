@@ -27,7 +27,7 @@ use fxhash::*;
 use hnsw_rs::prelude::*;
 
 use kmerutils::base::{kmergenerator::*, Kmer32bit, Kmer64bit, CompressedKmerT};
-use kmerutils::sketching::seqsketchjaccard::*;
+use kmerutils::sketching::{setsketchert::*};
 
 use probminhash::{setsketcher::SetSketchParams};
 
@@ -452,7 +452,10 @@ pub fn get_sequence_matcher(request_params : &RequestParams, processing_params :
             }
             hll_params.set_m(sketch_params.get_sketch_size());
             //
-            let hll_seqs_threading = HllSeqsThreading::default();
+            let nb_cpus = num_cpus::get();
+            log::info!("nb cpus : {}", nb_cpus);
+            let nb_iter_thtreads = ((nb_cpus.max(4) - 4) / computing_params.get_sketching_nbthread()).max(1);
+            let hll_seqs_threading = HllSeqsThreading::new(nb_iter_thtreads, 10_000_000);
             log::info!("HllSeqsThreading : {:?}", hll_seqs_threading);
             //
             match sketch_params.get_kmer_size() {

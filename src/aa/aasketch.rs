@@ -25,7 +25,7 @@ use probminhash::{setsketcher::SetSketchParams};
 
 use kmerutils::base::kmertraits::*;
 use kmerutils::aautils::kmeraa::*;
-use kmerutils::aautils::seqsketchjaccard::{SeqSketcherAAT, ProbHash3aSketch, SuperHashSketch, HyperLogLogSketch};
+use kmerutils::aautils::setsketchert::*;
 use kmerutils::sketcharg::DataType;
 
 use crate::utils::{idsketch::*, reloadhnsw};
@@ -449,13 +449,17 @@ pub fn aa_process_tohnsw(dirpath : &PathBuf, filter_params : &FilterParams, proc
                 log::warn!("!!!!!!!!!!!!!!!!!!!  need to adjust hll parameters!");
             }
             hll_params.set_m(sketch_params.get_sketch_size());
+            let nb_cpus = num_cpus::get();
+            log::info!("nb cpus : {}", nb_cpus);
+            let nb_iter_thtreads = ((nb_cpus.max(4) - 4) / others_params.get_sketching_nbthread()).max(1);
+            let hll_seqs_threading = HllSeqsThreading::new(nb_iter_thtreads, 10_000_000);
             //
             if kmer_size <= 6 {
-                let sketcher = HyperLogLogSketch::<KmerAA32bit, u16>::new(sketch_params, hll_params);
+                let sketcher = HyperLogLogSketch::<KmerAA32bit, u16>::new(sketch_params, hll_params, hll_seqs_threading);
                 sketchandstore_dir_compressedkmer::<KmerAA32bit, HyperLogLogSketch::<KmerAA32bit, u16>>(&dirpath, sketcher, &filter_params, &processing_parameters, others_params);
             }
             else if kmer_size <= 12 {
-                let sketcher =  HyperLogLogSketch::<KmerAA64bit, u16>::new(sketch_params, hll_params);
+                let sketcher =  HyperLogLogSketch::<KmerAA64bit, u16>::new(sketch_params, hll_params, hll_seqs_threading);
                 sketchandstore_dir_compressedkmer::<KmerAA64bit, HyperLogLogSketch::<KmerAA64bit, u16>>(&dirpath, sketcher, &filter_params, &processing_parameters, others_params);                
             }
             else {
