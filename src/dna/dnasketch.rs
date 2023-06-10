@@ -90,7 +90,7 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT+KmerBuilder<Kmer>, Ske
     let pool_nb_thread = pool.current_num_threads();
     let mut nb_max_threads = computing_params.get_sketching_nbthread();
     if nb_max_threads == 0 {
-        nb_max_threads = 1 + insertion_block_size.min(pool_nb_thread);
+        nb_max_threads = insertion_block_size.min(pool_nb_thread).max(1);
     }
     log::debug!("insertion_block_size : {}", insertion_block_size);
     log::info!("nb threads in pool : {:?}, using nb threads : {}", pool_nb_thread, nb_max_threads);
