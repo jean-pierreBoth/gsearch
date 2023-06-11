@@ -161,7 +161,7 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT+KmerBuilder<Kmer>, Ske
     // to send IdSeq to sketch from reading thread to sketcher thread
     // capacity not too large beccause of memory. If data is large cpu takes more time
     // than reading. The sketching queue is more important 
-    let (send, receive) = crossbeam_channel::bounded::<Vec<IdSeq>>(1.max(insertion_block_size/ 3));
+    let (send, receive) = crossbeam_channel::bounded::<Vec<IdSeq>>(1.max(insertion_block_size));
     // to send sketch result to a collector task
     let (collect_sender , collect_receiver) = 
             crossbeam_channel::bounded::<CollectMsg<<Sketcher as SeqSketcherT<Kmer>>::Sig>>(insertion_block_size+1);
