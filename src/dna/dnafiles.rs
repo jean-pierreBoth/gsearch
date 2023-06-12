@@ -132,7 +132,6 @@ pub fn process_buffer_by_sequence(pathb : &PathBuf, bufread : &[u8], filter_para
             new_seq.encode_and_add(&file_seq, &alphabet2b);
             // some checks , we filter non ACGT so length is less than record
             assert!(new_seq.size() <= nb_bases);
-            drop(seqrec);
             // we have DNA seq for now
             nb_bases_encoded += new_seq.size();
             // we encode path only fo the first seq. For files with hundreds millions of seq , memory 
