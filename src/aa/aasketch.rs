@@ -99,7 +99,7 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT+KmerBuilder<Kmer>, Ske
         let toprocess_str = computing_params.get_add_dir();
         toprocess_path = PathBuf::from(toprocess_str);
         // in this case we must reload
-        log::info!("dnasketch::sketchandstore_dir_compressedkmer will add new data from directory {:?} to hnsw dir {:?}", toprocess_path, hnsw_pb);
+        log::info!("aasketch::sketchandstore_dir_compressedkmer will add new data from directory {:?} to hnsw dir {:?}", toprocess_path, hnsw_pb);
         let hnsw_opt = reloadhnsw::reload_hnsw(&hnsw_pb);
         if hnsw_opt.is_err() {
             log::error!("cannot reload hnsw from directory : {:?}", &hnsw_pb);
@@ -113,7 +113,7 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT+KmerBuilder<Kmer>, Ske
             state = reload_res.unwrap();
         }
         else {
-            log::error!("dnasketch::cannot reload processing state (file 'processing_state.json' from directory : {:?}", &hnsw_pb);
+            log::error!("aasketch::cannot reload processing state (file 'processing_state.json' from directory : {:?}", &hnsw_pb);
             std::process::exit(1);           
         }
     } 
@@ -173,30 +173,30 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT+KmerBuilder<Kmer>, Ske
             let res_nb_sent;
             match block_processing {
                 true => {
-                    log::info!("dnasketch::sketchandstore_dir_compressedkmer : block processing");
+                    log::info!("aasketch::sketchandstore_dir_compressedkmer : block processing");
                     if computing_params.get_parallel_io() {
                         let nb_files_by_group = computing_params.get_nb_files_par();
-                        log::info!("dnasketch::sketchandstore_dir_compressedkmer : calling process_dir_parallel, nb_files in parallel : {}", nb_files_by_group);
-                        res_nb_sent = process_dir_parallel(&mut state, &DataType::DNA,  &toprocess_path, filter_params, 
+                        log::info!("aasketch::sketchandstore_dir_compressedkmer : calling process_dir_parallel, nb_files in parallel : {}", nb_files_by_group);
+                        res_nb_sent = process_dir_parallel(&mut state, &DataType::AA,  &toprocess_path, filter_params, 
                                         nb_files_by_group, &process_aabuffer_in_one_block, &send);
                     } // end case parallel io
                     else {
-                        log::info!("dnasketch::sketchandstore_dir_compressedkmer : calling process_dir serial");
-                        res_nb_sent = process_dir(&mut state, &DataType::DNA, &toprocess_path, filter_params, 
+                        log::info!("aasketch::sketchandstore_dir_compressedkmer : calling process_dir serial");
+                        res_nb_sent = process_dir(&mut state, &DataType::AA, &toprocess_path, filter_params, 
                                         &process_aafile_in_one_block, &send);
                     }                
                 }
                 false => {
-                    log::info!("dnasketch::sketchandstore_dir_compressedkmer : seq by seq processing");
+                    log::info!("aasketch::sketchandstore_dir_compressedkmer : seq by seq processing");
                     if computing_params.get_parallel_io() {
                         let nb_files_by_group = computing_params.get_nb_files_par();
-                        log::info!("dnasketch::sketchandstore_dir_compressedkmer : calling process_dir_parallel, nb_files in parallel : {}", nb_files_by_group);
-                        res_nb_sent = process_dir_parallel(&mut state, &DataType::DNA,  &toprocess_path, filter_params, 
+                        log::info!("aasketch::sketchandstore_dir_compressedkmer : calling process_dir_parallel, nb_files in parallel : {}", nb_files_by_group);
+                        res_nb_sent = process_dir_parallel(&mut state, &DataType::AA,  &toprocess_path, filter_params, 
                                 nb_files_by_group, &process_aabuffer_by_sequence, &send);
                     }
                     else {
                         log::info!("processing by sequence, sketching whole file globally");
-                        res_nb_sent = process_dir(&mut state, &DataType::DNA, &toprocess_path, filter_params,
+                        res_nb_sent = process_dir(&mut state, &DataType::AA, &toprocess_path, filter_params,
                                      &process_aafile_by_sequence, &send);
                     }
                 }                
@@ -291,6 +291,7 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT+KmerBuilder<Kmer>, Ske
                             nb_popped_bases += res_pop.as_ref().unwrap().iter().fold(0, |acc, s| acc + s.get_seq_len());
                             local_queue.push(res_pop.unwrap());
                         }
+                        log::debug!("nb_base_in_queue : {}, nb_popped_bases : {}", nb_base_in_queue, nb_popped_bases);
                         assert!(nb_base_in_queue >= nb_popped_bases);
                         nb_base_in_queue -= nb_popped_bases; 
                     }
@@ -366,8 +367,14 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT+KmerBuilder<Kmer>, Ske
 
         // a collector task to synchronize access to hnsw and SeqDict
         scope.spawn(|_| {
+            type VecSig<SeqSketcher, Kmer>  = Vec< <SeqSketcher as SeqSketcherAAT<Kmer>>::Sig>;
+            let store_size = 100_000;
+            let mut msg_store = Vec::<(VecSig<Sketcher,Kmer>, usize)>::with_capacity(store_size);
+            let mut itemv =  Vec::<ItemDict>::with_capacity(store_size);
+            //
             let mut dict_size = seqdict.get_nb_entries();
             let mut read_more = true;
+            //
             while read_more {
                 // try read, if error is Disconnected we stop read and both threads are finished.
                 let res_receive = collect_receiver.recv();
@@ -376,15 +383,43 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT+KmerBuilder<Kmer>, Ske
                                             log::debug!("end of collector reception");
                     }
                     Ok(to_insert) => {
-                        hnsw.insert((&to_insert.skecth_and_rank.0, dict_size));
-                        seqdict.0.push(to_insert.item);
-                        dict_size += 1;
+                        msg_store.push(to_insert.skecth_and_rank);
+                        itemv.push(to_insert.item);
                         nb_received += 1;
                         log::debug!("collector received nb_received : {}, receiver len : {}", nb_received, collect_receiver.len());
                     }
                 }
+                // we defer all insertion (only!!) at end of sketching as we observed scheduling problem between // iter and threads
+                if read_more == false {
+                    let insertion_start_time = SystemTime::now();
+                    let insertion_cpu_start: ProcessTime = ProcessTime::now();
+                    log::debug!("inserting block in hnsw, nb new points : {:?}", msg_store.len());
+                    let mut data_for_hnsw = Vec::<(&VecSig<Sketcher,Kmer>, usize)>::with_capacity(msg_store.len());
+                    for i in 0..msg_store.len() {
+                        log::debug!("inserting data id(filerank) : {}, itemdict : {}", msg_store[i].1, itemv[i].get_id().get_path());
+                        // due to threading file arrive in random order, so it this thread responsability to affect id in dictionary
+                        // otherwise we must introduce an indexmap in SeqDict
+                        data_for_hnsw.push((&msg_store[i].0, dict_size));
+                        dict_size += 1;
+                    }
+                    log::info!("parallel insertion ...");
+                    hnsw.parallel_insert(&data_for_hnsw);
+                    log::info!("parallel insert done");  
+                    seqdict.0.append(&mut itemv); 
+                    assert_eq!( seqdict.get_nb_entries(), hnsw.get_nb_point());
+                    // information on how time is spent
+                    let thread_cpu_time = insertion_cpu_start.try_elapsed();
+                    if thread_cpu_time.is_ok() {
+                        log::info!("hnsw insertion processed in  system time(s) : {}, cpu time(s) : {}", 
+                            insertion_start_time.elapsed().unwrap().as_secs(), thread_cpu_time.unwrap().as_secs());
+                    }
+                    log::debug!(" dictionary size : {} hnsw nb points : {}", seqdict.get_nb_entries(), hnsw.get_nb_point());
+                    msg_store.clear();
+                    itemv.clear();
+                }
             }
             //
+            assert_eq!(nb_received, seqdict.get_nb_entries());
             assert_eq!(seqdict.get_nb_entries(), hnsw.get_nb_point());
             log::debug!("collector thread dumping hnsw , received nb_received : {}", nb_received);
             let _ = dumpall(dump_path_ref, &hnsw, &seqdict, &processing_params);

@@ -26,9 +26,9 @@
 //! 
 //! * ask neighbourhood statistics in the database and possibly ask for an embedding.  
 //!  
-//! 1. ### subcommand  [--pio number] **tohnsw** [--aa]  --dir [-d] dir  --sketch [-s] size  --kmer kmersize  --algo name --nbng [-n] nb   --ef m [--seq]
+//! 1. ### subcommand  [--pio number]  [--nbthreads number] **tohnsw** [--aa]  --dir [-d] dir  --sketch [-s] size  --kmer kmersize  --algo name --nbng [-n] nb   --ef m [--seq]
 //! 
-//!     * \[--aa\] : set if data to process are Amino Acid sequences. Default is DNA.
+//!     * --aa : set if data to process are Amino Acid sequences. Default is DNA.
 
 //!     * \--dir  \[-d\]: the name of directory containing tree of DNA files or Amino Acid files. 
 //!   
@@ -242,14 +242,15 @@ fn parse_tohnsw_cmd(matches : &ArgMatches) -> Result<(String, ProcessingParams),
         log::info!("no block flag , will process file sequence by sequences");
     }
     //
-    let data_t = if matches.contains_id("aa_opt") {
-        println!("aa option , processing of AA sequences");
+    let data_t = if matches.get_flag("aa") {
+        log::info!("aa option , processing of AA sequences");
         DataType::AA
     }
     else {
-        println!("processing of DNA sequences");
+        log::info!("processing of DNA sequences");
         DataType::DNA
     };
+    log::info!("DataType : {:?}", data_t);
 
     let sketch_params =  SeqSketcherParams::new(*kmer_size as usize, *sketch_size as usize, sketch_algo, data_t);  
 
@@ -454,11 +455,10 @@ fn main() {
             .help("specifiy the algorithm to use for sketching: prob, super or hll")
             .value_parser(clap::value_parser!(String))
         )
-        .arg(Arg::new("aa_opt")                   // do we process amino acid file
+        .arg(Arg::new("aa")          // do we process amino acid file, default is dna, pass --aa
             .long("aa")
-            .num_args(0..=1)
-            .default_missing_value("true")
-            .help("Specificy amino acid processing, require no value")
+            .action(clap::ArgAction::SetTrue)
+            .help("--aa Specificy amino acid processing, require no value")
         )
         .arg(Arg::new("block")
             .long("block")
