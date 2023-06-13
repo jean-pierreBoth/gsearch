@@ -386,6 +386,10 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT+KmerBuilder<Kmer>, Ske
         // Note that doing parallel insertion requires a new thread that put us on scheduling dependance and can cause deadlock!!!
         // so we insert at each msh received!
         scope.spawn(|_| {
+            type VecSig<Sketcher, Kmer>  = Vec< <Sketcher as SeqSketcherT<Kmer>>::Sig>;
+            let store_size = 100_000;
+            let mut msg_store = Vec::<(VecSig<Sketcher,Kmer>, usize)>::with_capacity(store_size);
+            let mut itemv =  Vec::<ItemDict>::with_capacity(store_size);
             let mut dict_size = seqdict.get_nb_entries();
             let mut read_more = true;
             while read_more {
@@ -396,12 +400,39 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT+KmerBuilder<Kmer>, Ske
                                             log::debug!("end of collector reception");
                     }
                     Ok(to_insert) => {
-                        hnsw.insert((&to_insert.skecth_and_rank.0, dict_size));
-                        seqdict.0.push(to_insert.item);
-                        dict_size += 1;
+                        msg_store.push(to_insert.skecth_and_rank);
+                        itemv.push(to_insert.item);
                         nb_received += 1;
                         log::debug!("collector received nb_received : {}, receiver len : {}", nb_received, collect_receiver.len());
                     }
+                }
+                // we defer all insertion to end of sketching as we observed bad interaction between // iter and threads
+                if read_more == false {
+                    let insertion_start_time = SystemTime::now();
+                    let insertion_cpu_start: ProcessTime = ProcessTime::now();
+                    log::debug!("inserting block in hnsw, nb new points : {:?}", msg_store.len());
+                    let mut data_for_hnsw = Vec::<(&VecSig<Sketcher,Kmer>, usize)>::with_capacity(msg_store.len());
+                    for i in 0..msg_store.len() {
+                        log::debug!("inserting data id(filerank) : {}, itemdict : {}", msg_store[i].1, itemv[i].get_id().get_path());
+                        // due to threading file arrive in random order, so it this thread responsability to affect id in dictionary
+                        // otherwise we must introduce an indexmap in SeqDict
+                        data_for_hnsw.push((&msg_store[i].0, dict_size));
+                        dict_size += 1;
+                    }
+                    log::info!("parallel insertion ...");
+                    hnsw.parallel_insert(&data_for_hnsw);
+                    log::info!("parallel insert done");  
+                    seqdict.0.append(&mut itemv); 
+                    assert_eq!( seqdict.get_nb_entries(), hnsw.get_nb_point());
+                    // information on how time is spent
+                    let thread_cpu_time = insertion_cpu_start.try_elapsed();
+                    if thread_cpu_time.is_ok() {
+                        log::info!("hnsw insertion processed in  system time(s) : {}, cpu time(s) : {}", 
+                            insertion_start_time.elapsed().unwrap().as_secs(), thread_cpu_time.unwrap().as_secs());
+                    }
+                    log::debug!(" dictionary size : {} hnsw nb points : {}", seqdict.get_nb_entries(), hnsw.get_nb_point());
+                    msg_store.clear();
+                    itemv.clear();
                 }
             }
             //

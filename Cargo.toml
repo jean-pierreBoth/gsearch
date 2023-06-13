@@ -41,7 +41,7 @@ crossbeam-channel = {version = "0.5"}
 crossbeam = {version = "0.8"}
 concurrent-queue = {version = "2.2.0"}
 parking_lot ={version="0.12"}
-rayon = {version = "1.5"}
+rayon = {version = "1.7"}
 num_cpus = {version = "1.13.0"}
 
 cpu-time = {version = "1.0"}
