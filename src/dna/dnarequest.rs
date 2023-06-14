@@ -187,7 +187,7 @@ fn sketch_and_request_dir_compressedkmer<Kmer:CompressedKmerT + KmerBuilder<Kmer
             // we must read messages, sketch and insert into hnsw
             let parker: Parker = Parker::new();
             // we can create a new thread for at least nb_bases_thread_threshold bases.
-            let nb_bases_thread_threshold : usize = 1_000_000;
+            let nb_bases_thread_threshold : usize = 100_000_000;
             // a bounded blocking channel to limit the number of threads to pool_nb_thread.
             // at thread creation we send a msg into queue, at thread end we receive a msg.
             // So the length of the channel is number of active thread
