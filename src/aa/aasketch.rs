@@ -229,7 +229,7 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT+KmerBuilder<Kmer>, Ske
             let sketching_start_cpu = ThreadTime::now();
             let parker: Parker = Parker::new();
             // we can create a new thread for at least nb_bases_thread_threshold bases.
-            let nb_bases_thread_threshold : usize = 10_000_000;
+            let nb_bases_thread_threshold : usize = 100_000_000;
             log::info!("threshold number of bases for thread cretaion : {:?}", nb_bases_thread_threshold);
             // a bounded blocking queue to limit the number of threads to pool_nb_thread.
             // at thread creation we send a msg into queue, at thread end we receive a msg.
