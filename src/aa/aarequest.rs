@@ -112,9 +112,8 @@ fn sketch_and_request_dir_compressedkmer<Kmer:CompressedKmerT + KmerBuilder<Kmer
     // Sketcher allocation, we do need reverse complement
     //
     let kmer_hash_fn = | kmer : &Kmer | -> Kmer::Val {
-        let canonical =  kmer.reverse_complement().min(*kmer);
-        let mask : Kmer::Val = num::NumCast::from::<u64>((0b1 << 2*kmer.get_nb_base()) - 1).unwrap();
-        let hashval = canonical.get_compressed_value() & mask;
+        let mask : Kmer::Val = num::NumCast::from::<u64>((0b1 << 5*kmer.get_nb_base()) - 1).unwrap();
+        let hashval = kmer.get_compressed_value() & mask;
         hashval
     };
     // create something for likelyhood computation

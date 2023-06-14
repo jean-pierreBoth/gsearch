@@ -145,9 +145,8 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT+KmerBuilder<Kmer>, Ske
     // Sketcher allocation, we  need reverse complement
     //
     let kmer_hash_fn = | kmer : &Kmer | -> Kmer::Val {
-        let canonical =  kmer.reverse_complement().min(*kmer);
-        let mask : Kmer::Val = num::NumCast::from::<u64>((0b1 << 2*kmer.get_nb_base()) - 1).unwrap();
-        let hashval = canonical.get_compressed_value() & mask;
+        let mask : Kmer::Val = num::NumCast::from::<u64>((0b1 << 5*kmer.get_nb_base()) - 1).unwrap();
+        let hashval = kmer.get_compressed_value() & mask;
         hashval
     };
     //
@@ -252,7 +251,7 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT+KmerBuilder<Kmer>, Ske
                         Ok(idsequences) => {
                             // concat the new idsketch in insertion queue.
                             nb_msg_received += 1;
-                            nb_base_in_queue = idsequences.iter().fold(0, |acc, s| acc + s.get_seq_len());
+                            nb_base_in_queue += idsequences.iter().fold(0, |acc, s| acc + s.get_seq_len());
                             log::debug!("nb_base_in_queue : {}", nb_base_in_queue);
                             log::debug!("read received nb seq : {}, total nb msg received : {}", idsequences.len(), nb_msg_received);
                             let p_res = insertion_queue.push(idsequences);
@@ -419,7 +418,6 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT+KmerBuilder<Kmer>, Ske
                 }
             }
             //
-            assert_eq!(nb_received, seqdict.get_nb_entries());
             assert_eq!(seqdict.get_nb_entries(), hnsw.get_nb_point());
             log::debug!("collector thread dumping hnsw , received nb_received : {}", nb_received);
             let _ = dumpall(dump_path_ref, &hnsw, &seqdict, &processing_params);

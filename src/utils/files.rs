@@ -297,7 +297,17 @@ pub(crate) fn process_dir_parallel_rec(state : &mut ProcessingState, datatype: &
     let mut nb_sent :usize = 0;
     let mut nb_entries = 0usize;
     //
+    if std::fs::metadata(dir).is_err() {
+        log::error!("\n\n process_dir_parallel_rec , dir : {:?}", dir);
+        log::error!("\n directory do not exist or you do not have access permissions \n");
+        std::panic!();
+    }
+    log::debug!("process_dir_parallel_rec , dir : {:?}", dir);
+    //
     for entry in std::fs::read_dir(dir)? {
+        if entry.is_err() {
+            log::error!("error reading entry in director : {:?}, entry num : {}", dir, nb_entries);
+        }
         let entry = entry?;
         let pathb = entry.path();
         if pathb.is_dir() {
@@ -311,7 +321,9 @@ pub(crate) fn process_dir_parallel_rec(state : &mut ProcessingState, datatype: &
                     let f_len = meta.len();
                     log::trace!(" filename : {:?}, length = {}", pathb.file_name().unwrap_or_default(), f_len);
                 }
-                Err(_) => {},
+                Err(_) => {
+                    log::error!("cannot access to metadata of path : {:?}", pathb);
+                },
             }
             if path_block.len() < block_size {
                 // we push the file

@@ -215,6 +215,9 @@ impl SeqDict {
             }
             sequences.push(value.unwrap());
             if log::log_enabled!(log::Level::Debug) && nbloaded <= 3 {
+                if nbloaded == 0 {
+                    log::debug!("logging reload of first 4 reload...");
+                }
                 log::debug!(" nbloaded : {:?}, sesqid path : ({}, {}), len : {}", nbloaded, sequences[nbloaded].get_id().path,
                         sequences[nbloaded].get_id().fasta_id, sequences[nbloaded].get_len());
             }
