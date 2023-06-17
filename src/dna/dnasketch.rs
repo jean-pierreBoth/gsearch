@@ -359,6 +359,7 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT+KmerBuilder<Kmer>, Ske
                         }
                         drop(local_queue); // a precaution as  local_queue has been moved into the thread 
                         drop(collect_sender_clone);
+                        drop(sketcher_clone);
                         // we free a token in queue
                         let res = thread_token_receiver_cloned.recv();
                         log::debug!("thread_token_receiver_cloned.len = {:?}", thread_token_receiver_cloned.len());
