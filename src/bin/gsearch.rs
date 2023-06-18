@@ -405,7 +405,10 @@ enum CmdType {
 
 fn main() {
     let _ = init_log();
-
+    //
+    let start_t = std::time::SystemTime::now();
+    log::info!("\n gsearch begins at time:{:#?} \n ", start_t);
+    //
     let tohnsw_cmd  = Command::new("tohnsw")
         .about("Build HNSW graph database from a collection of database genomes based on MinHash-like metric")
         .arg(Arg::new("hnsw_dir")
