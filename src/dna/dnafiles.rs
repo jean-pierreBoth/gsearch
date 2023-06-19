@@ -85,7 +85,7 @@ pub fn process_file_by_sequence(pathb : &PathBuf, filter_params : &FilterParams)
         }
     }
     //
-    log::debug!("process_buffer_by_sequence file : {:?}, nb_bases_encoded : {}, nb_record : {}", 
+    log::debug!("process_file_by_sequence,  file : {:?}, nb_bases_encoded : {}, nb_record : {}", 
                         pathb, nb_bases_encoded, nb_record);
     log::debug!("nb total bases in file (with non ATCG) : {}", nb_bases_file);
     assert!(nb_bases_file >= nb_bases_encoded);

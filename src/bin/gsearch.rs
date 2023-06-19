@@ -406,7 +406,7 @@ enum CmdType {
 fn main() {
     let _ = init_log();
     //
-    let start_t = std::time::SystemTime::now();
+    let start_t = chrono::Local::now();
     log::info!("\n gsearch begins at time:{:#?} \n ", start_t);
     //
     let tohnsw_cmd  = Command::new("tohnsw")

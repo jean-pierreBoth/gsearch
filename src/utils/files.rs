@@ -221,7 +221,10 @@ pub(crate) fn process_files_group(datatype: &DataType, filter_params : &FilterPa
     pathb : &[PathBuf], file_task: &(dyn Fn(&PathBuf, &[u8], &FilterParams) -> Vec<IdSeq> + Sync)) -> Vec<Vec<IdSeq>> 
 {
     //
-    log::debug!("process_files_group recieved : {} files", pathb.len());
+    if log::log_enabled!(log::Level::Debug) {
+        log::debug!("process_files_group recieved : {} files", pathb.len());
+        log::debug!("memory  : {:?}", memory_stats::memory_stats().unwrap());
+    }
     //
     let start_t = SystemTime::now();
     let cpu_start = ThreadTime::try_now();
@@ -276,9 +279,15 @@ pub(crate) fn process_files_group(datatype: &DataType, filter_params : &FilterPa
         }
     }
     // this is what we  wanted, fasta buffer parsing in // !!
-    let seqseq = to_be_processed.into_par_iter().map(|file| process_file(&file.0, file.1).unwrap()).collect();
+    let seqseq = to_be_processed.par_iter().map(|file| process_file(&file.0, file.1).unwrap()).collect();
+    // explicit drop to be able to monitor memory
+    drop(to_be_processed);
+    drop(files_read);
     //
-    log::debug!(" end of process_files_group");
+    if log::log_enabled!(log::Level::Debug) {
+        log::debug!("memory  : {:?}", memory_stats::memory_stats().unwrap());
+        log::debug!(" end of process_files_group");
+    }
     //
     seqseq
 }  // end of process_files_group
