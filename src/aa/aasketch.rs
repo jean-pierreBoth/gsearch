@@ -484,7 +484,7 @@ pub fn aa_process_tohnsw(dirpath : &PathBuf, filter_params : &FilterParams, proc
             hll_params.set_m(sketch_params.get_sketch_size());
             let nb_cpus = num_cpus::get();
             log::info!("nb cpus : {}", nb_cpus);
-            let nb_iter_thtreads = ((nb_cpus.max(4) - 4) / others_params.get_sketching_nbthread()).max(1);
+            let nb_iter_thtreads = ((nb_cpus.max(4) - 4) / others_params.get_sketching_nbthread().max(1)).max(1);
             let hll_seqs_threading = HllSeqsThreading::new(nb_iter_thtreads, 10_000_000);
             //
             if kmer_size <= 6 {

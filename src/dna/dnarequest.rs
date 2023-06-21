@@ -477,7 +477,7 @@ pub fn get_sequence_matcher(request_params : &RequestParams, processing_params :
             //
             let nb_cpus = num_cpus::get();
             log::info!("nb cpus : {}", nb_cpus);
-            let nb_iter_thtreads = ((nb_cpus.max(4) - 4) / computing_params.get_sketching_nbthread()).max(1);
+            let nb_iter_thtreads = ((nb_cpus.max(4) - 4) / computing_params.get_sketching_nbthread().max(1)).max(1);
             let hll_seqs_threading = HllSeqsThreading::new(nb_iter_thtreads, 10_000_000);
             log::info!("HllSeqsThreading : {:?}", hll_seqs_threading);
             //
