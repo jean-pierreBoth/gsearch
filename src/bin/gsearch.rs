@@ -546,18 +546,20 @@ fn main() {
     // the global command
     //
     let matches = Command::new("gsearch")
-        .version("0.1.2")
+        .version("0.1.3")
         .about("Approximate nearest neighbour search for microbial genomes based on MinHash-like metric")
             .arg_required_else_help(true)
             .arg(Arg::new("pario")                // do we use parallel io
                 .long("pio")
                 .value_name("pio")
                 .value_parser(clap::value_parser!(usize))
+                .default_value("500")
                 .help("Parallel IO processing"))
             .arg(Arg::new("nbthreads")
                 .long("nbthreads")
                 .value_name("nbthreads")
                 .value_parser(clap::value_parser!(usize))
+                .default_value("8")
                 .help("nb thread for sketching"))
         .subcommand(tohnsw_cmd)
         .subcommand(add_cmd)
