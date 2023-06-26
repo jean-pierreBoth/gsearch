@@ -59,31 +59,35 @@ pub fn process_file_by_sequence(pathb : &PathBuf, filter_params : &FilterParams)
         let id = seqrec.id();
         let strid = String::from_utf8(Vec::from(id)).unwrap();
         let file_seq = seqrec.seq();
-        // process sequence if not capsid and not filtered out
-        if strid.find("capsid").is_none() && !filter_params.filter(&file_seq) {
-            let nb_bases = file_seq.len();
-            nb_bases_file += nb_bases;
-            let mut new_seq = Sequence::with_capacity(2, nb_bases);
-            new_seq.encode_and_add(&file_seq, &alphabet2b);
-            nb_bases_encoded += new_seq.size();
-            drop(seqrec);
-            // we have DNA seq for now
-            // we encode path only fo the first seq. For files with hundreds millions of seq , memory 
-            let nullstr = String::from(""); // we will sketch the whole and loose id, so we spare memory
-            let path = if to_sketch.len() == 0 {
-                pathb.to_str().unwrap().to_string()
-            }
-            else {
-                nullstr.clone()
-            };            
-            // we will sketch the whole and loose fasta id, so we spare memory
-            let seqwithid = IdSeq::new(path, nullstr,SequenceType::SequenceDNA(new_seq));
-            to_sketch.push(seqwithid);
-            if log::log_enabled!(log::Level::Trace) {
-                log::trace!("process_file, nb_sketched {} ", to_sketch.len());
+        // we check for length, it happens (for aa file at least) that some sequence may be null
+        if file_seq.len() > 0 {
+            // process sequence if not capsid and not filtered out
+            if strid.find("capsid").is_none() && !filter_params.filter(&file_seq) {
+                let nb_bases = file_seq.len();
+                nb_bases_file += nb_bases;
+                let mut new_seq = Sequence::with_capacity(2, nb_bases);
+                new_seq.encode_and_add(&file_seq, &alphabet2b);
+                nb_bases_encoded += new_seq.size();
+                drop(seqrec);
+                // we have DNA seq for now
+                // we encode path only fo the first seq. For files with hundreds millions of seq , memory 
+                let nullstr = String::from(""); // we will sketch the whole and loose id, so we spare memory
+                let path = if to_sketch.len() == 0 {
+                    pathb.to_str().unwrap().to_string()
+                }
+                else {
+                    nullstr.clone()
+                };            
+                // we will sketch the whole and loose fasta id, so we spare memory
+                let seqwithid = IdSeq::new(path, nullstr,SequenceType::SequenceDNA(new_seq));
+                to_sketch.push(seqwithid);
             }
         }
-    }
+        else {
+            log::error!("sequence of null length, file is {:?}, record num : {}", pathb, nb_record);
+        }
+        //
+    } // end while 
     //
     log::debug!("process_file_by_sequence,  file : {:?}, nb_bases_encoded : {}, nb_record : {}", 
                         pathb, nb_bases_encoded, nb_record);
@@ -112,6 +116,7 @@ pub fn process_buffer_by_sequence(pathb : &PathBuf, bufread : &[u8], filter_para
     let mut nb_record : usize = 0;
     //
     let mut reader = needletail::parse_fastx_reader(bufread).expect("expecting valid filename");
+    let mut record_num  : u64 = 0;
     // 
     while let Some(record) = reader.next() {
         if record.is_err() {
@@ -124,29 +129,36 @@ pub fn process_buffer_by_sequence(pathb : &PathBuf, bufread : &[u8], filter_para
         let id = seqrec.id();
         let strid = String::from_utf8(Vec::from(id)).unwrap();
         let file_seq = seqrec.seq();
-        // process sequence if not capsid and not filtered out, in block mode we do not filter any at the moment
-        if strid.find("capsid").is_none()  && !filter_params.filter(&file_seq) {
-            let nb_bases = file_seq.len();
-            nb_bases_file += nb_bases;
-            let mut new_seq = Sequence::with_capacity(2, nb_bases);
-            new_seq.encode_and_add(&file_seq, &alphabet2b);
-            // some checks , we filter non ACGT so length is less than record
-            assert!(new_seq.size() <= nb_bases);
-            // we have DNA seq for now
-            nb_bases_encoded += new_seq.size();
-            // we encode path only fo the first seq. For files with hundreds millions of seq , memory 
-            let nullstr = String::from(""); 
-            let path = if to_sketch.len() == 0 {
-                pathb.to_str().unwrap().to_string()
+        // we check for length it happens (for aa file at least) that some sequence may be null
+        if file_seq.len() > 0 {
+            // process sequence if not capsid and not filtered out, in block mode we do not filter any at the moment
+            if strid.find("capsid").is_none()  && !filter_params.filter(&file_seq) {
+                let nb_bases = file_seq.len();
+                nb_bases_file += nb_bases;
+                let mut new_seq = Sequence::with_capacity(2, nb_bases);
+                new_seq.encode_and_add(&file_seq, &alphabet2b);
+                // some checks , we filter non ACGT so length is less than record
+                assert!(new_seq.size() <= nb_bases);
+                // we have DNA seq for now
+                nb_bases_encoded += new_seq.size();
+                // we encode path only fo the first seq. For files with hundreds millions of seq , memory 
+                let nullstr = String::from(""); 
+                let path = if to_sketch.len() == 0 {
+                    pathb.to_str().unwrap().to_string()
+                }
+                else {
+                    nullstr.clone()
+                };
+                // we will sketch the whole and loose fasta id, so we spare memory
+                let seqwithid = IdSeq::new(path, nullstr,SequenceType::SequenceDNA(new_seq));
+                to_sketch.push(seqwithid);
             }
-            else {
-                nullstr.clone()
-            };
-            // we will sketch the whole and loose fasta id, so we spare memory
-            let seqwithid = IdSeq::new(path, nullstr,SequenceType::SequenceDNA(new_seq));
-            to_sketch.push(seqwithid);
         }
-    }
+        else {
+            log::error!("sequence of null length, file is {:?}, record num : {}", pathb, record_num);
+        }
+        record_num += 1;
+    } // end while
     //
     log::debug!("process_buffer_by_sequence file : {:?}, nb_bases_file : {} nb_bases_encoded : {}, nb_record : {}", 
                         pathb, nb_bases_file, nb_bases_encoded, nb_record);

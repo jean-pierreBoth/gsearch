@@ -153,6 +153,7 @@ pub fn process_aabuffer_by_sequence(pathb : &PathBuf, bufread : &[u8], filter_pa
     let alphabet = kmeraa::Alphabet::new();
     //
     let mut reader = needletail::parse_fastx_reader(bufread).expect("expecting valid filename");
+    let mut record_num: u64 = 0;
     // 
     while let Some(record) = reader.next() {
         if record.is_err() {
@@ -163,13 +164,21 @@ pub fn process_aabuffer_by_sequence(pathb : &PathBuf, bufread : &[u8], filter_pa
         let seqrec = record.expect("invalid record");
         let id = seqrec.id();
         let strid = String::from_utf8(Vec::from(id)).unwrap();
-        // process sequence if not capsid and not filtered out, in block mode we do not filter any at the moment
-        if strid.find("capsid").is_none()  && !filter_params.filter(&seqrec.seq()) {
-            let new_seq = kmeraa::SequenceAA::new_filtered(&seqrec.seq(), &alphabet);
-            let nullid = String::from(""); // we will sketch the whole and loose id, so we spare memory
-            let seqwithid = IdSeq::new(pathb.to_str().unwrap().to_string(), nullid,SequenceType::SequenceAA(new_seq));
-            to_sketch.push(seqwithid);
+        // it happens that aa files have null sequences!!
+        if seqrec.seq().len() > 0 {
+            if strid.find("capsid").is_none()  && !filter_params.filter(&seqrec.seq()) {
+                // process sequence if not capsid and not filtered out, in block mode we do not filter any at the moment
+                let new_seq = kmeraa::SequenceAA::new_filtered(&seqrec.seq(), &alphabet);
+                let nullid = String::from(""); // we will sketch the whole and loose id, so we spare memory
+                let seqwithid = IdSeq::new(pathb.to_str().unwrap().to_string(), nullid,SequenceType::SequenceAA(new_seq));
+                to_sketch.push(seqwithid);
+            }
         }
+        else {
+            log::error!("sequence of null length, file is {:?}, record num : {}", pathb, record_num);
+        }
+        //
+        record_num += 1;
     }
     if log::log_enabled!(log::Level::Trace) {
         log::trace!("process_file, nb_sketched {} ", to_sketch.len());
@@ -190,6 +199,8 @@ pub fn process_aafile_by_sequence(pathb : &PathBuf, filter_params : &FilterParam
     let alphabet = kmeraa::Alphabet::new();
     //
     let mut reader = needletail::parse_fastx_file(&pathb).expect("expecting valid filename");
+    let mut record_num: u64 = 0;
+    //
     while let Some(record) = reader.next() {
         if record.is_err() {
             println!("got bd record in file {:?}", pathb.file_name().unwrap());
@@ -199,19 +210,26 @@ pub fn process_aafile_by_sequence(pathb : &PathBuf, filter_params : &FilterParam
         let seqrec = record.expect("invalid record");
         let id = seqrec.id();
         let strid = String::from_utf8(Vec::from(id)).unwrap();
-        // process sequence if not capsid and not filtered out
-        if strid.find("capsid").is_none() && !filter_params.filter(&seqrec.seq()) {
-            let new_seq = kmeraa::SequenceAA::new_filtered(&seqrec.seq(), &alphabet);
-            drop(seqrec);
-            // we have AA seq for now
-            let nullid = String::from(""); // we will sketch the whole and loose id, so we spare memory
-            let seqwithid = IdSeq::new(pathb.to_str().unwrap().to_string(), nullid,SequenceType::SequenceAA(new_seq));
-            to_sketch.push(seqwithid);
-            if log::log_enabled!(log::Level::Trace) {
-                log::trace!("process_file, nb_sketched {} ", to_sketch.len());
+        // it happens that aa files have null sequences!!
+        if seqrec.seq().len() > 0 {
+            // process sequence if not capsid and not filtered out
+            if strid.find("capsid").is_none() && !filter_params.filter(&seqrec.seq()) {
+                let new_seq = kmeraa::SequenceAA::new_filtered(&seqrec.seq(), &alphabet);
+                drop(seqrec);
+                // we have AA seq for now
+                let nullid = String::from(""); // we will sketch the whole and loose id, so we spare memory
+                let seqwithid = IdSeq::new(pathb.to_str().unwrap().to_string(), nullid,SequenceType::SequenceAA(new_seq));
+                to_sketch.push(seqwithid);
+                if log::log_enabled!(log::Level::Trace) {
+                    log::trace!("process_file, nb_sketched {} ", to_sketch.len());
+                }
             }
         }
-    }
+        else {
+            log::error!("sequence of null length, file is {:?}, record num : {}", pathb, record_num);
+        }
+        record_num += 1;
+    } // end while 
     // we must send to_sketch to some sketcher
     return to_sketch;
 } // end of process_file_by_sequence
