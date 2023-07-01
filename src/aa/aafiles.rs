@@ -175,7 +175,7 @@ pub fn process_aabuffer_by_sequence(pathb : &PathBuf, bufread : &[u8], filter_pa
                     to_sketch.push(seqwithid);
                 }
                 else {
-                    log::warn!("null encoded sequence in file : {:?}, record num : {}, record seq : {:?}", pathb, record_num, &seqrec.seq());
+                    log::warn!("null encoded sequence in file : {:?}, record num : {}, record seq : {:?}", pathb, record_num, std::str::from_utf8(&seqrec.seq()).unwrap());
                     log::warn!("sequence id : {}", strid);
                 }
             }
@@ -229,7 +229,7 @@ pub fn process_aafile_by_sequence(pathb : &PathBuf, filter_params : &FilterParam
                     to_sketch.push(seqwithid);
                 }
                 else {
-                    log::warn!("null encoded sequence in file : {:?}, record num : {}, record seq : {:?}", pathb, record_num, &seqrec.seq());
+                    log::warn!("null encoded sequence in file : {:?}, record num : {}, record seq : {:?}", pathb, record_num, std::str::from_utf8(&seqrec.seq()).unwrap());
                     log::warn!("sequence id : {}", strid);
                 }
             }
