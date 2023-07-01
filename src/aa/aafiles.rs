@@ -169,15 +169,22 @@ pub fn process_aabuffer_by_sequence(pathb : &PathBuf, bufread : &[u8], filter_pa
             if strid.find("capsid").is_none()  && !filter_params.filter(&seqrec.seq()) {
                 // process sequence if not capsid and not filtered out, in block mode we do not filter any at the moment
                 let new_seq = kmeraa::SequenceAA::new_filtered(&seqrec.seq(), &alphabet);
-                let nullid = String::from(""); // we will sketch the whole and loose id, so we spare memory
-                let seqwithid = IdSeq::new(pathb.to_str().unwrap().to_string(), nullid,SequenceType::SequenceAA(new_seq));
-                to_sketch.push(seqwithid);
+                if new_seq.len() > 0 {
+                    let nullid = String::from(""); // we will sketch the whole and loose id, so we spare memory
+                    let seqwithid = IdSeq::new(pathb.to_str().unwrap().to_string(), nullid,SequenceType::SequenceAA(new_seq));
+                    to_sketch.push(seqwithid);
+                }
+                else {
+                    log::warn!("null encoded sequence in file : {:?}, record num : {}, record seq : {:?}", pathb, record_num, &seqrec.seq());
+                    log::warn!("sequence id : {}", strid);
+                }
             }
         }
         else {
             log::error!("sequence of null length, file is {:?}, record num : {}", pathb, record_num);
         }
         //
+        drop(seqrec);
         record_num += 1;
     }
     if log::log_enabled!(log::Level::Trace) {
@@ -215,19 +222,23 @@ pub fn process_aafile_by_sequence(pathb : &PathBuf, filter_params : &FilterParam
             // process sequence if not capsid and not filtered out
             if strid.find("capsid").is_none() && !filter_params.filter(&seqrec.seq()) {
                 let new_seq = kmeraa::SequenceAA::new_filtered(&seqrec.seq(), &alphabet);
-                drop(seqrec);
                 // we have AA seq for now
-                let nullid = String::from(""); // we will sketch the whole and loose id, so we spare memory
-                let seqwithid = IdSeq::new(pathb.to_str().unwrap().to_string(), nullid,SequenceType::SequenceAA(new_seq));
-                to_sketch.push(seqwithid);
-                if log::log_enabled!(log::Level::Trace) {
-                    log::trace!("process_file, nb_sketched {} ", to_sketch.len());
+                if new_seq.len() > 0 {
+                    let nullid = String::from(""); // we will sketch the whole and loose id, so we spare memory
+                    let seqwithid = IdSeq::new(pathb.to_str().unwrap().to_string(), nullid,SequenceType::SequenceAA(new_seq));
+                    to_sketch.push(seqwithid);
+                }
+                else {
+                    log::warn!("null encoded sequence in file : {:?}, record num : {}, record seq : {:?}", pathb, record_num, &seqrec.seq());
+                    log::warn!("sequence id : {}", strid);
                 }
             }
         }
         else {
             log::error!("sequence of null length, file is {:?}, record num : {}", pathb, record_num);
         }
+        //
+        drop(seqrec);
         record_num += 1;
     } // end while 
     // we must send to_sketch to some sketcher
