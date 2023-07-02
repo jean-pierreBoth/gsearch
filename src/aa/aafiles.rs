@@ -175,8 +175,11 @@ pub fn process_aabuffer_by_sequence(pathb : &PathBuf, bufread : &[u8], filter_pa
                     to_sketch.push(seqwithid);
                 }
                 else {
-                    log::warn!("null encoded sequence in file : {:?}, record num : {}, record seq : {:?}", pathb, record_num, std::str::from_utf8(&seqrec.seq()).unwrap());
-                    log::warn!("sequence id : {}", strid);
+                    log::error!("null encoded sequence ,file : {:?},  record num : {}, sequence id : {}", pathb, record_num, strid);
+                    let orig = std::string::String::from_utf8(seqrec.seq().to_vec());
+                    if orig.is_ok() {
+                        log::warn!("bad record seq : {:?}", orig.unwrap());
+                    }
                 }
             }
         }
@@ -229,8 +232,11 @@ pub fn process_aafile_by_sequence(pathb : &PathBuf, filter_params : &FilterParam
                     to_sketch.push(seqwithid);
                 }
                 else {
-                    log::warn!("null encoded sequence in file : {:?}, record num : {}, record seq : {:?}", pathb, record_num, std::str::from_utf8(&seqrec.seq()).unwrap());
-                    log::warn!("sequence id : {}", strid);
+                    log::error!("null encoded sequence ,file : {:?},  record num : {}, sequence id : {}", pathb, record_num, strid);
+                    let orig = std::string::String::from_utf8(seqrec.seq().to_vec());
+                    if orig.is_ok() {
+                        log::warn!("bad record seq : {:?}", orig.unwrap());
+                    }
                 }
             }
         }
