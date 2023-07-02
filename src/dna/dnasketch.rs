@@ -83,7 +83,7 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT+KmerBuilder<Kmer>, Ske
     // The number of threads must be adapted to memory size when sketching files of size tens of giabytes
     let block_processing = processing_params.get_block_flag();
     let insertion_block_size = match computing_params.get_parallel_io() {
-        true => { 2000.min(computing_params.get_nb_files_par()) },
+        true => { 5000.min(computing_params.get_nb_files_par()) },
         _    => { 2000 },
     };
     let pool: rayon::ThreadPool = rayon::ThreadPoolBuilder::new().build().unwrap();

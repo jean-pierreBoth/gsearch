@@ -78,7 +78,7 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT+KmerBuilder<Kmer>, Ske
     // and not too large to spare memory. If parallel_io is set dimension message queue to size of group
     // for files of size more than Gb we must use pario to limit memory, but leave enough msg in queue to get // sketch and insertion 
     let insertion_block_size = match computing_params.get_parallel_io() {
-        true => { 2000.min(computing_params.get_nb_files_par()) },
+        true => { 5000.min(computing_params.get_nb_files_par()) },
         _    => { 2000 },
     };
     let pool: rayon::ThreadPool = rayon::ThreadPoolBuilder::new().build().unwrap();
