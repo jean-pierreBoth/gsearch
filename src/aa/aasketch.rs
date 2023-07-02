@@ -85,7 +85,7 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT+KmerBuilder<Kmer>, Ske
     let pool_nb_thread = pool.current_num_threads();
     let mut nb_max_threads = computing_params.get_sketching_nbthread();
     if nb_max_threads == 0 {
-        nb_max_threads = 1 + insertion_block_size.min(pool_nb_thread);
+        nb_max_threads = insertion_block_size.min(pool_nb_thread).max(1);
     }
     log::info!("nb threads in pool : {:?}, using nb threads : {}", pool_nb_thread, nb_max_threads);
     log::debug!("insertion_block_size : {}", insertion_block_size);
@@ -157,12 +157,6 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT+KmerBuilder<Kmer>, Ske
     // to send sketch result to a collector task
     let (collect_sender , collect_receiver) = 
             crossbeam_channel::bounded::<CollectMsg<<Sketcher as SeqSketcherAAT<Kmer>>::Sig>>(insertion_block_size+1);
-    //
-    let pool: rayon::ThreadPool = rayon::ThreadPoolBuilder::new().build().unwrap();
-    let pool_nb_thread = pool.current_num_threads();
-    let nb_max_threads = insertion_block_size.min(pool_nb_thread);
-    log::info!("nb threads in pool : {:?}, using nb threads : {}", pool_nb_thread, nb_max_threads);
-
     // launch process_dir in a thread or async
     pool.scope(|scope| {
         // sequence sending, productor thread
