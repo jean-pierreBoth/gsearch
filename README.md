@@ -40,10 +40,10 @@ The Dictionary is dumped in a json file *seqdict.json*
 ## Request
 
 For requests  the subcommand ***request*** is being used. It reloads the dumped files, hnsw and seqdict related
-takes a list of fasta files containing requests and for each fasta file dumps the asked number of nearest neighbours according to distance mentioned above.
+takes a list of fasta files containing requests and for each fasta file dumps the asked number of nearest neighbours according to distance mentioned above. A tabular file will be saved to disk with 3 key columns: query genome path, database genome path (ranked by distance) and distance. The distance can be transformed into ANI or AAI according to the equation above. Check the scripts for analyzing output from request here: https://github.com/jianshu93/gsearch_analysis
 
 ## Ann
-For UMAP-like algorithm to do dimension reduction and then visuzlizing genome database, we run it after the tohnsw step (pre-built database) (see below useage ann section). See [annembed](https://github.com/jean-pierreBoth/annembed) crate for details. Then the output of this step can be visualized, for example for the GTDB v207 we have the following plot.
+For UMAP-like algorithm to perform dimension reduction and then visuzlizing genome database, we run it after the tohnsw step (pre-built database) (see below useage ann section). See [annembed](https://github.com/jean-pierreBoth/annembed) crate for details. Then the output of this step can be visualized, for example for the GTDB v207 we have the following plot.
 
 ![Alt!](https://github.com/jean-pierreBoth/gsearch/blob/master/GSearch-annembed-GTDBv207.jpg?raw=true)
 
