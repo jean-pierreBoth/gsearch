@@ -10,7 +10,7 @@ This package is developped by Jean-Pierre Both [jpboth](https://github.com/jean-
 
 ## Sketching of genomes/tohnsw
 
-The objective is to use the Jaccard index as an accurate proxy of mutation rate or Average Nucleitide Identity(ANI) According to equation:
+The objective is to use the Jaccard index as an accurate proxy of mutation rate or Average Nucleitide Identity(ANI) or Average Amino Acide Identity (AAI) According to equation:
 $$ANI=1+\frac{1}{k}log\frac{2*J}{1+J}$$
 
 where J is Jaccard-like index (e.g. Jp from ProbMinHash or J from SuperMinHash or SetSketch, see below) and k is k-mer size.
@@ -50,7 +50,7 @@ For UMAP-like algorithm to perform dimension reduction and then visuzlizing geno
 
 ## Simple case for install
 
-**Pre-built binaries** will be available on release page [binaries](https://github.com/jean-pierreBoth/gsearch/releases/tag/0.1.1) for major platforms (no need to install but just download and make it executable). We recommend you use the linux one (gsearch-linux-x86-64.zip) for linux system in this release page for convenience because the only dependency is GCC (Recent Linux version does not allow static compiling of GCC libraries like libc.so.6). For macOS, we recommend the binary mac-binaries(gsearch-darwin-x86-64.zip or gsearch-darwin-aarch64.zip) for corresponding platform (x86-64 or arm64).
+**Pre-built binaries** will be available on release page [binaries](https://github.com/jean-pierreBoth/gsearch/releases/tag/v0.1.3-beta) for major platforms (no need to install but just download and make it executable). We recommend you use the linux one (GSearch_Linux_x86-64_v0.1.3.zip) for linux system in this release page for convenience (only system libraries are required). For macOS, we recommend the binary mac-binaries (GSearch_Darwin_x86-64_v0.1.3.zip or GSearch_Darwin_aarch64_v0.1.3.zip) for corresponding platform (x86-64 or arm64).
 
 ## Or if you have conda installed
 
@@ -68,21 +68,18 @@ Otherwise it is possible to install/compile by yourself (see install section)
 
 ### get the binary for linux (make sure you have recent Linux installed with GCC, e.g., Ubuntu 18.0.4 or above)
 
-wget https://github.com/jean-pierreBoth/gsearch/releases/download/0.1.1/gsearch-linux-x86-64.zip --no-check-certificate
-unzip gsearch-linux-x86-64.zip
+wget https://github.com/jean-pierreBoth/gsearch/releases/download/v0.1.3-beta/GSearch_Linux_x86-64_v0.1.3.zip --no-check-certificate
+unzip GSearch_Linux_x86-64_v0.1.3.zip
 
 ## get the x86-64 binary for macOS
-wget https://github.com/jean-pierreBoth/gsearch/releases/download/0.1.1/gsearch-darwin-x86-64.zip --no-check-certificate
-unzip gsearch-darwin-x86-64.zip
+wget https://github.com/jean-pierreBoth/gsearch/releases/download/v0.1.3-beta/GSearch_Darwin_x86-64_v0.1.3.zip --no-check-certificate
+unzip GSearch_Darwin_x86-64_v0.1.3.zip
 ## get the aarch64/arm64 binary for macOS
-wget https://github.com/jean-pierreBoth/gsearch/releases/download/0.1.1/gsearch-darwin-aarch64.zip --no-check-certificate
-unzip gsearch-darwin-aarch64.zip
+wget https://github.com/jean-pierreBoth/gsearch/releases/download/v0.1.3-beta/GSearch_Darwin_aarch64_v0.1.3.zip --no-check-certificate
+unzip GSearch_Darwin_aarch64_v0.1.3.zip
 
 
-## Note that for MacOS, xz library will need to be installed. You need to install homebrew first (with your user password)
-/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-brew install openblas xz
-
+## Note that for MacOS, you need sudo previlege to allow external binary being executed
 * **make it excutable (changed it accordingly on macOS)**
 chmod a+x ./gsearch
 
@@ -102,7 +99,7 @@ sudo spctl --master-disable
 gsearch -h
  ************** initializing logger *****************
 
-Approximate nearest neighbour search for microbial genomes based on minhash metric
+Approximate nearest neighbour search for microbial genomes based on MinHash-like metric
 
 Usage: gsearch [OPTIONS] [COMMAND]
 
@@ -114,9 +111,10 @@ Commands:
   help     Print this message or the help of the given subcommand(s)
 
 Options:
-      --pio <pio>  Parallel IO processing
-  -h, --help       Print help
-  -V, --version    Print version
+      --pio <pio>              Parallel IO processing
+      --nbthreads <nbthreads>  nb thread for sketching
+  -h, --help                   Print help
+  -V, --version                Print version
 
 ```
 
@@ -166,8 +164,6 @@ gsearch add -b ./k16_s12000_n128_ef1600_canonical -n db_dir_nt (new genomes dire
 cd ./GTDB/prot
 gsearch add -b ./k7_s12000_n128_ef1600_gsearch -n db_dir_nt (new genomes directory in AA format predicted by prodigal/FragGeneScanRs)
 
-
-
 ### visuzlizing from the tohnsw step at amino acid level (AAI distance), output order of genome files are the same with with seqdict.json
 cd ./GTDB/prot
 gsearch ann -b ./k7_s12000_n128_ef1600_gsearch --stats --embed
@@ -189,7 +185,7 @@ gsearch ann -b ./k7_s12000_n128_ef1600_gsearch --stats --embed
 This can be done using the **--features** option as explained below, or by modifying the features section in  Cargo.toml. In that case just fill in the default you want.
 - kmerutils provides a feature "withzmq". This feature can be used to store compressed qualities on a server and run requests. It is not necessary in this crate.
 
-## Install
+## Install/compiling by yourself
 
 ### First install Rust tools
 
@@ -211,25 +207,17 @@ or with a system installed openblas:
 cargo install gsearch --features="annembed_openblas-system"
 ```
 
-- On MacOS, which requires dynamic library link (you have to install openblas first and then xz, the MacOS/Darwin binary provided also requires this):
+- On MacOS, which requires dynamic library link (you have to install openblas first):
 (note that openblas install lib path is different on M1 MACs).  
 So you need to run:
 
 ```bash
-    brew install openblas xz
+    brew install openblas
     echo 'export LDFLAGS="-L/usr/local/opt/openblas/lib"' >> ~/.bash_profile
     echo 'export CPPFLAGS="-I/usr/local/opt/openblas/include"' >> ~/.bash_profile
     echo 'export PKG_CONFIG_PATH="/usr/local/opt/openblas/lib/pkgconfig"' >> ~/.bash_profile
     source ~/.bash_profile
     cargo install gsearch --features="annembed_openblas-system"
-```
-
-- Intel:  
-  You can enable simd instruction with the feature hnsw_rs/simdeez_f.  
-  Using openblas instead of intel-mkl you would run:
-
-```bash
-cargo install gsearch --features="annembed_openblas-system" --features="hnsw_rs/simdeez_f"
 ```
 
 #### gsearch installation from the most recent version from github
@@ -247,7 +235,8 @@ git clone https://github.com/jean-pierreBoth/gsearch
 cd gsearch
 #### build
 cargo build --release --features="annembed_openblas-static"
-###on MacOS, which requires dynamic library link:
+cargo build --release --features="annembed_intel-mkl"
+###on MacOS, which requires dynamic library link (install openblas first, see above):
 cargo build --release --features="annembed_openblas-system"
 ```
 
