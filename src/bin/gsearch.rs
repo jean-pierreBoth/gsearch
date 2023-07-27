@@ -724,15 +724,22 @@ fn main() {
                                     log::info!("got type in hnsw : {}", &type_name);
                                     #[cfg(any(feature="annembed_openblas-system", feature="annembed_openblas-static" , feature="annembed_intel-mkl"))]
                                     match type_name.as_str() {
-                                        "u32" => {  // probminhash case
+                                        "u32" => {  // probminhash case nt
                                             let hnsw = reloadhnsw::reload_hnsw::<u32>(&hnsw_path).unwrap();
                                             if _ann_params.ask_stats() || _ann_params.embed() {
                                                 log::info!("calling embed::get_graph_stats_embed");
                                                 let _ = embed::get_graph_stats_embed(&hnsw, _ann_params.embed(), None);
                                             }
                                         }
+                                        "u64" => {  // probminhash case aa
+                                            let hnsw = reloadhnsw::reload_hnsw::<u64>(&hnsw_path).unwrap();
+                                            if _ann_params.ask_stats() || _ann_params.embed() {
+                                                log::info!("calling embed::get_graph_stats_embed");
+                                                let _ = embed::get_graph_stats_embed(&hnsw, _ann_params.embed(), None);
+                                            }
+                                        }
                                         "u16" => {
-                                            // hll case
+                                            // hll case nt and aa
                                             let hnsw = reloadhnsw::reload_hnsw::<u16>(&hnsw_path).unwrap();
                                             if _ann_params.ask_stats() || _ann_params.embed() {
                                                 log::info!("calling embed::get_graph_stats_embed");
@@ -740,13 +747,21 @@ fn main() {
                                             }
                                         }
                                         "f32" => {
-                                            // superminhash case
+                                            // superminhash case nt
                                             let hnsw = reloadhnsw::reload_hnsw::<f32>(&hnsw_path).unwrap();
                                             if _ann_params.ask_stats() || _ann_params.embed() {
                                                 log::info!("calling embed::get_graph_stats_embed");
                                                 let _ = embed::get_graph_stats_embed(&hnsw, _ann_params.embed(), None);
                                             }
-                                        }  
+                                        } 
+                                        "f64" => {
+                                            // superminhash case aa
+                                            let hnsw = reloadhnsw::reload_hnsw::<f64>(&hnsw_path).unwrap();
+                                            if _ann_params.ask_stats() || _ann_params.embed() {
+                                                log::info!("calling embed::get_graph_stats_embed");
+                                                let _ = embed::get_graph_stats_embed(&hnsw, _ann_params.embed(), None);
+                                            }
+                                        } 
                                         _    => {
                                             log::error!("unknow type of data in hnsw, type : {}", &type_name);
                                         }                 
