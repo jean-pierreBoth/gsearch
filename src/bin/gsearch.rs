@@ -722,7 +722,7 @@ fn main() {
                                     }
                                     let type_name = type_name.unwrap();
                                     log::info!("got type in hnsw : {}", &type_name);
-                                    #[cfg(any(feature="annembed_openblas-system", feature="annembed_openblas-static" , feature="annembed_intel-mkl"))]
+                                    //#[cfg(any(feature="annembed_openblas-system", feature="annembed_openblas-static" , feature="annembed_intel-mkl"))]
                                     match type_name.as_str() {
                                         "u32" => {  // probminhash case nt
                                             let hnsw = reloadhnsw::reload_hnsw::<u32>(&hnsw_path).unwrap();
