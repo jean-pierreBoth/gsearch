@@ -156,18 +156,18 @@ gsearch --pio 100 --nbthreads 24 request -b ./k5_n128_s1800_ef1600_universal_pro
 
 ### build database given genome file directory, fna.gz was expected. L for nt and .faa or .faa.gz for --aa. Limit for k is 32 (15 not work due to compression), for s is 65535 (u16) and for n is 255 (u8)
 
-gsearch tohnsw -d db_dir_nt -s 12000 -k 16 --ef 1600 -n 128 --algo prob
-gsearch tohnsw -d db_dir_aa -s 12000 -k 7 --ef 1600 -n 128 --aa --algo prob
+gsearch --pio 2000 --nbthreads 24 tohnsw -d db_dir_nt -s 12000 -k 16 --ef 1600 -n 128 --algo prob
+gsearch --pio 2000 --nbthreads 24 tohnsw -d db_dir_aa -s 12000 -k 7 --ef 1600 -n 128 --aa --algo prob
 
 ### When there are new genomes  after comparing with the current database (GTDB v207, e.g. ANI < 95% with any genome after searcing, corresponding to >0.875 ProbMinHash distance), those genomes can be added to the database
 
 ### old .graph,.data and all .json files will be updated to the new one. Then the new one can be used for requesting as an updated database
 
-gsearch add -b ./k16_s12000_n128_ef1600_canonical -n db_dir_nt (new genomes directory) 
+gsearch --pio 100 --nbthreads 24 add -b ./k16_s12000_n128_ef1600_canonical -n db_dir_nt (new genomes directory) 
 
 ### or add at the amino acid level, in the parameters.json file you can check whether it is DNA or AA data via the "data_t" field
 cd ./GTDB/prot
-gsearch add -b ./k7_s12000_n128_ef1600_gsearch -n db_dir_nt (new genomes directory in AA format predicted by prodigal/FragGeneScanRs)
+gsearch --pio 100 --nbthreads 24 add -b ./k7_s12000_n128_ef1600_gsearch -n db_dir_nt (new genomes directory in AA format predicted by prodigal/FragGeneScanRs)
 
 ### visuzlizing from the tohnsw step at amino acid level (AAI distance), output order of genome files are the same with with seqdict.json
 cd ./GTDB/prot
