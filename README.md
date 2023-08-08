@@ -37,6 +37,9 @@ The sketching of reference genomes can take some time (less than one hours for ~
 The Hnsw structure is dumped *in hnswdump.hnsw.graph* and  *hnswdump.hnsw.data*
 The Dictionary is dumped in a json file *seqdict.json*
 
+## Adding genomes to existing database
+For adding new genomes to existing database, the ***add*** subcommand is being used. It will automatically load sketching files, graph files and also paremeters used for build the graph and then use the same parameters to add new genomes to exisiting database genomes.
+
 ## Request
 
 For requests  the subcommand ***request*** is being used. It reloads the dumped files, hnsw and seqdict related
