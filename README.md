@@ -138,17 +138,19 @@ cd ./GTDB/nucl
 tar -xzvf k16_s12000_n128_ef1600.prob.tar.gz
 ### request neighbors for nt genomes (here -n is how many neighbors you want to return for each of your query genome)
 
-gsearch request -b ./k16_s12000_n128_ef1600_canonical -r ../../test_data/query_dir_nt -n 50
+gsearch --pio 100 --nbthreads 24 request -b ./k16_s12000_n128_ef1600_canonical -r ../../test_data/query_dir_nt -n 50
 
 ### or request neighbors for aa genomes (predicted by Prodigal or FragGeneScanRs)
 
 cd ./GTDB/prot
-gsearch request -b ./k7_s12000_n128_ef1600_gsearch -r ../../test_data/query_dir_aa -n 50
+tar xzvf k7_s12000_n128_ef1600.prob.tar.gz
+gsearch --pio 100 --nbthreads 24 request -b ./k7_s12000_n128_ef1600_gsearch -r ../../test_data/query_dir_aa -n 50
 
 ### or request neighbors for aa universal gene (extracted by hmmer according to hmm files from gtdb, we also provide one in release page)
 
 cd ./GTDB/universal
-gsearch request -b ./k5_n128_s1800_ef1600_universal_prob -r ../../test_data/query_dir_universal_aa -n 50
+tar xzvf k5_n128_s1800_ef1600_universal_prob.tar.gz
+gsearch --pio 100 --nbthreads 24 request -b ./k5_n128_s1800_ef1600_universal_prob -r ../../test_data/query_dir_universal_aa -n 50
 
 ### Building database. database is huge in size, users are welcome to download gtdb database here: (<https://data.ace.uq.edu.au/public/gtdb/data/releases/release207/207.0/genomic_files_reps/gtdb_genomes_reps_r207.tar.gz>) and here (<https://data.ace.uq.edu.au/public/gtdb/data/releases/release207/207.0/genomic_files_reps/gtdb_proteins_aa_reps_r207.tar.gz>)
 
