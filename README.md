@@ -1,4 +1,4 @@
-# GSearch: A Rust Genomic Search Program based on Various MinHash-like Metric and HNSW for Microbial Genomes
+# GSearch: A Rust Genomic Search Program based on Various MinHash-like Metrics and HNSW for Microbial Genomes
 
 ![Alt!](https://github.com/jean-pierreBoth/gsearch/blob/master/GSearch-logo.jpg?raw=true)
 
