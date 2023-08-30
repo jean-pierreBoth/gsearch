@@ -55,7 +55,7 @@ For UMAP-like algorithm to perform dimension reduction and then visuzlizing geno
 
 **Pre-built binaries** will be available on release page [binaries](https://github.com/jean-pierreBoth/gsearch/releases/tag/v0.1.3-beta) for major platforms (no need to install but just download and make it executable). We recommend you use the linux one (GSearch_Linux_x86-64_v0.1.3.zip) for linux system in this release page for convenience (only system libraries are required). For macOS, we recommend the binary mac-binaries (GSearch_Darwin_x86-64_v0.1.3.zip or GSearch_Darwin_aarch64_v0.1.3.zip) for corresponding platform (x86-64 or arm64).
 
-## Or if you have conda installed
+## Or if you have conda installed on linux
 
 [![install with bioconda](https://img.shields.io/badge/install%20with-bioconda-brightgreen.svg?style=flat)](http://bioconda.github.io/recipes/gsearch/README.html)
 
@@ -63,6 +63,13 @@ For UMAP-like algorithm to perform dimension reduction and then visuzlizing geno
     conda config --add channels bioconda
     conda install gsearch -c bioconda
     gsearchbin -h
+```
+## or if you are on MacOS and have homebrew installed
+```bash
+brew tap jianshu93/gsearch
+brew install gsearch
+gsearch -h
+
 ```
 
 Otherwise it is possible to install/compile by yourself (see install section)
