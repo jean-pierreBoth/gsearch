@@ -88,6 +88,9 @@ unzip GSearch_Darwin_x86-64_v0.1.3.zip
 wget https://github.com/jean-pierreBoth/gsearch/releases/download/v0.1.3-beta/GSearch_Darwin_aarch64_v0.1.3.zip --no-check-certificate
 unzip GSearch_Darwin_aarch64_v0.1.3.zip
 
+## get the binary for Windows, ann subcommand is not available for windows for now
+wget https://github.com/jean-pierreBoth/gsearch/releases/download/v0.1.3-beta/GSearch_pc-windows-msvc_x86-64_v0.1.3.zip
+
 
 ## Note that for MacOS, you need sudo previlege to allow external binary being executed
 * **make it excutable (changed it accordingly on macOS)**
