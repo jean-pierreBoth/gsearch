@@ -60,6 +60,9 @@ For UMAP-like algorithm to perform dimension reduction and then visuzlizing geno
 [![install with bioconda](https://img.shields.io/badge/install%20with-bioconda-brightgreen.svg?style=flat)](http://bioconda.github.io/recipes/gsearch/README.html)
 
 ```bash
+    ### we suggest python 3.8, so if you do not have one, you can create a new one
+    conda create -n python 38 python=3.8
+    conda activate python38
     conda config --add channels bioconda
     conda install gsearch -c bioconda
     #### a different binary name was used for bioconda channel, you can change it to gsearch later, see below
