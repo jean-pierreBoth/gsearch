@@ -62,7 +62,11 @@ For UMAP-like algorithm to perform dimension reduction and then visuzlizing geno
 ```bash
     conda config --add channels bioconda
     conda install gsearch -c bioconda
+    #### a different binary name was used for bioconda channel, you can change it to gsearch later, see below
     gsearchbin -h
+    ### change to gsearch binary name
+    cp $(which gsearchbin) $CONDA_PREFIX/bin/gsearch
+    gsearch -h
 ```
 ## or if you are on MacOS and have homebrew installed
 ```bash
