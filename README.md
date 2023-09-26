@@ -61,7 +61,7 @@ For UMAP-like algorithm to perform dimension reduction and then visuzlizing geno
 
 ```bash
     ### we suggest python 3.8, so if you do not have one, you can create a new one
-    conda create -n python 38 python=3.8
+    conda create -n python38 python=3.8
     conda activate python38
     conda config --add channels bioconda
     conda install gsearch -c bioconda
