@@ -13,7 +13,7 @@ This package is developped by Jean-Pierre Both [jpboth](https://github.com/jean-
 The objective is to use the Jaccard index as an accurate proxy of mutation rate or Average Nucleitide Identity(ANI) or Average Amino Acide Identity (AAI) According to equation:
 $$ANI=1+\frac{1}{k}log\frac{2*J}{1+J}$$
 
-where J is Jaccard-like index (e.g. Jp from ProbMinHash or J from SuperMinHash or SetSketch, see below) and k is k-mer size.
+where J is Jaccard-like index (e.g. Jp from ProbMinHash or J from SuperMinHash or SetSketch, a class of locality sensitive hashing algorithms, suitable for nearest neighbor search,  see below) and k is k-mer size.
 To achieve this we use sketching. We generate kmers along sequences and sketch the kmer distribution encountered in a file. Then final sketch is stored in a Hnsw database See [hnsw](https://arxiv.org/abs/1603.09320).
 
 The sketching and database is done by the subcommand ***tohnsw***.
