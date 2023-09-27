@@ -288,6 +288,10 @@ We provide pre-built genome/proteome database graph file for bacteria/archaea, v
 - Fungi database are based on the entire RefSeq fungal genomes (retrived via the MycoCosm website), we dereplicated and define a fungal speices at 99.5% ANI.
 - All four pre-built databases are available here:<http://enve-omics.ce.gatech.edu/data/gsearch>
 
+## To do list
+1. B-bit One Permutation MinHash with Optimal/Fast/BiDirectional densification, which are all locality sensitive hashing scheme and are both more space efficient and faster than classic MinHash with big O O(d+k), see Shrivastava 2017, Mai et.al.,2020 and Jia et.al.,2021. However, the densification step is not mergeable (it introduces randomness), which make it difficult to implement a streaming while hashing & densificaiton scheme. Instead, we must perform hashing & densificaiton when the entire genome/text file is loaded into memory, which requires much more memory in a parallel processing manner.
+2. UltraLogLog, Ertl 2023, a significant improvement over HyperLogLog for space/memory for cardinality estimation. We can use inclusion and exclusion rule to estimate Jaccard index (similar to Dashing) after obtaining carinality of two sets despite large variance. A simple but efficient new estimator of cardinality estimation, FGRA (Further Generalized Remaining Area) based on Tau-GRA (Wang and Pettie, 2023) can be used. But we can also map UltraLogLog to corresponding HyperLogLog to use maximum likelihood estimator (MLE) for cardinality (slower), or joint maximum likelihood estimator (JMLE) for intersecion cardinality (then Jaccard index), which are slightly more accurate than FGRA and meet the Cramér-Rao lower bound. However, the Hyperloglog-like scheme is not under the locality sensitive hashing scheme. 
+
 ## References
 
 1. Jianshu Zhao, Jean Pierre Both, Luis M. Rodriguez-R and Konstantinos T. Konstantinidis, 2022. GSearch: Ultra-Fast and Scalable Microbial Genome Search by combining Kmer Hashing with Hierarchical Navigable Small World Graphs. *bioRxiv* 2022:2022.2010.2021.513218. [biorxiv](https://www.biorxiv.org/content/10.1101/2022.10.21.513218v2).
