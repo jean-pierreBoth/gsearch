@@ -13,7 +13,7 @@ This package is developped by Jean-Pierre Both [jpboth](https://github.com/jean-
 The objective is to use the Jaccard index as an accurate proxy of mutation rate or Average Nucleitide Identity(ANI) or Average Amino Acide Identity (AAI) According to equation:
 $$ANI=1+\frac{1}{k}log\frac{2*J}{1+J}$$
 
-where J is Jaccard-like index (e.g. Jp from ProbMinHash or J from SuperMinHash or SetSketch, a class of locality sensitive hashing algorithms, suitable for nearest neighbor search,  see below) and k is k-mer size.
+where J is Jaccard-like index (e.g. Jp from ProbMinHash or J from SuperMinHash, SetSketch or Densified MinHash, a class of locality sensitive hashing algorithms, suitable for nearest neighbor search,  see below) and k is k-mer size.
 To achieve this we use sketching. We generate kmers along sequences and sketch the kmer distribution encountered in a file. Then final sketch is stored in a Hnsw database See [hnsw](https://arxiv.org/abs/1603.09320).
 
 The sketching and database is done by the subcommand ***tohnsw***.
@@ -26,7 +26,7 @@ The Jaccard index come in 2 flavours:
     In this case for J_p we use the probminhash algorithm as implemented in [probminhash](https://github.com/jean-pierreBoth/probminhash)  
     2. The unweighted (simple) Jaccard index defined by :
         $$Jaccard(A,B)=\frac{A \cap B}{A \cup B}$$
-        In this case for J we use the [SuperMinHash](https://arxiv.org/abs/1706.05698) or the [SetSketch](https://vldb.org/pvldb/vol14/p2244-ertl.pdf) (based on hyperloglog) method, also implemented in probminhash mentioned above.  
+        In this case for J we use the [SuperMinHash](https://arxiv.org/abs/1706.05698), [SetSketch](https://vldb.org/pvldb/vol14/p2244-ertl.pdf) (based on the locality sensitive hashing) or Densified [MinHash](http://proceedings.mlr.press/v70/shrivastava17a.html) method, also implemented in probminhash mentioned above.  
     The estimated Jaccard-like index is used to build HNSW graph database, which is implemented in crate [hnswlib-rs](https://crates.io/crates/hnsw_rs).
 
 The sketching of reference genomes can take some time (less than one hours for ~65,000 bacterial genomes of GTDB for parameters giving a correct quality of sketching, or 3 to 4 hours for entire NCBI/RefSeq prokaryotic genomes. ~318K). Result is stored in 2 structures:
