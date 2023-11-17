@@ -3,32 +3,32 @@
 //! 
 //! 
 
-use std::time::{SystemTime};
+use std::time::SystemTime;
 use cpu_time::{ProcessTime,ThreadTime};
 use std::time::Duration;
 
-use std::path::{PathBuf};
+use std::path::PathBuf;
 
 // for multithreading
 use std::sync::Arc;
 use crossbeam_channel::*;
-use crossbeam::sync::{Parker};
+use crossbeam::sync::Parker;
 use concurrent_queue::{ConcurrentQueue, PushError};
 
 
 use serde::{de::DeserializeOwned, Serialize};
 
-use std::fmt::{Debug};
+use std::fmt::Debug;
 
 // our crate
-use hnsw_rs::prelude::*;
+use hnsw_rs::{prelude::*, hnswio::HnswIo};
 
 
 use kmerutils::base::{kmergenerator::*, Kmer32bit, Kmer64bit, CompressedKmerT};
-use kmerutils::sketching::{setsketchert::*};
+use kmerutils::sketching::setsketchert::*;
 use kmerutils::sketcharg::DataType;
 
-use probminhash::{setsketcher::SetSketchParams};
+use probminhash::setsketcher::SetSketchParams;
 
 use crate::utils::{idsketch::*, reloadhnsw};
 use crate::utils::dumpload::*;
@@ -95,24 +95,33 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT+KmerBuilder<Kmer>, Ske
     log::debug!("insertion_block_size : {}", insertion_block_size);
     log::info!("nb threads in pool : {:?}, using nb threads : {}", pool_nb_thread, nb_max_threads);
     //
-    let mut hnsw : Hnsw::< <Sketcher as SeqSketcherT<Kmer>>::Sig, DistHamming>;
     let mut state :ProcessingState;
     //
     let toprocess_path : PathBuf;
+    //
+    let mut hnswio : HnswIo;
+    let mut hnsw : Hnsw::< <Sketcher as SeqSketcherT<Kmer>>::Sig, DistHamming>;
     //
     if computing_params.get_adding_mode() {
         let toprocess_str = computing_params.get_add_dir();
         toprocess_path = PathBuf::from(toprocess_str);
         // in this case we must reload
         log::info!("dnasketch::sketchandstore_dir_compressedkmer will add new data from directory {:?} to hnsw dir {:?}", toprocess_path, hnsw_pb);
-        let hnsw_opt = reloadhnsw::reload_hnsw(&hnsw_pb);
-        if hnsw_opt.is_err() {
+
+        let hnswio_res = reloadhnsw::get_hnswio(hnsw_pb);
+        if hnswio_res.is_err() {
+            std::panic!("cannot reload from directory {:?} failed msg : {:?}", &hnsw_pb, hnswio_res.err());
+        }
+        hnswio = hnswio_res.unwrap();
+        let hnsw_res = hnswio.load_hnsw();
+        if hnsw_res.is_err() {
             log::error!("cannot reload hnsw from directory : {:?}", &hnsw_pb);
             std::process::exit(1);
         }
         else { 
-            hnsw = hnsw_opt.unwrap();
+            hnsw = hnsw_res.unwrap();
         }
+
         let reload_res = ProcessingState::reload_json(&hnsw_pb);
         if reload_res.is_ok() {
             state = reload_res.unwrap();
@@ -585,7 +594,32 @@ pub fn dna_process_tohnsw(dirpath : &PathBuf, filter_params : &FilterParams, pro
             else {
                 panic!("kmers cannot be greater than 32");
             }
-        }        
+        }  
+        SketchAlgo::OPTDENS => {
+            if kmer_size <= 14 {
+                // allocated the correct sketcher
+                let sketcher = OptDensHashSketch::<Kmer32bit, f32>::new(sketchparams);
+                sketchandstore_dir_compressedkmer::<Kmer32bit, OptDensHashSketch::<Kmer32bit, f32> >(&dirpath, sketcher, 
+                            &filter_params, &processing_parameters, others_params);
+            }
+            else if kmer_size == 16 {
+                let sketcher = OptDensHashSketch::<Kmer16b32bit, f32>::new(sketchparams);
+                sketchandstore_dir_compressedkmer::<Kmer16b32bit, OptDensHashSketch::<Kmer16b32bit, f32>>(&dirpath, sketcher, 
+                            &filter_params, &processing_parameters, others_params);
+            }
+            else if  kmer_size <= 32 {
+                let sketcher = OptDensHashSketch::<Kmer64bit, f32>::new(sketchparams);
+                sketchandstore_dir_compressedkmer::<Kmer64bit, OptDensHashSketch::<Kmer64bit, f32>>(&dirpath, sketcher, 
+                            &filter_params, &processing_parameters, others_params);
+            }
+            else {
+                panic!("kmers cannot be greater than 32");
+            }
+        }
+        //
+        SketchAlgo::REVOPTDENS => {
+            panic!("REVOPTDENS not yet implemented over DNA sketch");
+        }      
     }
 } // end of dna_process
 

@@ -14,8 +14,8 @@
 
 use std::collections::HashMap;
 
-use std::path::{PathBuf};
-use std::fs::{OpenOptions};
+use std::path::PathBuf;
+use std::fs::OpenOptions;
 use std::io::{Write,BufWriter};
 
 use crate::utils::*;
@@ -222,7 +222,7 @@ impl Matcher{
         //
         let threshold = 0.99; // TODO ...
         let outname = "gsearch.matches";
-        let outpath = PathBuf::from(outname.clone());
+        let outpath = PathBuf::from(outname);
         let outfile = OpenOptions::new().write(true).create(true).truncate(true).open(&outpath);
         if outfile.is_err() {
             log::error!("Matcher analyze : dump could not open file {:?}", outpath.as_os_str());

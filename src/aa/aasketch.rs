@@ -1,7 +1,7 @@
 //! amino acid (AA) sketching
 
 
-use std::time::{SystemTime};
+use std::time::SystemTime;
 use cpu_time::ProcessTime;
 use std::time::Duration;
 
@@ -9,19 +9,19 @@ use std::time::Duration;
 use std::sync::Arc;
 use crossbeam_channel::*;
 use concurrent_queue::{ConcurrentQueue, PushError};
-use crossbeam::sync::{Parker};
+use crossbeam::sync::Parker;
 
 use serde::{de::DeserializeOwned, Serialize};
 
-use std::fmt::{Debug};
-use std::path::{PathBuf};
+use std::fmt::Debug;
+use std::path::PathBuf;
 use cpu_time::ThreadTime;
 
 
 // our crate
-use hnsw_rs::prelude::*;
+use hnsw_rs::{prelude::*, hnswio::HnswIo};
 
-use probminhash::{setsketcher::SetSketchParams};
+use probminhash::setsketcher::SetSketchParams;
 
 use kmerutils::base::kmertraits::*;
 use kmerutils::aautils::kmeraa::*;
@@ -90,7 +90,9 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT+KmerBuilder<Kmer>, Ske
     log::info!("nb threads in pool : {:?}, using nb threads : {}", pool_nb_thread, nb_max_threads);
     log::debug!("insertion_block_size : {}", insertion_block_size);
     //
+    let mut hnswio : HnswIo;
     let mut hnsw : Hnsw::< <Sketcher as SeqSketcherAAT<Kmer>>::Sig, DistHamming>;
+    //
     let mut state :ProcessingState;
     //
     let toprocess_path : PathBuf;
@@ -100,13 +102,18 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT+KmerBuilder<Kmer>, Ske
         toprocess_path = PathBuf::from(toprocess_str);
         // in this case we must reload
         log::info!("aasketch::sketchandstore_dir_compressedkmer will add new data from directory {:?} to hnsw dir {:?}", toprocess_path, hnsw_pb);
-        let hnsw_opt = reloadhnsw::reload_hnsw(&hnsw_pb);
-        if hnsw_opt.is_err() {
+        let hnswio_res = reloadhnsw::get_hnswio(hnsw_pb);
+        if hnswio_res.is_err() {
+            std::panic!("cannot reload from directory {:?} failed msg : {:?}", &hnsw_pb, hnswio_res.err());
+        }
+        hnswio = hnswio_res.unwrap();
+        let hnsw_res = hnswio.load_hnsw();
+        if hnsw_res.is_err() {
             log::error!("cannot reload hnsw from directory : {:?}", &hnsw_pb);
             std::process::exit(1);
         }
         else { 
-            hnsw = hnsw_opt.unwrap();
+            hnsw = hnsw_res.unwrap();
         }
         let reload_res = ProcessingState::reload_json(&hnsw_pb);
         if reload_res.is_ok() {
@@ -495,6 +502,24 @@ pub fn aa_process_tohnsw(dirpath : &PathBuf, filter_params : &FilterParams, proc
         }
         SketchAlgo::SUPER2 => {
             panic!("SUPER2 not yet implemented over AA sketching");
+        }
+        //
+        SketchAlgo::OPTDENS => {
+            if kmer_size <= 6 {
+                let sketcher = OptDensHashSketch::<KmerAA32bit, f32>::new(sketch_params);
+                sketchandstore_dir_compressedkmer::<KmerAA32bit, OptDensHashSketch::<KmerAA32bit, f32>>(&dirpath, sketcher, &filter_params, &processing_parameters, others_params);
+            }
+            else if kmer_size <= 12 {
+                let sketcher = OptDensHashSketch::<KmerAA64bit, f32>::new(sketch_params);
+                sketchandstore_dir_compressedkmer::<KmerAA64bit, OptDensHashSketch::<KmerAA64bit, f32>>(&dirpath, sketcher, &filter_params, &processing_parameters, others_params);                
+            }
+            else {
+                panic!("kmer for Amino Acids must be less or equal to 12");
+            }
+        }
+        //
+        SketchAlgo::REVOPTDENS => {
+            panic!("REVOPTDENS not yet implemented over AA sketching");
         }
     }
 } // end of aa_process_tohnsw

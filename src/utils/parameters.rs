@@ -2,11 +2,11 @@
 
 
 use std::fs::OpenOptions;
-use std::path::{Path};
+use std::path::Path;
 use std::io::{BufReader, BufWriter };
 
 use serde::{Deserialize, Serialize};
-use serde_json::{to_writer};
+use serde_json::to_writer;
 
 pub use kmerutils::sketcharg::*;
 

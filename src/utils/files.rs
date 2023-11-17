@@ -7,15 +7,15 @@ use std::fs::{OpenOptions, File};
 use std::path::{Path, PathBuf};
 use std::io::Read;
 
-use std::time::{SystemTime};
-use cpu_time::{ThreadTime};
+use std::time::SystemTime;
+use cpu_time::ThreadTime;
 
 use serde::{Deserialize, Serialize};
-use serde_json::{to_writer};
+use serde_json::to_writer;
 
 use rayon::prelude::*;
 
-use super::idsketch::{IdSeq};
+use super::idsketch::IdSeq;
 use super::parameters::*;
 
 
