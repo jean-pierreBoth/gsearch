@@ -100,7 +100,7 @@ use clap::{Arg, ArgMatches, Command, ArgAction};
 use std::path::{Path, PathBuf};
 
 // for logging (debug mostly, switched at compile time in cargo.toml)
-use env_logger::{Builder};
+use env_logger::Builder;
 
 // our crate
 use gsearch::dna::dnasketch::dna_process_tohnsw;
@@ -108,6 +108,9 @@ use gsearch::aa::aasketch::aa_process_tohnsw;
 use gsearch::utils::*;
 
 use kmerutils::sketcharg::{SketchAlgo, SeqSketcherParams};
+
+#[allow(unused)]
+use hnsw_rs::dist::DistHamming;
 
 //mod files;
 use gsearch::dna::dnarequest;
@@ -201,13 +204,16 @@ fn parse_tohnsw_cmd(matches : &ArgMatches) -> Result<(String, ProcessingParams),
         else if algoname == String::from("hll") {
             sketch_algo = SketchAlgo::HLL;
         }
+        else if algoname == String::from("optdens") {
+            sketch_algo = SketchAlgo::OPTDENS;
+        }
         else {
             println!("unknown asketching algo");
             std::panic!("unknown sketching algo");
         }
     }
     else {
-        log::error!("option --algo  super | prob | hll required");
+        log::error!("option --algo  super | prob | optdens | hll required");
         std::panic!("sketching algo required");
     }
     // kmer size
@@ -722,17 +728,24 @@ fn main() {
                                     }
                                     let type_name = type_name.unwrap();
                                     log::info!("got type in hnsw : {}", &type_name);
+                                    //
+                                    let hnswio_res = reloadhnsw::get_hnswio(hnsw_path);
+                                    if hnswio_res.is_err() {
+                                        std::panic!("error : {:?}", hnswio_res.err());
+                                    }
+                                    let mut hnswio = hnswio_res.unwrap();
+                                    //
                                     #[cfg(any(feature="annembed_openblas-system", feature="annembed_openblas-static" , feature="annembed_intel-mkl"))]
                                     match type_name.as_str() {
                                         "u32" => {  // probminhash case nt
-                                            let hnsw = reloadhnsw::reload_hnsw::<u32>(&hnsw_path).unwrap();
+                                            let hnsw = hnswio.load_hnsw::<u32, DistHamming>().unwrap();
                                             if _ann_params.ask_stats() || _ann_params.embed() {
                                                 log::info!("calling embed::get_graph_stats_embed");
                                                 let _ = embed::get_graph_stats_embed(&hnsw, _ann_params.embed(), None);
                                             }
                                         }
                                         "u64" => {  // probminhash case aa
-                                            let hnsw = reloadhnsw::reload_hnsw::<u64>(&hnsw_path).unwrap();
+                                            let hnsw = hnswio.load_hnsw::<u64, DistHamming>().unwrap();
                                             if _ann_params.ask_stats() || _ann_params.embed() {
                                                 log::info!("calling embed::get_graph_stats_embed");
                                                 let _ = embed::get_graph_stats_embed(&hnsw, _ann_params.embed(), None);
@@ -740,7 +753,7 @@ fn main() {
                                         }
                                         "u16" => {
                                             // hll case nt and aa
-                                            let hnsw = reloadhnsw::reload_hnsw::<u16>(&hnsw_path).unwrap();
+                                            let hnsw = hnswio.load_hnsw::<u16, DistHamming>().unwrap();
                                             if _ann_params.ask_stats() || _ann_params.embed() {
                                                 log::info!("calling embed::get_graph_stats_embed");
                                                 let _ = embed::get_graph_stats_embed(&hnsw, _ann_params.embed(), None);
@@ -748,15 +761,15 @@ fn main() {
                                         }
                                         "f32" => {
                                             // superminhash case nt
-                                            let hnsw = reloadhnsw::reload_hnsw::<f32>(&hnsw_path).unwrap();
+                                            let hnsw = hnswio.load_hnsw::<f32, DistHamming>().unwrap();
                                             if _ann_params.ask_stats() || _ann_params.embed() {
                                                 log::info!("calling embed::get_graph_stats_embed");
                                                 let _ = embed::get_graph_stats_embed(&hnsw, _ann_params.embed(), None);
                                             }
                                         } 
                                         "f64" => {
-                                            // superminhash case aa
-                                            let hnsw = reloadhnsw::reload_hnsw::<f64>(&hnsw_path).unwrap();
+                                            // superminhash , optminhash or revoptminhash case
+                                            let hnsw = hnswio.load_hnsw::<f64, DistHamming>().unwrap();
                                             if _ann_params.ask_stats() || _ann_params.embed() {
                                                 log::info!("calling embed::get_graph_stats_embed");
                                                 let _ = embed::get_graph_stats_embed(&hnsw, _ann_params.embed(), None);

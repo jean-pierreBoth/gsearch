@@ -41,7 +41,7 @@ crossbeam-channel = {version = "0.5"}
 crossbeam = {version = "0.8"}
 concurrent-queue = {version = "2.2.0"}
 parking_lot ={version="0.12"}
-rayon = {version = "1.7"}
+rayon = {version = "1.8"}
 num_cpus = {version = "1.13.0"}
 
 cpu-time = {version = "1.0"}
@@ -50,8 +50,8 @@ clap = {version = "4.1"}
 fxhash = {version = "0.2"}
 ##
 
-# probminhash = {version = "0.1.9"}
-probminhash = {git = "https://github.com/jean-pierreBoth/probminhash"}
+probminhash = {version = "0.1.10"}
+# probminhash = {git = "https://github.com/jean-pierreBoth/probminhash"}
 # probminhash = {path = "../probminhash"}
 
 hnsw_rs =  {version = "0.2"}
@@ -59,8 +59,8 @@ hnsw_rs =  {version = "0.2"}
 # hnsw_rs = {git = "https://gitlab.com/jpboth/hnswlib-rs.git"}
 # hnsw_rs = {path = "../hnswlib-rs"}
 
-kmerutils = {path = "../kmerutils"}
-# kmerutils = {git = "https://github.com/jean-pierreBoth/kmerutils"}
+# kmerutils = {path = "../kmerutils"}
+kmerutils = {git = "https://github.com/jean-pierreBoth/kmerutils"}
 # kmerutils = {git = "https://gitlab.com/jpboth/kmerutils.git"}
 # kmerutils = {version = "0.0.9"}
 
