@@ -39,7 +39,7 @@ pub fn get_hnsw_type(dump_dirpath : &Path) -> anyhow::Result<String>  {
 ///    We know filename : hnswdump.hnsw.data and hnswdump.hnsw.graph
 pub fn get_hnswio(dump_dirpath : &Path) -> Result<HnswIo, String> {
     //
-    let dumpname = String::from("hnswdump.hnsw");
+    let dumpname = String::from("hnswdump");
     let pathb = std::path::PathBuf::from(dump_dirpath);
     let mut reloader = HnswIo::new(pathb, dumpname);
     let options = ReloadOptions::default();
