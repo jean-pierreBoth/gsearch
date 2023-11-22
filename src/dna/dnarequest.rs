@@ -346,7 +346,7 @@ fn sketch_and_request_dir_compressedkmer<Kmer:CompressedKmerT + KmerBuilder<Kmer
                 }
                 // we do all request at end beccause of scheduling pb between par_iter and explicit thread in rayon 
                 if read_more == false {
-                    log::debug!("recieving new requests nb : {:?}", request_store.len());
+                    log::debug!("recieved requests nb : {:?}", request_store.len());
                     let mut data_for_hnsw = Vec::<VecSig<Sketcher,Kmer> >::with_capacity(request_store.len());
                     for i in 0..request_store.len() {
                         data_for_hnsw.push(request_store[i].clone());

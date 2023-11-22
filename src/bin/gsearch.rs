@@ -461,7 +461,7 @@ fn main() {
         .arg(Arg::new("sketch_algo")
             .required(true)
             .long("algo")
-            .help("specifiy the algorithm to use for sketching: prob, super or hll")
+            .help("specifiy the algorithm to use for sketching: prob, super, hll or optdens")
             .value_parser(clap::value_parser!(String))
         )
         .arg(Arg::new("aa")          // do we process amino acid file, default is dna, pass --aa
@@ -733,6 +733,7 @@ fn main() {
                                     if hnswio_res.is_err() {
                                         std::panic!("error : {:?}", hnswio_res.err());
                                     }
+                                    #[allow(unused)]
                                     let mut hnswio = hnswio_res.unwrap();
                                     //
                                     #[cfg(any(feature="annembed_openblas-system", feature="annembed_openblas-static" , feature="annembed_intel-mkl"))]
