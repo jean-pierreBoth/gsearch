@@ -6,9 +6,10 @@ gsearch is the new name of the crate archaea.  It stands for **genomic search**.
 
 This package (**currently in development**) compute probminhash signature of  bacteria and archaea (or virus and fungi) genomes and stores the id of bacteria and probminhash signature in a Hnsw structure for searching of new request genomes.
 
-This package is developped by Jean-Pierre Both [jpboth](https://github.com/jean-pierreBoth) for the software part and [Jianshu Zhao](https://github.com/jianshu93) for the genomics part. We also created a mirror of this repo on [GitLab](https://gitlab.com/Jianshu_Zhao/gsearch) and [Gitee](https://gitee.com/jianshuzhao/gsearch) (You need to log in first to see the content), just in case Github service is not available in some region, e.g, China.
+This package is developped by Jean-Pierre Both [jpboth](https://github.com/jean-pierreBoth) for the software part and [Jianshu Zhao](https://github.com/jianshu93) for the genomics part. We also created a mirror of this repo on [GitLab](https://gitlab.com/Jianshu_Zhao/gsearch) and [Gitee](https://gitee.com/jianshuzhao/gsearch) (You need to log in first to see the content), just in case Github service is not available in some region.
 
-## Sketching of genomes/tohnsw
+## Key functions
+## Sketching of genomes/tohnsw, to build hnsw graph database
 
 The objective is to use the Jaccard index as an accurate proxy of mutation rate or Average Nucleitide Identity(ANI) or Average Amino Acide Identity (AAI) According to equation:
 $$ANI=1+\frac{1}{k}log\frac{2*J}{1+J}$$
@@ -37,10 +38,10 @@ The sketching of reference genomes can take some time (less than one hours for ~
 The Hnsw structure is dumped *in hnswdump.hnsw.graph* and  *hnswdump.hnsw.data*
 The Dictionary is dumped in a json file *seqdict.json*
 
-## Adding genomes to existing database
+## Adding genomes to existing/pre-built database
 For adding new genomes to existing database, the ***add*** subcommand is being used. It will automatically load sketching files, graph files and also paremeters used for building the graph and then use the same parameters to add new genomes to exisiting database genomes.
 
-## Request
+## Request, search new genomes agains pre-built database
 
 For requests  the subcommand ***request*** is being used. It reloads the dumped files, hnsw and seqdict related
 takes a list of fasta files containing requests and for each fasta file dumps the asked number of nearest neighbours according to distance mentioned above. A tabular file will be saved to disk with 3 key columns: query genome path, database genome path (ranked by distance) and distance. The distance can be transformed into ANI or AAI according to the equation above. Check the scripts for analyzing output from request here: https://github.com/jianshu93/gsearch_analysis
@@ -53,7 +54,7 @@ For UMAP-like algorithm to perform dimension reduction and then visuzlizing geno
 
 ## Simple case for install
 
-**Pre-built binaries** will be available on release page [binaries](https://github.com/jean-pierreBoth/gsearch/releases/tag/v0.1.3-beta) for major platforms (no need to install but just download and make it executable). We recommend you use the linux one (GSearch_Linux_x86-64_v0.1.3.zip) for linux system in this release page for convenience (only system libraries are required). For macOS, we recommend the binary mac-binaries (GSearch_Darwin_x86-64_v0.1.3.zip or GSearch_Darwin_aarch64_v0.1.3.zip) for corresponding platform (x86-64 or arm64).
+**Pre-built binaries** will be available on release page [binaries](https://github.com/jean-pierreBoth/gsearch/releases/tag/v0.1.3-beta) for major platforms (no need to install but just download and make it executable). We recommend you use the linux one (GSearch_Linux_x86-64_v0.1.3.zip) for linux system in this release page for convenience (only system libraries are required). For macOS, we recommend the binary mac-binaries (GSearch_Darwin_x86-64_v0.1.3.zip or GSearch_Darwin_aarch64_v0.1.3.zip) for corresponding platform (x86-64 or arm64). Or GSearch_pc-windows-msvc_x86-64_v0.1.3.zip for Windows.
 
 ## Or if you have conda installed on linux
 
@@ -113,7 +114,7 @@ sudo spctl --master-disable
 
 ```
 
-## usage
+## Usage
 
 ```bash
 gsearch -h
@@ -138,30 +139,57 @@ Options:
 
 ```
 
-We then give here an example of utilization with prebuilt databases.
+##We then give here an example of utilization with prebuilt databases.
 
 ```bash
-### download neighbours for each genomes (fna, fasta, faa et.al. are supported) in query_dir_nt or aa using pre-built database
+### download neighbours for each genomes (fna, fasta, faa et.al. are supported) as using pre-built database, probminhash or SetSketch/hll database (prob and hll)
 
 wget http://enve-omics.ce.gatech.edu/data/public_gsearch/GTDBv207_v2023.tar.gz
-tar xzvf ./GTDBv207_v2023.tar.gz
+tar -xzvf ./GTDBv207_v2023.tar.gz
+
+### Densified MinHash database (optdens), go to https://doi.org/10.6084/m9.figshare.24617760.v1 
+### Download the file in the link by clicking the red download to you machine (file GSearch_GTDB_optdens.tar.gz will be downloaded)
+mkdir GTDB_optdens
+mv GSearch_GTDB_optdens.tar.gz GTDB_optdens/
+
+
 
 ### get test data, we provide 2 genomes at nt, AA and universal gene level
 
 wget https://github.com/jean-pierreBoth/gsearch/releases/download/v0.0.12/test_data.tar.gz --no-check-certificate
 tar xzvf ./test_data.tar.gz
 
+
+### test nt genome database
 cd ./GTDB/nucl
+##default probminhash database
 tar -xzvf k16_s12000_n128_ef1600.prob.tar.gz
-### request neighbors for nt genomes (here -n is how many neighbors you want to return for each of your query genome)
-
+# request neighbors for nt genomes (here -n is how many neighbors you want to return for each of your query genome)
 gsearch --pio 100 --nbthreads 24 request -b ./k16_s12000_n128_ef1600_canonical -r ../../test_data/query_dir_nt -n 50
+## SetSketch/hll database
+tar -xzvf k16_s4096_n128_ef1600.hll.tar.gz
+gsearch --pio 100 --nbthreads 24 request -b ./k16_s4096_n128_ef1600_canonical_hll -r ../../test_data/query_dir_nt -n 50
+## Densified MinHash, download first, see above
+cd GTDB_optdens
+tar -xzvf GSearch_GTDB_optdens.tar.gz
+cd GTDB
+#nt
+tar -xzvf k16_s18000_n128_ef1600_optdens.tar.gz
+gsearch --pio 100 --nbthreads 24 request -b ./k16_s18000_n128_ef1600_optdens -r ../../test_data/query_dir_nt -n 50
 
-### or request neighbors for aa genomes (predicted by Prodigal or FragGeneScanRs)
+
+### or request neighbors for aa genomes (predicted by Prodigal or FragGeneScanRs), probminhash and SetSketch/hll
 
 cd ./GTDB/prot
 tar xzvf k7_s12000_n128_ef1600.prob.tar.gz
 gsearch --pio 100 --nbthreads 24 request -b ./k7_s12000_n128_ef1600_gsearch -r ../../test_data/query_dir_aa -n 50
+
+#aa densified MinHash
+cd ./GTDB_optdens
+cd GTDB
+tar -xzvf k7_s12000_n128_ef1600_optdens.tar.gz
+gsearch --pio 100 --nbthreads 24 request -b ./k7_s12000_n128_ef1600_optdens -r ../../test_data/query_dir_aa -n 50
+
 
 ### or request neighbors for aa universal gene (extracted by hmmer according to hmm files from gtdb, we also provide one in release page)
 
@@ -169,7 +197,17 @@ cd ./GTDB/universal
 tar xzvf k5_n128_s1800_ef1600_universal_prob.tar.gz
 gsearch --pio 100 --nbthreads 24 request -b ./k5_n128_s1800_ef1600_universal_prob -r ../../test_data/query_dir_universal_aa -n 50
 
-### Building database. database is huge in size, users are welcome to download gtdb database here: (<https://data.ace.uq.edu.au/public/gtdb/data/releases/release207/207.0/genomic_files_reps/gtdb_genomes_reps_r207.tar.gz>) and here (<https://data.ace.uq.edu.au/public/gtdb/data/releases/release207/207.0/genomic_files_reps/gtdb_proteins_aa_reps_r207.tar.gz>)
+
+###We also provide pre-built database for all RefSeq_NCBI prokaryotic genomes, see below. You can download them if you want to test it. Following similar procedure as above to search those much larger database.
+##graph database based on probminhash and setsketc/hll, both nt and aa
+wget http://enve-omics.ce.gatech.edu/data/public_gsearch/NCBI_RefSeq_v2023.tar.gz
+
+##nt graph database based on densified MinHash, go to below link to download GSearch_k16_s18000_n128_ef1600_optdens.tar.gz
+https://doi.org/10.6084/m9.figshare.24615792.v1
+#aa graph database, densified MinHash, go to below link to download GSearch_k7_s12000_n128_ef1600_optdens.tar.gz
+https://doi.org/10.6084/m9.figshare.22681939.v1
+
+### Building database. database is huge in size, users are welcome to download gtdb database here: (<https://data.ace.uq.edu.au/public/gtdb/data/releases/release207/207.0/genomic_files_reps/gtdb_genomes_reps_r207.tar.gz>) and here (<https://data.ace.uq.edu.au/public/gtdb/data/releases/release207/207.0/genomic_files_reps/gtdb_proteins_aa_reps_r207.tar.gz>) or go to NCBI/RefSeq to download all available prokaryotic genomes
 
 ### build database given genome file directory, fna.gz was expected. L for nt and .faa or .faa.gz for --aa. Limit for k is 32 (15 not work due to compression), for s is 65535 (u16) and for n is 255 (u8)
 
