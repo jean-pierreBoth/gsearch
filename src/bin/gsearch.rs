@@ -733,6 +733,7 @@ fn main() {
                                     if hnswio_res.is_err() {
                                         std::panic!("error : {:?}", hnswio_res.err());
                                     }
+                                    #[allow(unused)]
                                     let mut hnswio = hnswio_res.unwrap();
                                     //
                                     #[cfg(any(feature="annembed_openblas-system", feature="annembed_openblas-static" , feature="annembed_intel-mkl"))]
