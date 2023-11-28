@@ -8,15 +8,18 @@ use csv::Writer;
 // our use
 use hnsw_rs::prelude::*;
 use annembed::fromhnsw::{hubness::Hubness,kgraph_from_hnsw_all};
+use annembed::fromhnsw::kgraph::KGraph;
 use annembed::prelude::*;
-
+use cpu_time::ProcessTime;
+use std::time::SystemTime;
+use std::time::Duration;
 
 pub fn get_graph_stats_embed<T, D>(hnsw: &Hnsw<T, D>, embed: bool, embed_params_opt : Option<EmbedderParams>) -> Result<(), ()>
 where
     T: Clone + Send + Sync,
     D: Distance<T> + Send + Sync,
 {
-    let knbn = 8;
+    let knbn = 15;
     log::info!("calling kgraph_from_hnsw_all, embed = {}", embed);
 
     let kgraph_res = kgraph_from_hnsw_all::<T, D, f32>(hnsw, knbn);
@@ -24,7 +27,28 @@ where
         // we are just interested in quantile statistics on first distance to neighbours.
         log::info!("\n\n computing graph statistics");
         let _kgraph_stats = kgraph.get_kraph_stats();
-        // 
+        
+        // Local Intrinsic dimension and hubness
+        // Get some statistics on induced graph. This is not related to the embedding process
+        let knbn_new = 25;
+        let kgraph_new : KGraph<f32>;
+        kgraph_new = kgraph_from_hnsw_all(&hnsw, knbn_new).unwrap();
+        log::info!("minimum number of neighbours {}", kgraph_new.get_max_nbng());
+        log::info!("dimension estimation...");
+        let sampling_size = 10000;
+        let cpu_start = ProcessTime::now();
+        let sys_now = SystemTime::now();
+        let dim_stat = kgraph_new.estimate_intrinsic_dim(sampling_size);
+        let cpu_time: Duration = cpu_start.elapsed();
+        println!("\n dimension estimation sys time(ms) : {:.3e},  cpu time(ms) {:.3e}\n", sys_now.elapsed().unwrap().as_millis(), cpu_time.as_millis());
+        if dim_stat.is_ok() {
+            let dim_stat = dim_stat.unwrap();
+            log::info!("\n dimension estimation with nbpoints : {}, dim : {:.3e}, sigma = {:.3e} \n", 
+                sampling_size, dim_stat.0, dim_stat.1);
+            println!(" dimension estimation with nbpoints : {}, dim : {:.3e}, sigma = {:.3e}", 
+                sampling_size, dim_stat.0, dim_stat.1); 
+        }
+        
         log::info!("\n\n hubness summary");
         let hubness = Hubness::new(&kgraph);
         let s3_hubness = hubness.get_standard3m();
