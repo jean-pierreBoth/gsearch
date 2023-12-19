@@ -15,9 +15,9 @@ The objective is to use the Jaccard index as an accurate proxy of mutation rate 
 $$ANI=1+\frac{1}{k}log\frac{2*J}{1+J}$$
 
 where J is Jaccard-like index (e.g. Jp from ProbMinHash or J from SuperMinHash, SetSketch or Densified MinHash, a class of locality sensitive hashing algorithms, suitable for nearest neighbor search,  see below) and k is k-mer size.
-To achieve this we use sketching. We generate kmers along sequences and sketch the kmer distribution encountered in a file. Then final sketch is stored in a Hnsw database See here [hnsw](https://arxiv.org/abs/1603.09320) or here [hnsw](https://ieeexplore.ieee.org/abstract/document/8594636).
+To achieve this we use sketching. We generate kmers along genome DNA or amino acid sequences and sketch the kmer distribution encountered (weighted or not) in a file, see [kmerutils](https://github.com/jean-pierreBoth/kmerutils). Then final sketch is stored in a Hnsw database See here [hnsw](https://arxiv.org/abs/1603.09320) or here [hnsw](https://ieeexplore.ieee.org/abstract/document/8594636).
 
-The sketching and database is done by the subcommand ***tohnsw***.
+The sketching and database building is done by the subcommand ***tohnsw***.
 
 The Jaccard index come in 2 flavours:  
     1. The probability Jaccard index that takes into account the Kmer multiplicity. It is defined by :
