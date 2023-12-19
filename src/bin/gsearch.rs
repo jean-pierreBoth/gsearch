@@ -461,7 +461,7 @@ fn main() {
         .arg(Arg::new("sketch_algo")
             .required(true)
             .long("algo")
-            .help("specifiy the algorithm to use for sketching: prob, super, hll or optdens")
+            .help("specifiy the algorithm to use for sketching: prob, super/super2, hll or optdens")
             .value_parser(clap::value_parser!(String))
         )
         .arg(Arg::new("aa")          // do we process amino acid file, default is dna, pass --aa
