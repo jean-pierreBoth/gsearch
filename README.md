@@ -4,7 +4,7 @@
 
 gsearch is the new name of the crate archaea.  It stands for **genomic search**.  
 
-This package (**currently in development**) compute probminhash signature of  bacteria and archaea (or virus and fungi) genomes and stores the id of bacteria and probminhash signature in a Hnsw structure for searching of new request genomes.
+This package (**currently in development**) compute MinHash-like signatures of  bacteria and archaea (or virus and fungi) genomes and stores the id of bacteria and MinHash-like signatures in a Hnsw structure for searching of new request genomes. A total of ~50,000 to ~60,000 lines of highly optimized Rust code were provided in this repo and several other crates/libraries develped for this repo, such as [kmerutils](https://github.com/jean-pierreBoth/kmerutils), [probminhash](https://github.com/jean-pierreBoth/probminhash), [hnswlib-rs](https://github.com/jean-pierreBoth/hnswlib-rs) and [annembed](https://github.com/jean-pierreBoth/annembed), see below for details. Some of the libraries are very popular and have been used about 10 thousand times, see [here](https://crates.io/crates/hnsw_rs)
 
 This package is developped by Jean-Pierre Both [jpboth](https://github.com/jean-pierreBoth) for the software part and [Jianshu Zhao](https://github.com/jianshu93) for the genomics part. We also created a mirror of this repo on [GitLab](https://gitlab.com/Jianshu_Zhao/gsearch) and [Gitee](https://gitee.com/jianshuzhao/gsearch) (You need to log in first to see the content), just in case Github service is not available in some region.
 
@@ -27,10 +27,10 @@ The Jaccard index come in 2 flavours:
     In this case for J_p we use the probminhash algorithm as implemented in [probminhash](https://github.com/jean-pierreBoth/probminhash)  
     2. The unweighted (simple) Jaccard index defined by :
         $$Jaccard(A,B)=\frac{A \cap B}{A \cup B}$$
-        In this case for J we use the [SuperMinHash](https://arxiv.org/abs/1706.05698), [SetSketch](https://vldb.org/pvldb/vol14/p2244-ertl.pdf) (based on the locality sensitivity in section 3.3 or joint maximum likelihood estimation in section 3.2, joint estimation) or densified MinHash based on [One Permutation Hashing with Optimal Densification](http://proceedings.mlr.press/v70/shrivastava17a.html) method or [One Permutation Hashing with Faster Densification](http://proceedings.mlr.press/v115/mai20a/mai20a.pdf) method, also implemented in probminhash mentioned above.  
+        In this case for J we use the [SuperMinHash](https://arxiv.org/abs/1706.05698), [SetSketch](https://vldb.org/pvldb/vol14/p2244-ertl.pdf) (based on the locality sensitivity in section 3.3 or joint maximum likelihood estimation in section 3.2, joint estimation) or densified MinHash based on [One Permutation Hashing with Optimal Densification](http://proceedings.mlr.press/v70/shrivastava17a/shrivastava17a.pdf) method or [One Permutation Hashing with Faster Densification](http://proceedings.mlr.press/v115/mai20a/mai20a.pdf) method, also implemented in probminhash mentioned above.  
     The estimated Jaccard-like index is used to build HNSW graph database, which is implemented in crate [hnswlib-rs](https://crates.io/crates/hnsw_rs).
 
-The sketching of reference genomes can take some time (less than one hours for ~65,000 bacterial genomes of GTDB for parameters giving a correct quality of sketching, or 3 to 4 hours for entire NCBI/RefSeq prokaryotic genomes. ~318K). Result is stored in 2 structures:
+The sketching of reference genomes can take some time (less than 0.5 hours for ~65,000 bacterial genomes of GTDB for parameters giving a correct quality of sketching, or 2 to 3 hours for entire NCBI/RefSeq prokaryotic genomes. ~318K). Result is stored in 2 structures:
 
 - A Hnsw structure storing rank of data processed and corresponding sketches.
 - A Dictionary associating each rank to a fasta id and fasta filename.
