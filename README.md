@@ -24,7 +24,8 @@ The Jaccard index come in 2 flavours:
     $$J_{P(A,B)}=\sum_{d\in D} \frac{1}{\sum_{d'\in D} \max (\frac{\omega_{A}(d')}{\omega_{A}(d)},\frac{\omega_{B}(d')}{\omega_{B}(d)})}$$
     where $\omega_{A}(d)$ is the multiplicity of $d$ in A
     (see [Moulton-Jiang-arxiv](https://arxiv.org/abs/1809.04052)).
-    In this case for J_p we use the probminhash algorithm as implemented in [probminhash](https://github.com/jean-pierreBoth/probminhash), or see original paper/implementation [here](https://ieeexplore.ieee.org/abstract/document/9185081).
+    In this case for J_p we use the probminhash algorithm as implemented in [probminhash](https://github.com/jean-pierreBoth/probminhash), or see original paper/implementation [here](https://ieeexplore.ieee.org/abstract/document/9185081). 
+
     2. The unweighted (simple) Jaccard index defined by :
         $$Jaccard(A,B)=\frac{A \cap B}{A \cup B}$$
         In this case for J we use the [SuperMinHash](https://arxiv.org/abs/1706.05698), [SetSketch](https://vldb.org/pvldb/vol14/p2244-ertl.pdf) (based on the locality sensitivity in section 3.3 or joint maximum likelihood estimation in section 3.2, joint estimation) or densified MinHash based on [One Permutation Hashing with Optimal Densification](http://proceedings.mlr.press/v70/shrivastava17a/shrivastava17a.pdf) method or [One Permutation Hashing with Faster Densification](http://proceedings.mlr.press/v115/mai20a/mai20a.pdf) method, also implemented in probminhash mentioned above.  
