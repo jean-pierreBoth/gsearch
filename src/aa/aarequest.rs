@@ -18,6 +18,9 @@ use crossbeam::sync::Parker;
 use serde::{Serialize, de::DeserializeOwned};
 use std::fmt::Debug;
 
+#[allow(unused)]
+use fxhash::*;
+
 use hnsw_rs::prelude::*;
 
 use probminhash::setsketcher::SetSketchParams;
@@ -528,11 +531,65 @@ pub fn get_sequence_matcher(request_params : &RequestParams, processing_params :
         } // end match HLL
         //
         SketchAlgo::REVOPTDENS => {
-            std::panic!("not yet");
-        }
+            match kmer_size {
+                1..=6 => {
+                    let hnsw_res = hnswio.load_hnsw::< <RevOptDensHashSketch<KmerAA32bit,f32> as SeqSketcherAAT<KmerAA32bit>>::Sig , DistHamming>();
+                    if hnsw_res.is_err() {
+                        std::panic!("error : {:?}", hnsw_res.err());
+                    };
+                    let hnsw = hnsw_res.unwrap();
+                    let sketcher = RevOptDensHashSketch::<KmerAA32bit, f32>::new(sketch_params);
+                    matcher = sketch_and_request_dir_compressedkmer::<KmerAA32bit, RevOptDensHashSketch<KmerAA32bit,f32> >(&request_dirpath, sketcher, 
+                            &filter_params, &seqdict, &processing_params, computing_params,
+                            &hnsw, nbng as usize, ef_search);
+                }
+                7..=12 => {
+                    let hnsw_res = hnswio.load_hnsw::< <RevOptDensHashSketch<KmerAA64bit,f32> as SeqSketcherAAT<KmerAA64bit>>::Sig , DistHamming>();
+                    if hnsw_res.is_err() {
+                        std::panic!("error : {:?}", hnsw_res.err());
+                    };
+                    let hnsw = hnsw_res.unwrap();
+                    let sketcher = RevOptDensHashSketch::<KmerAA64bit, f32>::new(sketch_params);
+                    matcher = sketch_and_request_dir_compressedkmer::<KmerAA64bit, RevOptDensHashSketch::<KmerAA64bit, f32> >(&request_dirpath, sketcher, 
+                            &filter_params, &seqdict, &processing_params, computing_params,
+                            &hnsw, nbng as usize, ef_search);
+                }
+                _ => {
+                    return Err(String::from("bad value for kmer size"));                   
+                }
+            } // end match on kmer size
+        } // end of REVOPTDENS
         SketchAlgo::SUPER2 => {
-            return Err(String::from(" SuperMinhash2 not yet in AA sketching")); 
-        }
+            match kmer_size {
+                1..=6 => {
+                    let hnsw_res = hnswio.load_hnsw::< <SuperHash2Sketch<KmerAA32bit,u32, FxHasher32> as SeqSketcherAAT<KmerAA32bit>>::Sig , DistHamming>();
+                    if hnsw_res.is_err() {
+                        std::panic!("error : {:?}", hnsw_res.err());
+                    };
+                    let hnsw = hnsw_res.unwrap();
+                    let bh32 = std::hash::BuildHasherDefault::<fxhash::FxHasher32>::default();
+                    let sketcher = SuperHash2Sketch::<KmerAA32bit, u32, FxHasher32>::new(sketch_params, bh32);
+                    matcher = sketch_and_request_dir_compressedkmer::<KmerAA32bit, SuperHash2Sketch<KmerAA32bit,u32,FxHasher32> >(&request_dirpath, sketcher, 
+                            &filter_params, &seqdict, &processing_params, computing_params,
+                            &hnsw, nbng as usize, ef_search);
+                }
+                7..=12 => {
+                    let hnsw_res = hnswio.load_hnsw::< <SuperHash2Sketch<KmerAA64bit,u64,FxHasher64> as SeqSketcherAAT<KmerAA64bit>>::Sig , DistHamming>();
+                    if hnsw_res.is_err() {
+                        std::panic!("error : {:?}", hnsw_res.err());
+                    };
+                    let hnsw = hnsw_res.unwrap();
+                    let bh64 = std::hash::BuildHasherDefault::<fxhash::FxHasher64>::default();
+                    let sketcher = SuperHash2Sketch::<KmerAA64bit, u64, FxHasher64>::new(sketch_params, bh64);
+                    matcher = sketch_and_request_dir_compressedkmer::<KmerAA64bit, SuperHash2Sketch::<KmerAA64bit, u64, FxHasher64> >(&request_dirpath, sketcher, 
+                            &filter_params, &seqdict, &processing_params, computing_params,
+                            &hnsw, nbng as usize, ef_search);
+                }
+                _ => {
+                    return Err(String::from("bad value for kmer size"));                   
+                }
+            }
+        } // end superminhash
     }; // end global match on algo
     //
     return Ok(matcher);

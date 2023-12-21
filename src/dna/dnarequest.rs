@@ -601,7 +601,7 @@ pub fn get_sequence_matcher(request_params : &RequestParams, processing_params :
                         std::panic!("error : {:?}", hnsw_res.err());
                     };
                     let hnsw = hnsw_res.unwrap(); 
-                    let bh32 = std::hash::BuildHasherDefault::<FxHasher32>::default();
+                    let bh32 = std::hash::BuildHasherDefault::<fxhash::FxHasher32>::default();
                     let sketcher = SuperHash2Sketch::<Kmer32bit, u32, FxHasher32>::new(sketch_params, bh32);
                     matcher = sketch_and_request_dir_compressedkmer::<Kmer32bit, SuperHash2Sketch::<Kmer32bit, u32, FxHasher32> >(&request_dirpath, sketcher, 
                         &filter_params, &seqdict, &processing_params, &computing_params,
@@ -639,8 +639,46 @@ pub fn get_sequence_matcher(request_params : &RequestParams, processing_params :
         } // end superminhash2
         //
         SketchAlgo::REVOPTDENS => {
-            panic!("REVOPTDENS not yet implemented over DNA request");
-        }
+            match sketch_params.get_kmer_size() {
+                0..=14 => {
+                    let hnsw_res = hnswio.load_hnsw::< <RevOptDensHashSketch<Kmer32bit, f32> as SeqSketcherT<Kmer32bit> >::Sig, DistHamming>();
+                    if hnsw_res.is_err() {
+                        std::panic!("error : {:?}", hnsw_res.err());
+                    };
+                    let hnsw = hnsw_res.unwrap();
+                    let sketcher = RevOptDensHashSketch::<Kmer32bit, f32>::new(sketch_params);
+                    matcher = sketch_and_request_dir_compressedkmer::<Kmer32bit, RevOptDensHashSketch::<Kmer32bit, f32> >(&request_dirpath, sketcher, 
+                        &filter_params, &seqdict, &processing_params, &computing_params,
+                        &hnsw, nbng as usize, ef_search);
+                }
+                17..=32 => {
+                    let hnsw_res = hnswio.load_hnsw::< <RevOptDensHashSketch<Kmer64bit, f32> as SeqSketcherT<Kmer64bit> >::Sig, DistHamming>();
+                    if hnsw_res.is_err() {
+                        std::panic!("error : {:?}", hnsw_res.err());
+                    };
+                    let hnsw = hnsw_res.unwrap();                    
+                    let sketcher = RevOptDensHashSketch::<Kmer64bit, f32>::new(sketch_params);
+                    matcher = sketch_and_request_dir_compressedkmer::<Kmer64bit, RevOptDensHashSketch::<Kmer64bit, f32> >(&request_dirpath, sketcher, 
+                        &filter_params, &seqdict, &processing_params, &computing_params,
+                        &hnsw, nbng as usize, ef_search);
+                }
+                16 => {
+                    let hnsw_res = hnswio.load_hnsw::< <RevOptDensHashSketch<Kmer16b32bit, f32> as SeqSketcherT<Kmer16b32bit> >::Sig, DistHamming>();
+                    if hnsw_res.is_err() {
+                        std::panic!("error : {:?}", hnsw_res.err());
+                    };
+                    let hnsw = hnsw_res.unwrap();  
+                    let sketcher = RevOptDensHashSketch::<Kmer16b32bit, f32>::new(sketch_params);
+                    matcher = sketch_and_request_dir_compressedkmer::<Kmer16b32bit, RevOptDensHashSketch::<Kmer16b32bit, f32> >(&request_dirpath, sketcher, 
+                        &filter_params, &seqdict, &processing_params, &computing_params,
+                        &hnsw, nbng as usize, ef_search); 
+                } 
+                _ => {
+                    log::error!("bad value for kmer size. 15 is not allowed");
+                    return Err(String::from("bad value for kmer size"));                   
+                }  
+            }
+        } // end case RevOptDensHashSketch
         
     } // end match on algo
     //

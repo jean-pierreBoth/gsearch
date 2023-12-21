@@ -60,7 +60,7 @@ hnsw_rs =  {version = "0.2"}
 # hnsw_rs = {path = "../hnswlib-rs"}
 
 # kmerutils = {path = "../kmerutils"}
-kmerutils = {git = "https://github.com/jean-pierreBoth/kmerutils", rev = "eac5625"}
+kmerutils = {git = "https://github.com/jean-pierreBoth/kmerutils"}
 # kmerutils = {git = "https://gitlab.com/jpboth/kmerutils.git"}
 # kmerutils = {version = "0.0.9"}
 
@@ -74,7 +74,7 @@ env_logger = { version = "0.9"}
 
 # optional dependency to embed hnsw graph
 # annembed = {version = "0.0.11", optional = true}
-annembed = {git = "https://github.com/jean-pierreBoth/annembed", optional=true, rev = "e355aef"}
+annembed = {git = "https://github.com/jean-pierreBoth/annembed"}
 #annembed = {path = "../annembed", optional = true}
 
 
