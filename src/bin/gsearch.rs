@@ -205,7 +205,10 @@ fn parse_tohnsw_cmd(matches : &ArgMatches) -> Result<(String, ProcessingParams),
             sketch_algo = SketchAlgo::HLL;
         }
         else if algoname == String::from("optdens") {
-            sketch_algo = SketchAlgo::OPTDENS;
+            sketch_algo = SketchAlgo::OPTDENS;   
+        }
+        else if algoname == String::from("revoptdens") {
+            sketch_algo = SketchAlgo::REVOPTDENS;
         }
         else {
             println!("unknown asketching algo");
@@ -213,7 +216,7 @@ fn parse_tohnsw_cmd(matches : &ArgMatches) -> Result<(String, ProcessingParams),
         }
     }
     else {
-        log::error!("option --algo  super | prob | optdens | hll required");
+        log::error!("option --algo  super | super2 | prob | optdens | revoptdens | hll required");
         std::panic!("sketching algo required");
     }
     // kmer size
@@ -461,7 +464,7 @@ fn main() {
         .arg(Arg::new("sketch_algo")
             .required(true)
             .long("algo")
-            .help("specifiy the algorithm to use for sketching: prob, super/super2, hll or optdens")
+            .help("specifiy the algorithm to use for sketching: prob, super/super2, hll or optdens/revoptdens")
             .value_parser(clap::value_parser!(String))
         )
         .arg(Arg::new("aa")          // do we process amino acid file, default is dna, pass --aa
