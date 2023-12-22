@@ -555,7 +555,7 @@ fn main() {
     // the global command
     //
     let matches = Command::new("gsearch")
-        .version("0.1.3")
+        .version("0.1.4")
         .about("Approximate nearest neighbour search for microbial genomes based on MinHash-like metric")
             .arg_required_else_help(true)
             .arg(Arg::new("pario")                // do we use parallel io
