@@ -547,8 +547,8 @@ pub fn dna_process_tohnsw(dirpath : &PathBuf, filter_params : &FilterParams, pro
             // if memory limits the number of sketching threads, we will use more in iterators.
             let nb_cpus = num_cpus::get();
             log::info!("nb cpus : {}", nb_cpus);
-            let nb_iter_thtreads = ((nb_cpus.max(4) - 4) / others_params.get_sketching_nbthread().max(1)).max(1);
-            let hll_seqs_threading = HllSeqsThreading::new(nb_iter_thtreads, 10_000_000);
+            let nb_iter_threads = ((nb_cpus.max(4) - 4) / others_params.get_sketching_nbthread().max(1)).max(1);
+            let hll_seqs_threading = HllSeqsThreading::new(nb_iter_threads, 10_000_000);
             log::info!("HllSeqsThreading : {:?}", hll_seqs_threading);
             if kmer_size <= 14 {
                 // allocated the correct sketcher
@@ -618,7 +618,25 @@ pub fn dna_process_tohnsw(dirpath : &PathBuf, filter_params : &FilterParams, pro
         }
         //
         SketchAlgo::REVOPTDENS => {
-            panic!("REVOPTDENS not yet implemented over DNA sketch");
+            if kmer_size <= 14 {
+                // allocated the correct sketcher
+                let sketcher = RevOptDensHashSketch::<Kmer32bit, f32>::new(sketchparams);
+                sketchandstore_dir_compressedkmer::<Kmer32bit, RevOptDensHashSketch::<Kmer32bit, f32> >(&dirpath, sketcher, 
+                            &filter_params, &processing_parameters, others_params);
+            }
+            else if kmer_size == 16 {
+                let sketcher = RevOptDensHashSketch::<Kmer16b32bit, f32>::new(sketchparams);
+                sketchandstore_dir_compressedkmer::<Kmer16b32bit, RevOptDensHashSketch::<Kmer16b32bit, f32>>(&dirpath, sketcher, 
+                            &filter_params, &processing_parameters, others_params);
+            }
+            else if  kmer_size <= 32 {
+                let sketcher = RevOptDensHashSketch::<Kmer64bit, f32>::new(sketchparams);
+                sketchandstore_dir_compressedkmer::<Kmer64bit, RevOptDensHashSketch::<Kmer64bit, f32>>(&dirpath, sketcher, 
+                            &filter_params, &processing_parameters, others_params);
+            }
+            else {
+                panic!("kmers cannot be greater than 32");
+            }
         }      
     }
 } // end of dna_process
