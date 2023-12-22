@@ -74,8 +74,8 @@ env_logger = { version = "0.9"}
 
 # optional dependency to embed hnsw graph
 # annembed = {version = "0.0.11", optional = true}
-# annembed = {git = "https://github.com/jean-pierreBoth/annembed", optional=true}
-annembed = {path = "../annembed", optional = true}
+annembed = {git = "https://github.com/jean-pierreBoth/annembed", optional=true}
+# annembed = {path = "../annembed", optional = true}
 
 
 # no more pb with between anyhow intel-mkl-src
