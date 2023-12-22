@@ -501,7 +501,23 @@ pub fn aa_process_tohnsw(dirpath : &PathBuf, filter_params : &FilterParams, proc
             }
         }
         SketchAlgo::SUPER2 => {
-            panic!("SUPER2 not yet implemented over AA sketching");
+            if kmer_size <= 6 {
+                // allocated the correct sketcher. SuperHash2Sketch should enable BuildHasher choice to sketch to u32.
+                // we used just in tests
+                let bh = std::hash::BuildHasherDefault::<fxhash::FxHasher32>::default();
+                let sketcher = SuperHash2Sketch::<KmerAA32bit, u32, fxhash::FxHasher32>::new(sketch_params, bh);
+                sketchandstore_dir_compressedkmer::<KmerAA32bit, SuperHash2Sketch::<KmerAA32bit, u32, fxhash::FxHasher32> >(&dirpath, sketcher, 
+                            &filter_params, &processing_parameters, others_params);
+            }
+            else if kmer_size <= 12 {
+                let bh = std::hash::BuildHasherDefault::<fxhash::FxHasher64>::default();
+                let sketcher = SuperHash2Sketch::<KmerAA64bit, u64, fxhash::FxHasher64>::new(sketch_params, bh);
+                sketchandstore_dir_compressedkmer::<KmerAA64bit, SuperHash2Sketch::<KmerAA64bit, u64, fxhash::FxHasher64> >(&dirpath, sketcher, 
+                            &filter_params, &processing_parameters, others_params);
+            }
+            else {
+                panic!("kmer for Amino Acids must be less or equal to 12");
+            }
         }
         //
         SketchAlgo::OPTDENS => {
@@ -519,7 +535,17 @@ pub fn aa_process_tohnsw(dirpath : &PathBuf, filter_params : &FilterParams, proc
         }
         //
         SketchAlgo::REVOPTDENS => {
-            panic!("REVOPTDENS not yet implemented over AA sketching");
+            if kmer_size <= 6 {
+                let sketcher = RevOptDensHashSketch::<KmerAA32bit, f32>::new(sketch_params);
+                sketchandstore_dir_compressedkmer::<KmerAA32bit, RevOptDensHashSketch::<KmerAA32bit, f32>>(&dirpath, sketcher, &filter_params, &processing_parameters, others_params);
+            }
+            else if kmer_size <= 12 {
+                let sketcher = RevOptDensHashSketch::<KmerAA64bit, f32>::new(sketch_params);
+                sketchandstore_dir_compressedkmer::<KmerAA64bit, RevOptDensHashSketch::<KmerAA64bit, f32>>(&dirpath, sketcher, &filter_params, &processing_parameters, others_params);                
+            }
+            else {
+                panic!("kmer for Amino Acids must be less or equal to 12");
+            }
         }
     }
 } // end of aa_process_tohnsw
