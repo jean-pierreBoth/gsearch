@@ -325,7 +325,7 @@ We provide pre-built genome/proteome database graph file for bacteria/archaea, v
 - Bacteria/archaea genomes from NCBI/RefSeq until Jan. 2023 (~318,000 genomes)(<https://www.ncbi.nlm.nih.gov/refseq/about/prokaryotes/>), no clustering at a given ANI threshold.
 - Virus data base are based on the JGI IMG/VR database newest version (<https://genome.jgi.doe.gov/portal/IMG_VR/IMG_VR.home.html>), which also define a virus OTU (vOTU) at 95% ANI.  
 - Fungi database are based on the entire RefSeq fungal genomes (retrived via the MycoCosm website), we dereplicated and define a fungal speices at 99.5% ANI.
-- All four pre-built databases are available here:<http://enve-omics.ce.gatech.edu/data/gsearch>
+- All four pre-built databases are available here:<http://enve-omics.ce.gatech.edu/data/gsearch> or at FigShare, see the download links [here](./gsearch_database.txt)
 
 ## To do list
 
