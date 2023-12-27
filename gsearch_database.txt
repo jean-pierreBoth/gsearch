@@ -1,0 +1,34 @@
+GSearch database share site Figshare, go to the link for each type of database in your browser and then click the download link.
+
+### RefSeq genome nt optdens
+https://doi.org/10.6084/m9.figshare.24615792.v1
+
+### RefSeq genome aa optdens
+https://doi.org/10.6084/m9.figshare.22681939.v1
+
+
+### GTDB genome all optdens
+https://doi.org/10.6084/m9.figshare.24617760.v1
+
+
+
+### Refseq genome nt prob and hll
+https://doi.org/10.6084/m9.figshare.24615678.v1
+
+
+### RefSeq genome aa prob and hll
+https://doi.org/10.6084/m9.figshare.24630000.v1
+
+
+### GTDB genome prob and hll, nt and aa
+https://doi.org/10.6084/m9.figshare.24632319.v1 
+
+### IMG/VR 4 virus genome optdens, aa
+https://doi.org/10.6084/m9.figshare.24632316.v1 
+
+### RefSeq genome super2 nt
+https://doi.org/10.6084/m9.figshare.24905271.v1
+
+### GTDB genome super2 nt and aa
+https://doi.org/10.6084/m9.figshare.24905994.v1
+
