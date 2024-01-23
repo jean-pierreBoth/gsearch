@@ -35,16 +35,16 @@ impl <'a> ReqAnswer<'a> {
         let has_match = self.neighbours.iter().any(|&n| n.distance <= threshold);
         let mut nb_match = 0;
         if has_match {
-            write!(out, "\n\n {} path: {}, fasta_id: {}, length : {}", self.rank, self.req_item.get_id().get_path(), 
+            write!(out, "\n{}\t{}\tfasta_id:\t{}\tlength:\t{}", self.rank, self.req_item.get_id().get_path(), 
                     self.req_item.get_id().get_fasta_id(), self.req_item.get_len())?;
             for n in self.neighbours {
                 // get database identification of neighbour
                 if n.distance  < threshold {
                     nb_match += 1;
                     let database_id = seqdict.0[n.d_id].get_id().get_path();
-                    write!(out, "\n\t query_id: \t {} \t distance: \t {:.5E} \t answer_fasta_path \t {}",self.req_item.get_id().get_path(), n.distance, database_id)?;
+                    write!(out, "\nquery_id:\t{}\tdistance:\t {:.5E}\tanswer_fasta_path\t{}",self.req_item.get_id().get_path(), n.distance, database_id)?;
                     log::debug!(" \t data id : {}", n.d_id);
-                    write!(out, "\t {} \t answer_seq_len:\t {}", seqdict.0[n.d_id].get_id().get_fasta_id(), seqdict.0[n.d_id].get_len())?;
+                    write!(out, "{} \t answer_seq_len:\t {}", seqdict.0[n.d_id].get_id().get_fasta_id(), seqdict.0[n.d_id].get_len())?;
                 }
             }
         } // end match
