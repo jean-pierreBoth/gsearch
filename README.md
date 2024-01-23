@@ -45,7 +45,37 @@ For adding new genomes to existing database, the ***add*** subcommand is being u
 ## Request, search new genomes agains pre-built database
 
 For requests  the subcommand ***request*** is being used. It reloads the dumped files, hnsw and seqdict related
-takes a list of fasta files containing requests and for each fasta file dumps the asked number of nearest neighbours according to distance mentioned above. A tabular file will be saved to disk with 3 key columns: query genome path, database genome path (ranked by distance) and distance. The distance can be transformed into ANI or AAI according to the equation above. Check the scripts for analyzing output from request here: https://github.com/jianshu93/gsearch_analysis
+takes a list of fasta files containing requests and for each fasta file dumps the asked number of nearest neighbours according to distance mentioned above. A tabular file will be saved to disk (gsearch.neighbors.txt) with 3 key columns: query genome path, database genome path (ranked by distance) and distance. The distance can be transformed into ANI or AAI according to the equation above. We provide the script to do that: 
+```bash
+./scripts/reformat.sh -h
+    Usage: ./script.sh kmer model input_file output_file
+
+    kmer          The kmer value used for ANI calculation.
+    model         The model to be used for ANI calculation (1 or 2), corresponding to Poisson model or Binomial model.
+    input_file    File containing the data to be transformed into tabular format.
+    output_file   File where the tabular output will be saved.
+```
+```bash
+./scripts/reformat.sh 16 1 ./gsearch.neighbors.txt ./clean.txt
+```
+You will then see the clean output like this:
+
+| Query_Name      | Distance | Neighbor_Fasta_name             | Neighbor_Seq_Len | ANI     |
+|-----------------|----------|---------------------------------|------------------|---------|
+| test03.fasta.gz | 5.40E-01 | GCF_024448335.1_genomic.fna.gz  | 4379993          | 97.1126 |
+| test03.fasta.gz | 8.22E-01 | GCF_000219605.1_genomic.fna.gz  | 4547930          | 92.5276 |
+| test03.fasta.gz | 8.71E-01 | GCF_021432085.1_genomic.fna.gz  | 4775870          | 90.7837 |
+| test03.fasta.gz | 8.76E-01 | GCF_003935375.1_genomic.fna.gz  | 4657537          | 90.5424 |
+| test03.fasta.gz | 8.78E-01 | GCF_000341615.1_genomic.fna.gz  | 4674664          | 90.4745 |
+| test03.fasta.gz | 8.79E-01 | GCF_014764705.1_genomic.fna.gz  | 4861582          | 90.4108 |
+| test03.fasta.gz | 8.79E-01 | GCF_000935215.1_genomic.fna.gz  | 4878963          | 90.398  |
+| test03.fasta.gz | 8.82E-01 | GCF_002929225.1_genomic.fna.gz  | 4898053          | 90.2678 |
+| test03.fasta.gz | 8.83E-01 | GCA_007713455.1_genomic.fna.gz  | 4711826          | 90.2361 |
+| test03.fasta.gz | 8.86E-01 | GCF_003696315.1_genomic.fna.gz  | 4321164          | 90.1098 |
+
+Query_Name is your query genomes, Distance is genomic Jaccard distance (1-J/Jp), Neighbor_Fasta_name is the nearest neighbors based on the genomic Jaccard distance, ranked by distance. ANI is calculated from genomic Jaccard distance according the equaiton above between you query genome and nearest database genomes.
+
+We also provide scripts for analyzing output from request and compare with other ANI based methods here: https://github.com/jianshu93/gsearch_analysis
 
 ## Ann
 For UMAP-like algorithm to perform dimension reduction and then visuzlizing genome database, we run it after the tohnsw step (pre-built database) (see below useage ann section). See [annembed](https://github.com/jean-pierreBoth/annembed) crate for details. Then the output of this step can be visualized, for example for the GTDB v207 we have the following plot. A new paper for the library and also this subcommand is in preparation.
@@ -160,16 +190,24 @@ mv GSearch_GTDB_optdens.tar.gz GTDB_optdens/
 wget https://github.com/jean-pierreBoth/gsearch/releases/download/v0.0.12/test_data.tar.gz --no-check-certificate
 tar xzvf ./test_data.tar.gz
 
+###clone gsearch repo for the scripts
+git clone https://github.com/jean-pierreBoth/gsearch.git
 
 ### test nt genome database
 cd ./GTDB/nucl
 ##default probminhash database
 tar -xzvf k16_s12000_n128_ef1600.prob.tar.gz
-# request neighbors for nt genomes (here -n is how many neighbors you want to return for each of your query genome)
+# request neighbors for nt genomes (here -n is how many neighbors you want to return for each of your query genome, output will be gsearch.neighbors.txt in the current folder)
 gsearch --pio 100 --nbthreads 24 request -b ./k16_s12000_n128_ef1600_canonical -r ../../test_data/query_dir_nt -n 50
+## reformat output to have ANI
+../../gsearch/scripts/reformat.sh 16 1 ./gsearch.neighbors.txt ./clean_ANI.txt
+
 ## SetSketch/hll database
 tar -xzvf k16_s4096_n128_ef1600.hll.tar.gz
 gsearch --pio 100 --nbthreads 24 request -b ./k16_s4096_n128_ef1600_canonical_hll -r ../../test_data/query_dir_nt -n 50
+## reformat output to have ANI
+../../gsearch/scripts/reformat.sh 16 1 ./gsearch.neighbors.txt ./clean_ANI.txt
+
 ## Densified MinHash, download first, see above
 cd GTDB_optdens
 tar -xzvf GSearch_GTDB_optdens.tar.gz
@@ -177,20 +215,24 @@ cd GTDB
 #nt
 tar -xzvf k16_s18000_n128_ef1600_optdens.tar.gz
 gsearch --pio 100 --nbthreads 24 request -b ./k16_s18000_n128_ef1600_optdens -r ../../test_data/query_dir_nt -n 50
-
+## reformat output to have ANI
+../../gsearch/scripts/reformat.sh 16 1 ./gsearch.neighbors.txt ./clean_ANI.txt
 
 ### or request neighbors for aa genomes (predicted by Prodigal or FragGeneScanRs), probminhash and SetSketch/hll
 
 cd ./GTDB/prot
 tar xzvf k7_s12000_n128_ef1600.prob.tar.gz
 gsearch --pio 100 --nbthreads 24 request -b ./k7_s12000_n128_ef1600_gsearch -r ../../test_data/query_dir_aa -n 50
+## reformat output to have AAI
+../../gsearch/scripts/reformat.sh 16 1 ./gsearch.neighbors.txt ./clean_AAI.txt
 
 #aa densified MinHash
 cd ./GTDB_optdens
 cd GTDB
 tar -xzvf k7_s12000_n128_ef1600_optdens.tar.gz
 gsearch --pio 100 --nbthreads 24 request -b ./k7_s12000_n128_ef1600_optdens -r ../../test_data/query_dir_aa -n 50
-
+## reformat output to have AAI
+../../gsearch/scripts/reformat.sh 16 1 ./gsearch.neighbors.txt ./clean_ANI.txt
 
 ### or request neighbors for aa universal gene (extracted by hmmer according to hmm files from gtdb, we also provide one in release page)
 
