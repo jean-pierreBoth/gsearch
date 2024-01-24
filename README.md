@@ -106,6 +106,7 @@ For UMAP-like algorithm to perform dimension reduction and then visuzlizing geno
 ## or if you are on MacOS and have homebrew installed
 ```bash
 brew tap jianshu93/gsearch
+brew update
 brew install gsearch
 gsearch -h
 
