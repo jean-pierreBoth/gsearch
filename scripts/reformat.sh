@@ -34,11 +34,13 @@ fi
 # Check if correct number of arguments is provided
 if [[ "$1" == "" || "$2" == "" || "$3" == "" || "$4" == "" || "$4" == "-h" ]]; then
     echo "
+    This script is to format output from gsearch software and calculate ANI with a given model
+
     Usage: ./script.sh kmer model input_file output_file
 
     kmer          The kmer value used for ANI calculation.
     model         The model to be used for ANI calculation (1 or 2), corresponding to Poisson model or Binomial model.
-    input_file    File containing the data to be transformed into tabular format.
+    input_file    File containing the data to be transformed into tabular format, should be gsearch.neighbors.txt
     output_file   File where the tabular output will be saved.
     " >&2
     exit 1
