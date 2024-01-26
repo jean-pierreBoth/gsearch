@@ -86,7 +86,18 @@ For UMAP-like algorithm to perform dimension reduction and then visuzlizing geno
 
 ![Alt!](https://github.com/jean-pierreBoth/gsearch/blob/master/GSearch-annembed-GTDBv207.jpg?raw=true)
 
+## Database split
+We provide a bunch of scripts to allow split database genomes into N pieces and build HNSW graph database for each piece, then run search of new genomes against those pieces and collect results. This will only requires 1/N memory for your machine at the cost of additional sketching for the same query genomes. 
+```bash
+### for a folder with genomes in it, we can split it into N subfolders randomly by running:
+./scripts/split_folder.sh input_folder_path output_folder_path 3
 
+### using the output from above split_folder.sh step, build database for each subfolder
+./scripts/multiple_build.sh output_folder_path gsearch_db_folder
+
+### using output from above multiple_build.sh step, search new genomes againt each database
+./scripts/multiple_search.sh gsearch_db_folder_output new_genome_folder_path output
+```
 ## Simple case for install
 
 **Pre-built binaries** will be available on release page [binaries](https://github.com/jean-pierreBoth/gsearch/releases/tag/v0.1.3-beta) for major platforms (no need to install but just download and make it executable). We recommend you use the linux one (GSearch_Linux_x86-64_v0.1.3.zip) for linux system in this release page for convenience (only system libraries are required). For macOS, we recommend the binary mac-binaries (GSearch_Darwin_x86-64_v0.1.3.zip or GSearch_Darwin_aarch64_v0.1.3.zip) for corresponding platform (x86-64 or arm64). Or GSearch_pc-windows-msvc_x86-64_v0.1.3.zip for Windows.
