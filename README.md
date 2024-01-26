@@ -279,9 +279,8 @@ gsearch ann -b ./k7_s12000_n128_ef1600_gsearch --stats --embed
 
 ## Output explanation
 
-**gsearch.answers.txt** is the default output file in your current directory.  
- For each of your genome in the query_dir, there will be requested N nearest genomes found and sorted by distance (smallest to largest).  
-  If one genome in the query does not exist in the output file, meaning at this level (nt or aa), there is no such nearest genomes in the database (or distant away from the best hit in the database), you may then go to amino acid level or universal gene level.
+**gsearch.neighbors.txt** is the default output file in your current directory.  
+ For each of your genome in the query_dir, there will be requested N nearest genomes found and sorted by distance (smallest to largest) or ANI (largest to smallest). If one genome in the query does not exist in the output file, meaning at this level (nt or aa), there is no such nearest genomes in the database (or distant away from the best hit in the database), you may then go to amino acid level or universal gene level.
 
 ## Dependencies, features and Installation
 
