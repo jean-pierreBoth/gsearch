@@ -1,8 +1,8 @@
-# GSearch: A Rust Genomic Search Program based on Various MinHash-like Metrics and HNSW for Microbial Genomes
+# GSearch: Ultra-fast and Scalable Genome Search based on Various MinHash-like Metrics and HNSW
 
 ![Alt!](https://github.com/jean-pierreBoth/gsearch/blob/master/GSearch-logo.jpg?raw=true)
 
-gsearch is the new name of the crate archaea.  It stands for **genomic search**.  
+GSearch stands for **genomic search**.  
 
 This package (**currently in development**) compute MinHash-like signatures of  bacteria and archaea (or virus and fungi) genomes and stores the id of bacteria and MinHash-like signatures in a Hnsw structure for searching of new request genomes. A total of ~50,000 to ~60,000 lines of highly optimized Rust code were provided in this repo and several other crates/libraries develped for this repo, such as [kmerutils](https://github.com/jean-pierreBoth/kmerutils), [probminhash](https://github.com/jean-pierreBoth/probminhash), [hnswlib-rs](https://github.com/jean-pierreBoth/hnswlib-rs) and [annembed](https://github.com/jean-pierreBoth/annembed), see below for details. Some of the libraries are very popular and have been used about 10 thousand times, see [here](https://crates.io/crates/hnsw_rs).
 
