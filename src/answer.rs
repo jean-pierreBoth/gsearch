@@ -42,7 +42,7 @@ impl <'a> ReqAnswer<'a> {
                 if n.distance  < threshold {
                     nb_match += 1;
                     let database_id = seqdict.0[n.d_id].get_id().get_path();
-                    write!(out, "\nquery_id:\t{}\tdistance:\t {:.5E}\tanswer_fasta_path\t{}",self.req_item.get_id().get_path(), n.distance, database_id)?;
+                    write!(out, "\nquery_id:\t{}\tdistance:\t{:.5E}\tanswer_fasta_path\t{}",self.req_item.get_id().get_path(), n.distance, database_id)?;
                     log::debug!(" \t data id : {}", n.d_id);
                     write!(out, "{} \t answer_seq_len:\t {}", seqdict.0[n.d_id].get_id().get_fasta_id(), seqdict.0[n.d_id].get_len())?;
                 }
