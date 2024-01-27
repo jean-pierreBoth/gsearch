@@ -49,18 +49,25 @@ For adding new genomes to existing database, the ***add*** subcommand is being u
 ## Request, search new genomes agains pre-built database
 
 For requests  the subcommand ***request*** is being used. It reloads the dumped files, hnsw and seqdict related
-takes a list of fasta files containing requests and for each fasta file dumps the asked number of nearest neighbours according to distance mentioned above. A tabular file will be saved to disk (gsearch.neighbors.txt) with 3 key columns: query genome path, database genome path (ranked by distance) and distance. The distance can be transformed into ANI or AAI according to the equation above. We provide the script to do that: 
+takes a list of fasta files containing requests and for each fasta file dumps the asked number of nearest neighbours according to distance mentioned above. A tabular file will be saved to disk (gsearch.neighbors.txt) with 3 key columns: query genome path, database genome path (ranked by distance) and distance. The distance can be transformed into ANI or AAI according to the equation above. We provide the program reformat (also parallel implementation) to do that: 
 ```bash
-./scripts/reformat.sh -h
-    Usage: ./script.sh kmer model input_file output_file
+reformat -h
+Processes input files for ANI calculation
 
-    kmer          The kmer value used for ANI calculation.
-    model         The model to be used for ANI calculation (1 or 2), corresponding to Poisson model or Binomial model.
-    input_file    File containing the data to be transformed into tabular format.
-    output_file   File where the tabular output will be saved.
+Usage: reformat <kmer> <model> <input_file> <output_file>
+
+Arguments:
+  <kmer>         The kmer value used for ANI calculation (16)
+  <model>        The model to be used for ANI calculation (1 or 2)
+  <input_file>   File containing the data to be transformed into tabular format
+  <output_file>  File where the tabular output will be saved
+
+Options:
+  -h, --help     Print help
+  -V, --version  Print version
 ```
 ```bash
-./scripts/reformat.sh 16 1 ./gsearch.neighbors.txt ./clean.txt
+reformat 16 1 ./gsearch.neighbors.txt ./clean.txt
 ```
 You will then see the clean output like this:
 
