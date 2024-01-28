@@ -58,7 +58,7 @@ Usage: reformat <kmer> <model> <input_file> <output_file>
 
 Arguments:
   <kmer>         The kmer value used for ANI calculation (16)
-  <model>        The model to be used for ANI calculation (1 or 2)
+  <model>        The model to be used for ANI calculation (1 or 2,corresponding to Poisson model and Binomial model)
   <input_file>   File containing the data to be transformed into tabular format
   <output_file>  File where the tabular output will be saved
 
