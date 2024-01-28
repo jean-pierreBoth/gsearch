@@ -33,8 +33,8 @@ check_gsearch_installed() {
 # Check if gsearch is installed
 check_gsearch_installed
 
-# Check for the existence of reformat.sh
-if ! command -v reformat.sh >/dev/null 2>&1; then
+# Check for the existence of reformat
+if ! command -v reformat >/dev/null 2>&1; then
     echo "reformat.sh is not found. Please ensure it is installed and in your PATH."
     exit 1
 fi
@@ -80,8 +80,8 @@ for folder in "$INPUT_FOLDER"/*/; do
         continue
     fi
 
-    # Run the reformat.sh script
-    reformat.sh 16 1 ./gsearch.neighbors.txt ./clean.txt
+    # Run the reformat command
+    reformat 16 1 ./gsearch.neighbors.txt ./clean.txt
 
     # Store the header if it's not already stored
     if [[ -z "$HEADER_LINE" ]]; then
