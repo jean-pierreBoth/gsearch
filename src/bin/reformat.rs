@@ -13,7 +13,7 @@ fn main() -> io::Result<()> {
              .help("The kmer value used for ANI calculation")
              .required(true))
         .arg(Arg::new("model")
-             .help("The model to be used for ANI calculation (1 or 2)")
+             .help("The model to be used for ANI calculation (1 or 2, corresponding to Poisson model and Binomial model)")
              .required(true))
         .arg(Arg::new("input_file")
              .help("File containing the data to be transformed into tabular format")
