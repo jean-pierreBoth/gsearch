@@ -201,8 +201,9 @@ Options:
 wget http://enve-omics.ce.gatech.edu/data/public_gsearch/GTDBv207_v2023.tar.gz
 tar -xzvf ./GTDBv207_v2023.tar.gz
 
-### Densified MinHash database (optdens), go to https://doi.org/10.6084/m9.figshare.24617760.v1 
+### Densified MinHash database (optdens) for NCBI/RefSeq, go to https://doi.org/10.6084/m9.figshare.24617760.v1 
 ### Download the file in the link by clicking the red download to you machine (file GSearch_GTDB_optdens.tar.gz will be downloaded)
+wget http://enve-omics.ce.gatech.edu/data/public_gsearch/GSearch_optdens.tar.gz
 mkdir GTDB_optdens
 mv GSearch_GTDB_optdens.tar.gz GTDB_optdens/
 
