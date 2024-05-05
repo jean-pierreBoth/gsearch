@@ -22,7 +22,6 @@ use std::fmt::Debug;
 use fxhash::*;
 
 use hnsw_rs::prelude::*;
-
 use probminhash::setsketcher::SetSketchParams;
 
 use kmerutils::base::kmertraits::*;
