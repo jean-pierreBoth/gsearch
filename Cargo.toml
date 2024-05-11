@@ -1,7 +1,7 @@
 [package]
 name = "gsearch"
 version = "0.1.4"
-authors = ["jeanpierre.both@gmail.com","jianshu.zhao@gatech.edu"]
+authors = ["jeanpierre.both@gmail.com", "jianshu.zhao@gatech.edu"]
 repository = "https://github.com/jean-pierreBoth/gsearch"
 keywords = ["hnsw", "probminhash", "bacteria"]
 edition = "2021"
@@ -9,10 +9,9 @@ license = "MIT OR Apache-2.0"
 description = "genome classification, probminhash hnsw, genome search"
 
 
-
 [[bin]]
 
-name= "gsearchbin"
+name = "gsearchbin"
 path = "src/bin/gsearch.rs"
 
 [[bin]]
@@ -31,69 +30,67 @@ path = "src/lib.rs"
 # cargo doc --no-deps avoid dependencies doc generation
 #
 
-serde= {version = "1.0", features = ["derive"] }
-serde_json= {version = "1.0"}
+serde = { version = "1.0", features = ["derive"] }
+serde_json = { version = "1.0" }
 
-num = {version = "0.4"}
-chrono = {version = "0.4"}
-memory-stats = {version = "1.1", features=["always_use_statm"]}
+num = { version = "0.4" }
+chrono = { version = "0.4" }
+memory-stats = { version = "1.1", features = ["always_use_statm"] }
 
 # for //
-crossbeam-utils = {version = "0.8"}
-crossbeam-channel = {version = "0.5"}
-crossbeam = {version = "0.8"}
-concurrent-queue = {version = "2.2.0"}
-parking_lot ={version="0.12"}
-rayon = {version = "1.8"}
-num_cpus = {version = "1.13.0"}
+crossbeam-utils = { version = "0.8" }
+crossbeam-channel = { version = "0.5" }
+crossbeam = { version = "0.8" }
+concurrent-queue = { version = "2.5" }
+parking_lot = { version = "0.12" }
+rayon = { version = "1.10" }
+num_cpus = { version = "1.13.0" }
 
-cpu-time = {version = "1.0"}
-needletail = {version = "0.5"}
-clap = {version = "4.1"}
-fxhash = {version = "0.2"}
+cpu-time = { version = "1.0" }
+needletail = { version = "0.5" }
+clap = { version = "4.5" }
+fxhash = { version = "0.2" }
 ##
 
-probminhash = {version = "0.1.10"}
+probminhash = { version = "0.1.11" }
 # probminhash = {git = "https://github.com/jean-pierreBoth/probminhash"}
 # probminhash = {path = "../probminhash"}
 
-hnsw_rs =  {version = "0.2"}
-# hnsw_rs =  {git = "https://github.com/jean-pierreBoth/hnswlib-rs"}
+# hnsw_rs = { version = "0.3" }
+hnsw_rs = { git = "https://github.com/jean-pierreBoth/hnswlib-rs" }
 # hnsw_rs = {git = "https://gitlab.com/jpboth/hnswlib-rs.git"}
-# hnsw_rs = {path = "../hnswlib-rs"}
+# hnsw_rs = { path = "../hnswlib-rs" }
 
-# kmerutils = {path = "../kmerutils"}
-kmerutils = {git = "https://github.com/jean-pierreBoth/kmerutils"}
+kmerutils = { path = "../kmerutils" }
+# kmerutils = { git = "https://github.com/jean-pierreBoth/kmerutils" }
 # kmerutils = {git = "https://gitlab.com/jpboth/kmerutils.git"}
-# kmerutils = {version = "0.0.9"}
+# kmerutils = {version = "0.0.10"}
 
-lazy_static = { version = "1.4"}
+lazy_static = { version = "1.4" }
 
 # decreasing order of log for debug build : (max_level_)trace debug info warn error off
 # decreasing order of log for release build (release_max_level_)  .. idem
 #log = { version = "0.4", features = ["max_level_trace", "release_max_level_trace"] }
-log = { version = "0.4"}
-env_logger = { version = "0.9"}
+log = { version = "0.4" }
+env_logger = { version = "0.11" }
 
 # optional dependency to embed hnsw graph
 # annembed = {version = "0.0.11", optional = true}
-annembed = {git = "https://github.com/jean-pierreBoth/annembed", optional=true}
-# annembed = {path = "../annembed", optional = true}
+annembed = { git = "https://github.com/jean-pierreBoth/annembed", optional = true }
+#annembed = { path = "../annembed", optional = true }
 
 
 # no more pb with between anyhow intel-mkl-src
 anyhow = { version = "1.0.58" }
-csv = {version = "1.1"}
+csv = { version = "1.1" }
 
 [features]
 
-default = []
+default = ["annembed_openblas-system"]
 
-annembed_openblas-static = [ "annembed/openblas-static"]
-annembed_openblas-system = [ "annembed/openblas-system"]
-annembed_intel-mkl = [ "annembed/intel-mkl-static"]
+annembed_openblas-static = ["annembed/openblas-static"]
+annembed_openblas-system = ["annembed/openblas-system"]
+annembed_intel-mkl = ["annembed/intel-mkl-static"]
 
 withzmq = ["kmerutils/withzmq"]
 simdeez_f = ["hnsw_rs/simdeez_f", "kmerutils/simdeez_f"]
-
-
