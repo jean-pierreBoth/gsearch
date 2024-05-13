@@ -56,15 +56,15 @@ probminhash = { version = "0.1.11" }
 # probminhash = {git = "https://github.com/jean-pierreBoth/probminhash"}
 # probminhash = {path = "../probminhash"}
 
-# hnsw_rs = { version = "0.3" }
-hnsw_rs = { git = "https://github.com/jean-pierreBoth/hnswlib-rs" }
+hnsw_rs = { version = "0.3" }
+#hnsw_rs = { git = "https://github.com/jean-pierreBoth/hnswlib-rs" }
 # hnsw_rs = {git = "https://gitlab.com/jpboth/hnswlib-rs.git"}
 # hnsw_rs = { path = "../hnswlib-rs" }
 
-kmerutils = { path = "../kmerutils" }
+# kmerutils = { path = "../kmerutils" }
 # kmerutils = { git = "https://github.com/jean-pierreBoth/kmerutils" }
 # kmerutils = {git = "https://gitlab.com/jpboth/kmerutils.git"}
-# kmerutils = {version = "0.0.10"}
+kmerutils = { version = "0.0.11" }
 
 lazy_static = { version = "1.4" }
 
@@ -75,8 +75,8 @@ log = { version = "0.4" }
 env_logger = { version = "0.11" }
 
 # optional dependency to embed hnsw graph
-# annembed = {version = "0.0.11", optional = true}
-annembed = { git = "https://github.com/jean-pierreBoth/annembed", optional = true }
+annembed = { version = "0.1.3", optional = true }
+# annembed = { git = "https://github.com/jean-pierreBoth/annembed", optional = true }
 #annembed = { path = "../annembed", optional = true }
 
 
