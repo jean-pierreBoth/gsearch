@@ -100,6 +100,7 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT+KmerBuilder<Kmer>, Ske
     let toprocess_path : PathBuf;
     //
     let mut hnswio : HnswIo;
+    // For MinHash-like algorithms, we initialize HNSW with hamming distance to calculate collision probability of sketch/signature vectors
     let mut hnsw : Hnsw::< <Sketcher as SeqSketcherT<Kmer>>::Sig, DistHamming>;
     //
     if computing_params.get_adding_mode() {
