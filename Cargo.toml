@@ -19,6 +19,10 @@ path = "src/bin/gsearch.rs"
 name = "reformat"
 path = "src/bin/reformat.rs"
 
+[[bin]]
+
+name = "superani"
+path = "src/bin/superani.rs"
 
 [lib]
 
@@ -84,9 +88,11 @@ annembed = { version = "0.1.3", optional = true }
 anyhow = { version = "1.0.58" }
 csv = { version = "1.1" }
 
+skani = "0.1.0"
+
 [features]
 
-default = ["annembed_openblas-system"]
+default = []
 
 annembed_openblas-static = ["annembed/openblas-static"]
 annembed_openblas-system = ["annembed/openblas-system"]
