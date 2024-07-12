@@ -88,6 +88,26 @@ Query_Name is your query genomes, Distance is genomic Jaccard distance (1-J/Jp),
 
 We also provide scripts for analyzing output from request and compare with other ANI based methods here: https://github.com/jianshu93/gsearch_analysis
 
+## SuperANI
+Additional ANI calculation (if you do not want to use MinHash estimated ANI) for the query genomes and nearest neighbor genomes can be performed via the program superani:
+
+```bash
+superani -h
+ ************** initializing logger *****************
+
+Computing average nucleotide identity between reference and query genomes via sparse kmer chaining or Open Syncmer with Densified MinHash
+
+Usage: superani --ql <FILE> --rl <FILE> --output <FILE>
+
+Options:
+  -q, --ql <FILE>      A file containing a list of query genome paths (.gz supported)
+  -r, --rl <FILE>      A file containing a list of reference genome paths (.gz supported)
+  -o, --output <FILE>  Output file to write results
+  -h, --help           Print help
+  -V, --version        Print version
+```
+The input is query genome path and reference genome path and output is ANI between each query and each reference genome. Both input files can be created by extracting from the output of gsearch request command with some modification of genome path. Multithreaded computation is supported and it can also be used as a seperate ANI calculator.  
+
 ## Ann
 For UMAP-like algorithm to perform dimension reduction and then visuzlizing genome database, we run it after the tohnsw step (pre-built database) (see below useage ann section). See [annembed](https://github.com/jean-pierreBoth/annembed) crate for details. Then the output of this step can be visualized, for example for the GTDB v207 we have the following plot. See paper [here](https://www.biorxiv.org/content/10.1101/2024.01.28.577627v1).
 
