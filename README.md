@@ -108,6 +108,20 @@ Options:
 ```
 The input is query genome path and reference genome path and output is ANI between each query and each reference genome. Both input files can be created by extracting from the output of gsearch request command with some modification of genome path. Multithreaded computation is supported and it can also be used as a seperate ANI calculator.  
 
+## FragGeneScanRs
+```bash
+### predict genes for request at amino acid level, credit to original author but we rewrite the user inteface to be consistent with gsearch and other commands
+FragGeneScanRs -s ./data/NC_000913.fna -o NC_000913 -t complete -p 8
+
+```
+
+## hmmsearch
+```bash
+### we wrapped the HMMER C AIP and made modification so that the output is tabular for easy parsing. Universal gene HMMs can be found in the data folder
+hmmsearch_rs -f ./data/test03.faa -m ./data/DNGNGWU00010_mingle_output_good_seqs.hmm
+```
+
+
 ## Ann
 For UMAP-like algorithm to perform dimension reduction and then visuzlizing genome database, we run it after the tohnsw step (pre-built database) (see below useage ann section). See [annembed](https://github.com/jean-pierreBoth/annembed) crate for details. Then the output of this step can be visualized, for example for the GTDB v207 we have the following plot. See paper [here](https://www.biorxiv.org/content/10.1101/2024.01.28.577627v1).
 
