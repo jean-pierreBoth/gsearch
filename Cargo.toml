@@ -24,6 +24,14 @@ path = "src/bin/reformat.rs"
 name = "superani"
 path = "src/bin/superani.rs"
 
+[[bin]]
+name = "FragGeneScanRs"
+path = "src/bin/FragGeneScanRs.rs"
+
+[[bin]]
+name = "hmmsearch"
+path = "src/bin/hmmsearch_rs.rs"
+
 [lib]
 
 path = "src/lib.rs"
@@ -55,7 +63,14 @@ needletail = { version = "0.5" }
 clap = { version = "4.5" }
 fxhash = { version = "0.2" }
 ##
+seq_io = "0.3.1"
+thiserror = "1.0.25"
+strum = "0.21.0"
+strum_macros = "0.21.0"
+frag_gene_scan_rs = "1.1.0"
+skani = "0.1.0"
 
+hmmer-rs = {git = "https://github.com/jianshu93/hmmer-rs"}
 probminhash = { version = "0.1.11" }
 # probminhash = {git = "https://github.com/jean-pierreBoth/probminhash"}
 # probminhash = {path = "../probminhash"}
