@@ -11,7 +11,8 @@ This package is developped by Jean-Pierre Both [jpboth](https://github.com/jean-
 ## Key functions
 ## Sketching of genomes/tohnsw, to build hnsw graph database
 
-The objective is to use the Jaccard index as an accurate proxy of mutation rate or Average Nucleitide Identity(ANI) or Average Amino Acide Identity (AAI) According to equation (Poisson model or Binomial model):$$ANI=1+\frac{1}{k}log\frac{2*J}{1+J}$$
+The objective is to use the Jaccard index as an accurate proxy of mutation rate or Average Nucleitide Identity(ANI) or Average Amino Acide Identity (AAI) According to equation (Poisson model or Binomial model):
+$$ANI=1+\frac{1}{k}log\frac{2*J}{1+J}$$
 
 or
 
