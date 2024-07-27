@@ -431,6 +431,6 @@ We provide pre-built genome/proteome database graph file for bacteria/archaea, v
 
 ## References
 
-1. Jianshu Zhao, Jean Pierre-Both, Luis M. Rodriguez-R and Konstantinos T. Konstantinidis, 2022. GSearch: Ultra-Fast and Scalable Microbial Genome Search by combining Kmer Hashing with Hierarchical Navigable Small World Graphs. *bioRxiv* 2022:2022.2010.2021.513218. [biorxiv](https://www.biorxiv.org/content/10.1101/2022.10.21.513218v3).
+1. Jianshu Zhao, Jean Pierre Both, Luis M Rodriguez-R, Konstantinos T Konstantinidis, GSearch: ultra-fast and scalable genome search by combining K-mer hashing with hierarchical navigable small world graphs, Nucleic Acids Research, 2024;, gkae609, https://doi.org/10.1093/nar/gkae609. 
 
 2. Jianshu Zhao, Jean Pierre-Both, Konstantinos T Konstantinidis, 2024. Approximate Nearest Neighbor Graph Provides Fast and Efficient Embedding with Applications in Large-scale Biological Data. *bioRxiv* 2024.01.28.577627. [biorxiv](https://www.biorxiv.org/content/10.1101/2024.01.28.577627v1)
