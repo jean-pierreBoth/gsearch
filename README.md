@@ -141,7 +141,7 @@ We provide a bunch of scripts to allow split database genomes into N pieces and 
 ```
 ## Simple case for install
 
-**Pre-built binaries** will be available on release page [binaries](https://github.com/jean-pierreBoth/gsearch/releases/tag/v0.1.3-beta) for major platforms (no need to install but just download and make it executable). We recommend you use the linux one (GSearch_Linux_x86-64_v0.1.3.zip) for linux system in this release page for convenience (only system libraries are required). For macOS, we recommend the binary mac-binaries (GSearch_Darwin_x86-64_v0.1.3.zip or GSearch_Darwin_aarch64_v0.1.3.zip) for corresponding platform (x86-64 or arm64). Or GSearch_pc-windows-msvc_x86-64_v0.1.3.zip for Windows.
+**Pre-built binaries** will be available on release page [binaries](https://github.com/jean-pierreBoth/gsearch/releases/tag/v0.1.5) for major platforms (no need to install but just download and make it executable). We recommend you use the linux one (gsearch_Linux_x86-64_v0.1.5.zip) for linux system in this release page for convenience (only system libraries are required). For macOS, we recommend the universal binary mac-binaries (gsearch_Darwin_universal_v0.1.5.tar.gz). Or GSearch_pc-windows-msvc_x86-64_v0.1.3.zip for Windows.
 
 ## Or if you have conda installed on linux
 
@@ -170,15 +170,14 @@ Otherwise it is possible to install/compile by yourself (see install section)
 
 ### get the binary for linux (make sure you have recent Linux installed with GCC, e.g., Ubuntu 18.0.4 or above)
 
-wget https://github.com/jean-pierreBoth/gsearch/releases/download/v0.1.3-beta/GSearch_Linux_x86-64_v0.1.3.zip --no-check-certificate
-unzip GSearch_Linux_x86-64_v0.1.3.zip
+wget https://github.com/jean-pierreBoth/gsearch/releases/download/v0.1.5/gsearch_Linux_x86-64_v0.1.5.zip --no-check-certificate
+unzip gsearch_Linux_x86-64_v0.1.5.zip
+cd gsearch_Linux_x86-64_v0.1.5
 
-## get the x86-64 binary for macOS
-wget https://github.com/jean-pierreBoth/gsearch/releases/download/v0.1.3-beta/GSearch_Darwin_x86-64_v0.1.3.zip --no-check-certificate
-unzip GSearch_Darwin_x86-64_v0.1.3.zip
-## get the aarch64/arm64 binary for macOS
-wget https://github.com/jean-pierreBoth/gsearch/releases/download/v0.1.3-beta/GSearch_Darwin_aarch64_v0.1.3.zip --no-check-certificate
-unzip GSearch_Darwin_aarch64_v0.1.3.zip
+## get the binary for macOS (universal)
+wget https://github.com/jean-pierreBoth/gsearch/releases/download/v0.1.5/gsearch_Darwin_universal_v0.1.5.tar.gz --no-check-certificate
+tar -xzvf gsearch_Darwin_universal_v0.1.5.tar.gz
+
 
 ## get the binary for Windows, ann subcommand is not available for windows for now
 wget https://github.com/jean-pierreBoth/gsearch/releases/download/v0.1.3-beta/GSearch_pc-windows-msvc_x86-64_v0.1.3.zip
