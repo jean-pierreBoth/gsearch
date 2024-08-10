@@ -1,3 +1,10 @@
+[![install with bioconda](https://img.shields.io/badge/install%20with-bioconda-brightgreen.svg?style=flat)](http://bioconda.github.io/recipes/gsearch/README.html)
+![](https://anaconda.org/bioconda/gsearch/badges/license.svg)
+![](https://anaconda.org/bioconda/gsearch/badges/version.svg)
+![](https://anaconda.org/bioconda/gsearch/badges/latest_release_relative_date.svg)
+![](https://anaconda.org/bioconda/gsearch/badges/platforms.svg)
+[![DOI](https://zenodo.org/badge/187937357.svg)](https://doi.org/10.5281/zenodo.10543594)
+
 # GSearch: Ultra-fast and Scalable Genome Search based on Various MinHash-like Metrics and HNSW
 
 ![Alt!](https://github.com/jean-pierreBoth/gsearch/blob/master/GSearch-logo.jpg?raw=true)
