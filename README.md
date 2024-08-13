@@ -121,7 +121,26 @@ The input is query genome path and reference genome path and output is ANI betwe
 FragGeneScanRs -s ./data/NC_000913.fna -o NC_000913 -t complete -p 8
 
 ```
+## SuperAAI
+Calculate AAI between genomes based on FracMinhash
+```bash
+ ************** initializing logger *****************
 
+Compute Average Amino Acid Identity (AAI) via FracMinHash/Sourmash for genomes
+
+Usage: superaai [OPTIONS] --ql <FILE> --rl <FILE> --output <FILE>
+
+Options:
+  -q, --ql <FILE>      File containing list of query protein paths (.faa format, .gz supported)
+  -r, --rl <FILE>      File containing list of reference protein paths (.faa format, .gz supported)
+  -o, --output <FILE>  Output file to write results
+  -k, --kmer <INT>     K-mer size for MinHash calculation [default: 7]
+  -l, --scaled <INT>   Scaled factor for MinHash calculation [default: 100]
+  -s, --sketch <INT>   Sketch size for MinHash (number of hashes) [default: 5120]
+  -h, --help           Print help
+  -V, --version        Print version
+```
+The input is query genome path (proteome) and reference genome path (proteome) and output is AAI between each query and each reference genome. 
 ## hmmsearch
 ```bash
 ### we wrapped the HMMER C API and made modification so that the output is tabular for easy parsing. Universal gene HMMs can be found in the data folder
