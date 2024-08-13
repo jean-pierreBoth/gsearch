@@ -29,8 +29,13 @@ name = "FragGeneScanRs"
 path = "src/bin/FragGeneScanRs.rs"
 
 [[bin]]
-name = "hmmsearch"
+name = "hmmsearch_rs"
 path = "src/bin/hmmsearch_rs.rs"
+
+[[bin]]
+
+name = "superaai"
+path = "src/bin/superaai.rs"
 
 [lib]
 
@@ -69,7 +74,7 @@ strum = "0.21.0"
 strum_macros = "0.21.0"
 frag_gene_scan_rs = "1.1.0"
 skani = "0.1.0"
-
+sourmash = "0.15.0"
 hmmer-rs = {git = "https://github.com/jianshu93/hmmer-rs"}
 probminhash = { version = "0.1.11" }
 # probminhash = {git = "https://github.com/jean-pierreBoth/probminhash"}
@@ -102,6 +107,7 @@ annembed = { version = "0.1.3", optional = true }
 # no more pb with between anyhow intel-mkl-src
 anyhow = { version = "1.0.58" }
 csv = { version = "1.1" }
+
 
 
 [features]
