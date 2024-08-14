@@ -170,6 +170,7 @@ Query_Name is your query genomes, Distance is genomic Jaccard distance (1-J/Jp),
 
 We also provide scripts for analyzing output from request and compare with other ANI based methods here: https://github.com/jianshu93/gsearch_analysis
 
+
 ## SuperANI
 Additional ANI calculation (if you do not want to use MinHash estimated ANI) for the query genomes and nearest neighbor genomes can be performed via the program superani:
 
@@ -196,6 +197,30 @@ The input is query genome path and reference genome path and output is ANI betwe
 FragGeneScanRs -s ./data/NC_000913.fna -o NC_000913 -t complete -p 8
 
 ```
+
+## hmmsearch_rs
+```bash
+hmmsearch_rs -h
+
+ ************** initializing logger *****************
+
+Search protein sequences against HMM profiles
+
+Usage: hmmsearch_rs [OPTIONS] --faa <fasta> --hmm <hmm>
+
+Options:
+  -f, --faa <fasta>      Path to the faa file containing the protein sequences
+  -m, --hmm <hmm>        Path to the HMM file
+  -o, --output <output>  Output file to save the search results
+  -h, --help             Print help
+  -V, --version          Print version
+```
+we wrapped the HMMER C API and made modification so that the output is tabular for easy parsing. Universal gene HMMs can be found in the data folder. This command is only available in the release page for linux, not via bioconda. It is available for MacOS
+```bash
+### search a proteome agains a HMM pforile
+hmmsearch_rs -f ./data/test03.faa -m ./data/HMM_bacteria/PF00380.20.HMM
+```
+
 ## SuperAAI
 Calculate AAI between genomes based on FracMinhash
 ```bash
@@ -216,12 +241,6 @@ Options:
   -V, --version        Print version
 ```
 The input is query genome path (proteome) and reference genome path (proteome) and output is AAI between each query and each reference genome. 
-## hmmsearch_rs
-```bash
-### we wrapped the HMMER C API and made modification so that the output is tabular for easy parsing. Universal gene HMMs can be found in the data folder
-hmmsearch_rs -f ./data/test03.faa -m ./data/DNGNGWU00010_mingle_output_good_seqs.hmm
-```
-
 
 ## Ann
 For UMAP-like algorithm to perform dimension reduction and then visuzlizing genome database, we run it after the tohnsw step (pre-built database) (see below useage ann section). See [annembed](https://github.com/jean-pierreBoth/annembed) crate for details. Then the output of this step can be visualized, for example for the GTDB v207 we have the following plot. See paper [here](https://www.biorxiv.org/content/10.1101/2024.01.28.577627v1).
@@ -239,6 +258,34 @@ We provide a bunch of scripts to allow split database genomes into N pieces and 
 
 ### using output from above multiple_build.sh step, search new genomes againt each database
 ./scripts/multiple_search.sh gsearch_db_folder_output new_genome_folder_path output
+```
+## Database clustering via CoreSet construction for large databases
+For real world datasets with billions of genomes, in additional to the random split idea mentioned above, approximate clustering via CoreSet can be used via the hnswcore command:
+
+```bash
+hnswcore -h
+
+ ************** initializing logger *****************
+
+Approximate Clustering via Streaming CoreSet Construction
+
+Usage: hnswcore --dir <dir> --fname <fname> --type <typename> [COMMAND]
+
+Commands:
+  coreset  CoreSet Construction
+  help     Print this message or the help of the given subcommand(s)
+
+Options:
+  -d, --dir <dir>        directory contains HNSW database files
+  -f, --fname <fname>    HNSW database file basename
+  -t, --type <typename>  type for HNSW distance, e.f., f32, u32
+  -h, --help             Print help
+```
+You can ask for a given number of cluters so that each cluster of genome sketches is smaller in size:
+
+```bash
+### if the optdens and revoptdens was used, the output HNSW database can be clustered into 5 pieces like this
+hnswcore --dir ./ --fname hnswdump --type f32 coreset --cluster 5
 ```
 
 ## Simple case for install
