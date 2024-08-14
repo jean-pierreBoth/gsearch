@@ -15,6 +15,30 @@ This package (**currently in development**) compute MinHash-like signatures of  
 
 This package is developped by Jean-Pierre Both [jpboth](https://github.com/jean-pierreBoth) for the software part and [Jianshu Zhao](https://github.com/jianshu93) for the genomics part. We also created a mirror of this repo on [GitLab](https://gitlab.com/Jianshu_Zhao/gsearch) and [Gitee](https://gitee.com/jianshuzhao/gsearch) (You need to log in first to see the content), just in case Github service is not available in some region.
 
+```bash
+gsearch -h
+ ************** initializing logger *****************
+
+Approximate nearest neighbour search for microbial genomes based on MinHash-like metric
+
+Usage: gsearch [OPTIONS] [COMMAND]
+
+Commands:
+  tohnsw   Build HNSW graph database from a collection of database genomes based on MinHash-like metric
+  add      Add new genome files to a pre-built HNSW graph database
+  request  Request nearest neighbors of query genomes against a pre-built HNSW graph database/index
+  ann      Approximate Nearest Neighbor Embedding using UMAP-like algorithm
+  help     Print this message or the help of the given subcommand(s)
+
+Options:
+      --pio <pio>              Parallel IO processing
+      --nbthreads <nbthreads>  nb thread for sketching
+  -h, --help                   Print help
+  -V, --version                Print version
+
+```
+
+
 ## Key functions
 ## Sketching of genomes/tohnsw, to build hnsw graph database
 
@@ -50,13 +74,64 @@ The sketching of reference genomes and HNSW graph database building can take som
 The Hnsw structure is dumped *in hnswdump.hnsw.graph* and  *hnswdump.hnsw.data*
 The Dictionary is dumped in a json file *seqdict.json*
 
+```bash
+ ************** initializing logger *****************
+
+Build HNSW graph database from a collection of database genomes based on MinHash-like metric
+
+Usage: gsearch tohnsw [OPTIONS] --dir <hnsw_dir> --kmer <kmer_size> --sketch <sketch_size> --nbng <neighbours> --algo <sketch_algo>
+
+Options:
+  -d, --dir <hnsw_dir>        directory for storing database genomes
+  -k, --kmer <kmer_size>      k-mer size to use
+  -s, --sketch <sketch_size>  sketch size of minhash to use
+  -n, --nbng <neighbours>     Maximum allowed number of neighbors (M) in HNSW
+      --ef <ef>               ef_construct in HNSW
+      --algo <sketch_algo>    specifiy the algorithm to use for sketching: prob, super/super2, hll or optdens/revoptdens
+      --aa                    --aa Specificy amino acid processing, require no value
+      --block                 --block : sketching is done concatenating sequences
+  -h, --help                  Print help
+
+```
+
+
 ## Adding genomes to existing/pre-built database
 For adding new genomes to existing database, the ***add*** subcommand is being used. It will automatically load sketching files, graph files and also paremeters used for building the graph and then use the same parameters to add new genomes to exisiting database genomes.
+
+```bash
+ ************** initializing logger *****************
+
+Add new genome files to a pre-built HNSW graph database
+
+Usage: gsearch add --hnsw <hnsw_dir> --new <newdata_dir>
+
+Options:
+  -b, --hnsw <hnsw_dir>    set the name of directory containing already constructed hnsw data
+  -n, --new <newdata_dir>  set directory containing new data
+  -h, --help               Print help
+```
 
 ## Request, search new genomes agains pre-built database
 
 For requests  the subcommand ***request*** is being used. It reloads the dumped files, hnsw and seqdict related
-takes a list of fasta files containing requests and for each fasta file dumps the asked number of nearest neighbours according to distance mentioned above. A tabular file will be saved to disk (gsearch.neighbors.txt) with 3 key columns: query genome path, database genome path (ranked by distance) and distance. The distance can be transformed into ANI or AAI according to the equation above. We provide the program reformat (also parallel implementation) to do that: 
+takes a list of fasta files containing requests and for each fasta file dumps the asked number of nearest neighbours according to distance mentioned above. 
+```bash
+
+ ************** initializing logger *****************
+
+Request nearest neighbors of query genomes against a pre-built HNSW graph database/index
+
+Usage: gsearch request --hnsw <DATADIR> --nbanswers <nb_answers> --query <request_dir>
+
+Options:
+  -b, --hnsw <DATADIR>          directory contains pre-built database files
+  -n, --nbanswers <nb_answers>  Sets the number of neighbors for the query
+  -r, --query <request_dir>     Sets the directory of request genomes
+  -h, --help                    Print help
+
+```
+
+A tabular file will be saved to disk in current directory (gsearch.neighbors.txt) with 3 key columns: query genome path, database genome path (ranked by distance) and distance. The distance can be transformed into ANI or AAI according to the equation above. We provide the program reformat (also parallel implementation) to do that: 
 ```bash
 reformat -h
 Processes input files for ANI calculation
@@ -141,7 +216,7 @@ Options:
   -V, --version        Print version
 ```
 The input is query genome path (proteome) and reference genome path (proteome) and output is AAI between each query and each reference genome. 
-## hmmsearch
+## hmmsearch_rs
 ```bash
 ### we wrapped the HMMER C API and made modification so that the output is tabular for easy parsing. Universal gene HMMs can be found in the data folder
 hmmsearch_rs -f ./data/test03.faa -m ./data/DNGNGWU00010_mingle_output_good_seqs.hmm
@@ -165,9 +240,10 @@ We provide a bunch of scripts to allow split database genomes into N pieces and 
 ### using output from above multiple_build.sh step, search new genomes againt each database
 ./scripts/multiple_search.sh gsearch_db_folder_output new_genome_folder_path output
 ```
+
 ## Simple case for install
 
-**Pre-built binaries** will be available on release page [binaries](https://github.com/jean-pierreBoth/gsearch/releases/tag/v0.1.5) for major platforms (no need to install but just download and make it executable). We recommend you use the linux one (gsearch_Linux_x86-64_v0.1.5.zip) for linux system in this release page for convenience (only system libraries are required). For macOS, we recommend the universal binary mac-binaries (gsearch_Darwin_universal_v0.1.5.tar.gz). Or GSearch_pc-windows-msvc_x86-64_v0.1.3.zip for Windows.
+**Pre-built binaries** will be available on release page [binaries](https://github.com/jean-pierreBoth/gsearch/releases/tag/v0.1.5) for major platforms (no need to install but just download and make it executable). We recommend you use the linux one (gsearch_Linux_x86-64_v0.1.5.zip) for linux system in this release page for convenience (only system libraries are required). For macOS, we recommend the universal binary mac-binaries (gsearch_Darwin_universal_v0.1.5.tar.gz). Or GSearch_pc-windows-msvc_x86-64_v0.1.5.zip for Windows.
 
 ## Or if you have conda installed on linux
 
@@ -224,30 +300,6 @@ sudo spctl --master-disable
 ```
 
 ## Usage
-
-```bash
-gsearch -h
- ************** initializing logger *****************
-
-Approximate nearest neighbour search for microbial genomes based on MinHash-like metric
-
-Usage: gsearch [OPTIONS] [COMMAND]
-
-Commands:
-  tohnsw   Build HNSW graph database from a collection of database genomes based on MinHash-like metric
-  add      Add new genome files to a pre-built HNSW graph database
-  request  Request nearest neighbors of query genomes against a pre-built HNSW graph database/index
-  ann      Approximate Nearest Neighbor Embedding using UMAP-like algorithm
-  help     Print this message or the help of the given subcommand(s)
-
-Options:
-      --pio <pio>              Parallel IO processing
-      --nbthreads <nbthreads>  nb thread for sketching
-  -h, --help                   Print help
-  -V, --version                Print version
-
-```
-
 ##We then give here an example of utilization with prebuilt databases.
 
 ```bash
