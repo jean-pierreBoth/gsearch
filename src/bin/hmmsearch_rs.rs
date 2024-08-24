@@ -1,5 +1,5 @@
 use clap::{Command, Arg, value_parser};
-use hmmer_rs::{Hmm, HmmerPipeline, EaselSequence, Alphabet};
+use hmmer_rs_2::{Hmm, HmmerPipeline, EaselSequence, Alphabet};
 use needletail::parse_fastx_file;
 use std::path::Path;
 use std::fs::File;
