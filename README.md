@@ -288,6 +288,41 @@ You can ask for a given number of cluters so that each cluster of genome sketche
 hnswcore --dir ./ --fname hnswdump --type f32 coreset --cluster 5
 ```
 
+## Seqeunce search
+We also provide general purpose sequence search via BigSig(BItsliced Genomic Signature Index), which can be used to quickly identify reads against a reference genome database.
+```bash
+ ************** initializing logger *****************
+
+Large-scale Sequence Search with BItsliced Genomic Signature Index (BIGSIG)
+
+Usage: bigsig [COMMAND]
+
+Commands:
+  construct  Construct a BIGSIG
+  query      Query a BIGSI on one or more fasta/fastq.gz files
+  identify   Identify reads based on probability
+  help       Print this message or the help of the given subcommand(s)
+
+Options:
+  -h, --help     Print help
+  -V, --version  Print version
+```
+You can run the 2 steps to perform read identification like this:
+```bash
+### ref_file_example is path for reference genomes, see below
+time bigsig construct -r ref_file_example.txt -b test -k 31 -mv 21 -s 10000000 -n 4 -t 24
+time bigsig identify -b test.mxi -q ./test_data/SRR548019.fastq.gz -n output -t 24
+```
+
+input format:
+
+```bash
+### ref_file_example.txt
+Salmonella_enterica_salamae_VIII_74-1880	./refs/74_1880.fasta
+Salmonella_enterica_salamae_b_Ar0560	./refs/Ar0560.fasta
+Salmonella_enterica_houtenae_Type	./refs/NCTC10401.fasta
+Salmonella_bongori_Type-NCTC12419	./refs/S_bongoriType_NCTC12419.fasta
+```
 ## Simple case for install
 
 **Pre-built binaries** will be available on release page [binaries](https://github.com/jean-pierreBoth/gsearch/releases/tag/v0.1.5) for major platforms (no need to install but just download and make it executable). We recommend you use the linux one (gsearch_Linux_x86-64_v0.1.5.zip) for linux system in this release page for convenience (only system libraries are required). For macOS, we recommend the universal binary mac-binaries (gsearch_Darwin_universal_v0.1.5.tar.gz). Or GSearch_pc-windows-msvc_x86-64_v0.1.5.zip for Windows.
