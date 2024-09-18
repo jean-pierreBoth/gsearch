@@ -88,7 +88,7 @@ fn main() -> Result<()> {
                 .help("Minimum coverage kmer threshold")
                 .default_missing_value("-1")))
         .subcommand(Command::new("query")
-            .about("Query a BIGSI on one or more fasta/fastq.gz files")
+            .about("Query a BIGSIG on one or more fasta/fastq.gz files")
             .arg_required_else_help(true)
             .version("0.1.0")
             .arg(Arg::new("bigsi")
