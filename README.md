@@ -299,7 +299,7 @@ Usage: bigsig [COMMAND]
 
 Commands:
   construct  Construct a BIGSIG
-  query      Query a BIGSI on one or more fasta/fastq.gz files
+  query      Query a BIGSIG on one or more fasta/fastq.gz files
   identify   Identify reads based on probability
   help       Print this message or the help of the given subcommand(s)
 
