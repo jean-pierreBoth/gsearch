@@ -5,6 +5,8 @@
 ![](https://anaconda.org/bioconda/gsearch/badges/platforms.svg)
 [![DOI](https://zenodo.org/badge/187937357.svg)](https://doi.org/10.5281/zenodo.10543594)
 
+![Alt!](https://github.com/jean-pierreBoth/gsearch/blob/master/GSearch_art.jpg?raw=true)
+
 # GSearch: Ultra-fast and Scalable Genome Search based on Various MinHash-like Metrics and HNSW
 
 ![Alt!](https://github.com/jean-pierreBoth/gsearch/blob/master/GSearch-logo.jpg?raw=true)
