@@ -345,7 +345,7 @@ Salmonella_bongori_Type-NCTC12419	./refs/S_bongoriType_NCTC12419.fasta
     conda create -n python38 python=3.8
     conda activate python38
     conda config --add channels bioconda
-    conda install gsearch -c bioconda
+    conda install -c conda-forge -c bioconda gsearch
     gsearch -h
 ```
 ## or if you are on MacOS and have homebrew installed
