@@ -11,7 +11,7 @@
 
 ![Alt!](https://github.com/jean-pierreBoth/gsearch/blob/master/GSearch-logo.jpg?raw=true)
 
-##quick install
+## quick install
 ```bash
 conda install -c conda-forge -c bioconda gsearch
 ```
