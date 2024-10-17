@@ -11,8 +11,16 @@
 
 ![Alt!](https://github.com/jean-pierreBoth/gsearch/blob/master/GSearch-logo.jpg?raw=true)
 
-## quick install
+## quick install on Linux
 ```bash
+### pre-combiled binary
+wget https://github.com/jean-pierreBoth/gsearch/releases/download/v0.1.5/gsearch_Linux_x86-64_v0.1.5.zip
+unzip gsearch_Linux_x86-64_v0.1.5.zip
+chmod a+x ./gsearch_Linux_x86-64_v0.1.5/*
+cd gsearch_Linux_x86-64_v0.1.5
+./gsearch -h
+
+### Install via bioconda (hmmsearch_rs and hnswcore not available for now)
 conda install -c conda-forge -c bioconda gsearch
 ```
 
