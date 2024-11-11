@@ -531,18 +531,23 @@ This can be done using the **--features** option as explained below, or by modif
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 ```
 
-### gsearch installation and compilation from Crates.io (Recommended)
+### gsearch installation and compilation from Crates.io (not recommended)
+- simple install without annembed feature
+```bash
+cargo install gsearch --no-default-features --features="simdeez_f"
+```
+
 
 - simple installation, with annembed enabled would be with intel-mkl
-
 ```bash
-    cargo install gsearch --features="annembed_intel-mkl"
+    cargo install gsearch --no-default-features --features="annembed_intel-mkl,simdeez_f"
+    
 ```
 
 or with a system installed openblas:
 
 ```bash
-cargo install gsearch --features="annembed_openblas-system"
+cargo install gsearch --features="annembed_openblas-system,simdeez_f"
 ```
 
 - On MacOS, which requires dynamic library link (you have to install openblas first):
