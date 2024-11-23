@@ -284,7 +284,12 @@ wget https://github.com/jianshu93/coreset/releases/download/v0.1.0/hnswcore_Linu
 unzip hnswcore_Linux_x86-64_v0.1.0.zip
 chmod a+x ./hnswcore
 ```
+1. First, we need to build a database via MinHash sketch and have nearest neighbors for each database genome.
+```bash
+gsearch --pio 4000 --nbthreads 60 tohnsw -d ../files -k 16 -s 18000 -n 128 --ef 1600 --algo optdens
 
+```
+2. Second, we use the output from the step 1 to run Coreset clustering, --dir is the current directory in step 1.
 ```bash
 hnswcore -h
 
@@ -307,9 +312,10 @@ Options:
 You can ask for a given number of cluters so that each cluster of genome sketches is smaller in size:
 
 ```bash
-### if the optdens and revoptdens was used, the output HNSW database can be clustered into 5 pieces like this
+### if the optdens and revoptdens was used (see step 1), the output HNSW database can be clustered into 5 pieces like this
 hnswcore --dir ./ --fname hnswdump --type f32 coreset --cluster 5
 ```
+3. Use the dictjsontocsv.ipynb python notebook in scripts folder to transfrom the cluster membership information id in HNSW to actual genome id.
 
 ## Seqeunce search
 We also provide general purpose sequence search via BigSig(BItsliced Genomic Signature Index), which can be used to quickly identify reads against a reference genome database.
