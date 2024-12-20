@@ -28,9 +28,6 @@ path = "src/bin/superani.rs"
 name = "FragGeneScanRs"
 path = "src/bin/FragGeneScanRs.rs"
 
-[[bin]]
-name = "hmmsearch_rs"
-path = "src/bin/hmmsearch_rs.rs"
 
 [[bin]]
 
