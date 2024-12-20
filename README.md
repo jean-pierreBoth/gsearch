@@ -262,7 +262,7 @@ Options:
 The input is query genome path (proteome) and reference genome path (proteome) and output is AAI between each query and each reference genome. 
 
 ## Ann
-For UMAP-like algorithm to perform dimension reduction and then visuzlizing genome database, we run it after the tohnsw step (pre-built database) (see below useage ann section). See [annembed](https://github.com/jean-pierreBoth/annembed) crate for details. Then the output of this step can be visualized, for example for the GTDB v207 we have the following plot. See paper [here](https://www.biorxiv.org/content/10.1101/2024.01.28.577627v1).
+For UMAP-like algorithm to perform dimension reduction and then visuzlizing genome database, we run it after the tohnsw step (pre-built database) (see below useage ann section). See [annembed](https://github.com/jean-pierreBoth/annembed) crate for details. Then the output of this step can be visualized, for example for the GTDB v207 we have the following plot. See paper [here](https://academic.oup.com/nargab/article/6/4/lqae172/7928174).
 
 ![Alt!](https://github.com/jean-pierreBoth/gsearch/blob/master/GSearch-annembed-GTDBv207.jpg?raw=true)
 
