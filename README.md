@@ -5,6 +5,9 @@
 ![](https://anaconda.org/bioconda/gsearch/badges/platforms.svg)
 [![DOI](https://zenodo.org/badge/187937357.svg)](https://doi.org/10.5281/zenodo.10543594)
 
+[![Latest Version](https://img.shields.io/crates/v/gsearch?style=for-the-badge&color=mediumpurple&logo=rust)](https://crates.io/crates/gsearch)
+[![docs.rs](https://img.shields.io/docsrs/gsearch?style=for-the-badge&logo=docs.rs&color=mediumseagreen)](https://docs.rs/gsearch/latest/gsearch/)
+
 ![Alt!](https://github.com/jean-pierreBoth/gsearch/blob/master/GSearch_art.jpg?raw=true)
 
 # GSearch: Ultra-fast and Scalable Genome Search based on Various MinHash-like Metrics and HNSW
@@ -626,4 +629,4 @@ We provide pre-built genome/proteome database graph file for bacteria/archaea, v
 
 1. Jianshu Zhao, Jean Pierre Both, Luis M Rodriguez-R, Konstantinos T Konstantinidis, GSearch: ultra-fast and scalable genome search by combining K-mer hashing with hierarchical navigable small world graphs, Nucleic Acids Research, 2024;, gkae609, https://doi.org/10.1093/nar/gkae609. 
 
-2. Jianshu Zhao, Jean Pierre-Both, Konstantinos T Konstantinidis, 2024. Approximate Nearest Neighbor Graph Provides Fast and Efficient Embedding with Applications in Large-scale Biological Data. *bioRxiv* 2024.01.28.577627. [biorxiv](https://www.biorxiv.org/content/10.1101/2024.01.28.577627v1)
+2. Jianshu Zhao, Jean Pierre Both, Konstantinos T Konstantinidis, Approximate nearest neighbor graph provides fast and efficient embedding with applications for large-scale biological data, NAR Genomics and Bioinformatics, Volume 6, Issue 4, December 2024, lqae172, https://doi.org/10.1093/nargab/lqae172
