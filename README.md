@@ -172,18 +172,18 @@ reformat 16 1 ./gsearch.neighbors.txt ./clean.txt
 ```
 You will then see the clean output like this:
 
-| Query_Name      | Distance | Neighbor_Fasta_name             | Neighbor_Seq_Len | ANI     |
-|-----------------|----------|---------------------------------|------------------|---------|
-| test03.fasta.gz | 5.40E-01 | GCF_024448335.1_genomic.fna.gz  | 4379993          | 97.1126 |
-| test03.fasta.gz | 8.22E-01 | GCF_000219605.1_genomic.fna.gz  | 4547930          | 92.5276 |
-| test03.fasta.gz | 8.71E-01 | GCF_021432085.1_genomic.fna.gz  | 4775870          | 90.7837 |
-| test03.fasta.gz | 8.76E-01 | GCF_003935375.1_genomic.fna.gz  | 4657537          | 90.5424 |
-| test03.fasta.gz | 8.78E-01 | GCF_000341615.1_genomic.fna.gz  | 4674664          | 90.4745 |
-| test03.fasta.gz | 8.79E-01 | GCF_014764705.1_genomic.fna.gz  | 4861582          | 90.4108 |
-| test03.fasta.gz | 8.79E-01 | GCF_000935215.1_genomic.fna.gz  | 4878963          | 90.398  |
-| test03.fasta.gz | 8.82E-01 | GCF_002929225.1_genomic.fna.gz  | 4898053          | 90.2678 |
-| test03.fasta.gz | 8.83E-01 | GCA_007713455.1_genomic.fna.gz  | 4711826          | 90.2361 |
-| test03.fasta.gz | 8.86E-01 | GCF_003696315.1_genomic.fna.gz  | 4321164          | 90.1098 |
+| Query_Name      | Distance | Neighbor_Fasta_name            | Neighbor_Seq_Len | ANI     |
+| --------------- | -------- | ------------------------------ | ---------------- | ------- |
+| test03.fasta.gz | 5.40E-01 | GCF_024448335.1_genomic.fna.gz | 4379993          | 97.1126 |
+| test03.fasta.gz | 8.22E-01 | GCF_000219605.1_genomic.fna.gz | 4547930          | 92.5276 |
+| test03.fasta.gz | 8.71E-01 | GCF_021432085.1_genomic.fna.gz | 4775870          | 90.7837 |
+| test03.fasta.gz | 8.76E-01 | GCF_003935375.1_genomic.fna.gz | 4657537          | 90.5424 |
+| test03.fasta.gz | 8.78E-01 | GCF_000341615.1_genomic.fna.gz | 4674664          | 90.4745 |
+| test03.fasta.gz | 8.79E-01 | GCF_014764705.1_genomic.fna.gz | 4861582          | 90.4108 |
+| test03.fasta.gz | 8.79E-01 | GCF_000935215.1_genomic.fna.gz | 4878963          | 90.398  |
+| test03.fasta.gz | 8.82E-01 | GCF_002929225.1_genomic.fna.gz | 4898053          | 90.2678 |
+| test03.fasta.gz | 8.83E-01 | GCA_007713455.1_genomic.fna.gz | 4711826          | 90.2361 |
+| test03.fasta.gz | 8.86E-01 | GCF_003696315.1_genomic.fna.gz | 4321164          | 90.1098 |
 
 Query_Name is your query genomes, Distance is genomic Jaccard distance (1-J/Jp), Neighbor_Fasta_name is the nearest neighbors based on the genomic Jaccard distance, ranked by distance. ANI is calculated from genomic Jaccard distance according the equaiton above between you query genome and nearest database genomes.
 
@@ -618,12 +618,7 @@ We provide pre-built genome/proteome database graph file for bacteria/archaea, v
 - Fungi database are based on the entire RefSeq fungal genomes (retrived via the MycoCosm website), we dereplicated and define a fungal speices at 99.5% ANI.
 - All four pre-built databases are available here:<http://enve-omics.ce.gatech.edu/data/gsearch> or at FigShare, see the download links [here](./gsearch_database.txt)
 
-## To do list
-
-1.C-MinHash, One Permutation Hashing with Circular Permutation (Li and Li 2022 ICML), the best MinHash in terms of accuracy, which has a significant improvement for RMSE than any other MinHash-like ones. Using a circular permutation for empty bins in the sketch vector generated from OPH, so that the empty bins can have hash values borrowed from other non-empty bins with some randomness, not just copy from the nearest non-empty bins as in the densified MinHash scheme. However, the circular permutation vector can be large for large D with a regular K (MinHash K) and it has to be circularly shifted K times and applied K times, which might consume a large amount of memory. For microbial genomes, with D often 10^7 or so and K 10^4 to 10^5 to have 99% ANI accuracy, the permutation vector is not a problem. \
-2. UltraLogLog(Ertl 2023) and ExaLogLog (Ertl 2024), a significant improvement over HyperLogLog for space/memory for cardinality estimation. We can use inclusion and exclusion rule to estimate Jaccard index after obtaining cardinality of two sets despite large variance. A simple but efficient new estimator of cardinality estimation, FGRA (Further Generalized Remaining Area) based on Tau-GRA (Wang and Pettie, 2023) can be used. But we can also map UltraLogLog to corresponding HyperLogLog to use maximum likelihood estimator (MLE) for cardinality (slower), or joint maximum likelihood estimator (JMLE) for intersecion cardinality (then Jaccard index), which are slightly more accurate than FGRA and meet the Cramér-Rao lower bound. The ExaLogLog estimator is also MLE based but it is not so fast despite smaller space requirement. However, the Hyperloglog-like scheme is not under the locality sensitive hashing scheme and the RMSE is much larger than MinHash-like ones.\
-3. For extremely large genome databases, e.g. 10^9 or more genomes, the size of sketches and HNSW graph size increase linearly, which creates a challenge for memory to store/load such big files. However, it is possible/easy to sketch and build HNSW graph only for a small piece of the large genome database and create several small sketch files and HNSW graph files for searching. We can search those several small pieces one by one, then collect search results(nearest neighbors) and sorting them accoridng to the Jaccard distance. This is algorithmically equal (for both accuracy and running time) to sketching and building HNSW graph for the entire large database but requires only a small piece of memory. But how to choose the small piece so that it is computationlly efficient? Coreset algorithm, if implemented in a streaming fashion, can be used to cluster similar genomes into clusters, in a way similar to that of k-medoid but significantly more computationally efficient, see coreset crate [here](https://github.com/jean-pierreBoth/coreset). We will definitely implement the idea in the near future. For now, it easy to just mannually split the large database into small pieces, similar to the real-world industrial-level application of this idea for graph-based NNS library [here](http://www.vldb.org/pvldb/vol12/p461-fu.pdf)\
-4. Flat navigable small world graph with hubs or simply [HubNSW](https://arxiv.org/abs/2412.01940) can be used to reduce memory significantly, will be available soon.
+## Future developments considered are given [here](todo.md)
 
 
 ## References

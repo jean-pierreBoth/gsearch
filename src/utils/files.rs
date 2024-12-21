@@ -31,6 +31,12 @@ pub struct ProcessingState {
 } 
 
 
+impl Default for ProcessingState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ProcessingState {
     pub fn new() -> Self {
         ProcessingState{nb_seq : 0, nb_file : 0, elapsed_t : 0.}
@@ -55,7 +61,7 @@ impl ProcessingState {
         }
         // 
         let mut writer = BufWriter::new(fileres.unwrap());
-        let _ = to_writer(&mut writer, &self).unwrap();
+        to_writer(&mut writer, &self).unwrap();
         //
         Ok(())
     } // end of dump
@@ -97,11 +103,11 @@ pub fn is_fasta_dna_file(pathb : &PathBuf) -> bool {
     let filename = pathb.to_str().unwrap();
     if filename.ends_with("fna.gz")|| filename.ends_with("fa.gz") || 
                 filename.ends_with("fasta.gz") || filename.ends_with("fna") || filename.ends_with("fa") || filename.ends_with("fasta") {
-        return true;
+        true
     }
     else { 
         log::debug!("found non dna file : {:?}", filename);
-        return false;
+        false
     }
 }  // end of is_fasta_file
 
@@ -109,12 +115,7 @@ pub fn is_fasta_dna_file(pathb : &PathBuf) -> bool {
 /// returns true if file is a fasta file preotein (possibly gzipped) suffixed by .faa
 pub fn is_fasta_aa_file(pathb : &PathBuf) -> bool {
     let filename = pathb.to_str().unwrap();
-    if filename.ends_with("faa.gz")|| filename.ends_with("faa") {
-        return true;
-    }
-    else { 
-        return false;
-    }
+    filename.ends_with("faa.gz") || filename.ends_with("faa")
 }  // end of is_fasta_aa_file
 
 
@@ -134,7 +135,7 @@ pub fn process_dir(state : &mut ProcessingState, datatype: &DataType, dir: &Path
         let entry = entry?;
         let pathb = entry.path();
         if pathb.is_dir() {
-            nb_sent =  process_dir(state, &datatype, &pathb, filter_params, file_task, sender)?;
+            nb_sent =  process_dir(state, datatype, &pathb, filter_params, file_task, sender)?;
         } else {
             // check if entry is a fasta.gz file or a .faa file
             let mut to_sketch = match datatype {
@@ -230,7 +231,7 @@ pub(crate) fn process_files_group(datatype: &DataType, filter_params : &FilterPa
     let cpu_start = ThreadTime::try_now();
     //
     let process_file = |pathb : &PathBuf,  buffer : &[u8] | -> Option<Vec::<IdSeq>> {
-        if buffer.len() > 0 {
+        if !buffer.is_empty() {
             Some(file_task(pathb, buffer, filter_params))
         }
         else {
@@ -274,12 +275,12 @@ pub(crate) fn process_files_group(datatype: &DataType, filter_params : &FilterPa
     let mut to_be_processed : Vec<(&PathBuf, &[u8])> = Vec::with_capacity(pathb.len());
     let couples = pathb.iter().zip(&files_read);
     for c in couples {
-        if c.1.len() > 0 {
+        if !c.1.is_empty() {
             to_be_processed.push((c.0,c.1));
         }
     }
     // this is what we  wanted, fasta buffer parsing in // !!
-    let seqseq = to_be_processed.par_iter().map(|file| process_file(&file.0, file.1).unwrap()).collect();
+    let seqseq = to_be_processed.par_iter().map(|file| process_file(file.0, file.1).unwrap()).collect();
     // explicit drop to be able to monitor memory
     drop(to_be_processed);
     drop(files_read);
@@ -320,7 +321,7 @@ pub(crate) fn process_dir_parallel_rec(state : &mut ProcessingState, datatype: &
         let entry = entry?;
         let pathb = entry.path();
         if pathb.is_dir() {
-            nb_sent =  process_dir_parallel_rec(state, &datatype, &pathb, filter_params, block_size, path_block, file_task, sender)?;
+            nb_sent =  process_dir_parallel_rec(state, datatype, &pathb, filter_params, block_size, path_block, file_task, sender)?;
         } 
         else {
             nb_entries += 1;
@@ -339,7 +340,7 @@ pub(crate) fn process_dir_parallel_rec(state : &mut ProcessingState, datatype: &
                 path_block.push(pathb.clone());
                 // now if buffer is full we do the work, process send and empty buffer
                 if path_block.len() == block_size {
-                    let seqs = process_files_group(datatype,  filter_params, &path_block, file_task);
+                    let seqs = process_files_group(datatype,  filter_params, path_block, file_task);
                     for mut seqfile in seqs {
                         for i in 0..seqfile.len() {
                             seqfile[i].rank = state.nb_seq;
@@ -387,7 +388,7 @@ pub(crate) fn process_dir_parallel(state : &mut ProcessingState, datatype: &Data
     let mut path_block = Vec::<PathBuf>::with_capacity(nb_files_by_group);
     //
     let res_nb_sent_parallel = process_dir_parallel_rec(state, datatype,  dirpath, filter_params, 
-                    nb_files_by_group,  &mut path_block, &file_task, &sender);
+                    nb_files_by_group,  &mut path_block, &file_task, sender);
     // we must treat residue in path_block if any
     match res_nb_sent_parallel {
         Ok(nb) => { nb_sent_parallel_rec = nb;},
@@ -396,7 +397,7 @@ pub(crate) fn process_dir_parallel(state : &mut ProcessingState, datatype: &Data
                         },
     };
     // now must treat residue in path_block
-    if path_block.len() > 0 {
+    if !path_block.is_empty() {
         log::info!("files::process_dir_parallel sending residue, size : {}", path_block.len());
         let seqs = process_files_group(datatype, filter_params, &path_block, &file_task);
         for mut seqfile in seqs {
@@ -420,7 +421,7 @@ pub(crate) fn process_dir_parallel(state : &mut ProcessingState, datatype: &Data
     }
     let nb_sent_parallel = state.nb_file - nb_files_at_entry;
     log::debug!("process_dir_parallel parallel io case : all messages sent :{}", nb_sent_parallel_rec);
-    let res_nb_sent = Ok(nb_sent_parallel);
+    
     //
-    return res_nb_sent;
+    Ok(nb_sent_parallel)
 } // end of process_dir_parallel

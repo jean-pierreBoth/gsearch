@@ -1,9 +1,7 @@
 use clap::{Arg, Command};
-use bigsig::{bigsi, build, perfect_search, batch_search_pe, read_id_mt_pe, reports};
+use bigsig::{bigsi, build};
 use std::alloc::System;
-use std::io::{self, Result};
-use std::io::ErrorKind;
-use std::error::Error;
+use std::io::Result;
 use std::time::SystemTime;
 use env_logger::Builder;
 use rayon::ThreadPoolBuilder;

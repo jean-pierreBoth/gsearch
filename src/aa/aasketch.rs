@@ -115,7 +115,7 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT+KmerBuilder<Kmer>, Ske
         else { 
             hnsw = hnsw_res.unwrap();
         }
-        let reload_res = ProcessingState::reload_json(&hnsw_pb);
+        let reload_res = ProcessingState::reload_json(hnsw_pb);
         if reload_res.is_ok() {
             state = reload_res.unwrap();
         }
@@ -133,7 +133,7 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT+KmerBuilder<Kmer>, Ske
     }
     //
     let mut seqdict : SeqDict;
-    seqdict = get_seqdict(&hnsw_pb, computing_params).unwrap();
+    seqdict = get_seqdict(hnsw_pb, computing_params).unwrap();
     //
     // where do we dump hnsw* seqdict and so on
     // If in add mode we dump where is already an hnsw database
@@ -152,9 +152,9 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT+KmerBuilder<Kmer>, Ske
     // Sketcher allocation, we  need reverse complement
     //
     let kmer_hash_fn = | kmer : &Kmer | -> Kmer::Val {
-        let mask : Kmer::Val = num::NumCast::from::<u64>((0b1 << 5*kmer.get_nb_base()) - 1).unwrap();
-        let hashval = kmer.get_compressed_value() & mask;
-        hashval
+        let mask : Kmer::Val = num::NumCast::from::<u64>((0b1 << (5*kmer.get_nb_base())) - 1).unwrap();
+        
+        kmer.get_compressed_value() & mask
     };
     //
     let mut nb_sent : usize = 0;       // this variable is moved in sender  io thread
@@ -268,11 +268,11 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT+KmerBuilder<Kmer>, Ske
                         }
                     }
                 }
-                if read_more == false && insertion_queue.len() == 0 && thread_token_sender.len() == 0 {
+                if !read_more && insertion_queue.len() == 0 && thread_token_sender.is_empty() {
                     log::info!("no more read to come, no more data to sketch, no more sketcher running ...");
                     break;
                 }
-                else if read_more == false && insertion_queue.len() == 0 {
+                else if !read_more && insertion_queue.len() == 0 {
                     // TODO here we just have to wait all thread end, should use a condvar, now we check every second
                     parker.park_timeout(Duration::from_millis(1000));
                 }
@@ -295,7 +295,7 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT+KmerBuilder<Kmer>, Ske
                         assert!(nb_base_in_queue >= nb_popped_bases);
                         nb_base_in_queue -= nb_popped_bases; 
                     }
-                    assert!(local_queue.len() > 0);
+                    assert!(!local_queue.is_empty());
                     let _ = thread_token_sender.send(1);
                     log::debug!("nb sketching threads running = {:?}", thread_token_sender.len());
                     let thread_token_receiver_cloned = thread_token_receiver.clone();
@@ -320,16 +320,16 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT+KmerBuilder<Kmer>, Ske
                             }
                             false => { // means we are in seq by seq mode inside a file. We get one signature by msg (or file)
                                 // TODO: This can be further // either by iter or explicit thread
-                                for i in 0..local_queue.len() {
-                                    let sequencegroup_ref : Vec<&SequenceAA> = local_queue[i].iter().map(|v| v.get_sequence_aa().unwrap()).collect();
+                                for (i,vseq) in local_queue.iter().enumerate() {
+                                    let sequencegroup_ref : Vec<&SequenceAA> = vseq.iter().map(|v| v.get_sequence_aa().unwrap()).collect();
                                     let seq_len = sequencegroup_ref.iter().fold(0, | acc, s | acc + s.size());
                                     // as we treat the file globally, the signature is indexed by filerank!
-                                    let seq_rank :  Vec<usize> = local_queue[i].iter().map(|v| v.get_filerank()).collect();
+                                    let seq_rank :  Vec<usize> = vseq.iter().map(|v| v.get_filerank()).collect();
                                     let signatures = sketcher_clone.sketch_compressedkmeraa_seqs(&sequencegroup_ref, kmer_hash_fn);
-                                    log::debug!("msg num : {}, nb sub seq : {}, path : {:?}, file rank : {}", i, local_queue[i].len(), local_queue[i][0].get_path(), seq_rank[0]);
+                                    log::debug!("msg num : {}, nb sub seq : {}, path : {:?}, file rank : {}", i, vseq.len(), vseq[0].get_path(), seq_rank[0]);
                                     assert_eq!(signatures.len(), 1);
                                     // we get the item for the first seq (all sub sequences have same identity)
-                                    let item: ItemDict = ItemDict::new(Id::new(local_queue[i][0].get_path(), local_queue[i][0].get_fasta_id()), seq_len);
+                                    let item: ItemDict = ItemDict::new(Id::new(vseq[0].get_path(), vseq[0].get_fasta_id()), seq_len);
                                     let msg = CollectMsg::new((signatures[0].clone(), seq_rank[0]), item);
                                     let _ = collect_sender_clone.send(msg);
                                 }
@@ -390,7 +390,7 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT+KmerBuilder<Kmer>, Ske
                     }
                 }
                 // we defer all insertion (only!!) at end of sketching as we observed scheduling problem between // iter and threads
-                if read_more == false {
+                if !read_more {
                     let insertion_start_time = SystemTime::now();
                     let insertion_cpu_start: ProcessTime = ProcessTime::now();
                     log::debug!("inserting block in hnsw, nb new points : {:?}", msg_store.len());
@@ -421,7 +421,7 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT+KmerBuilder<Kmer>, Ske
             //
             assert_eq!(seqdict.get_nb_entries(), hnsw.get_nb_point());
             log::debug!("collector thread dumping hnsw , received nb_received : {}", nb_received);
-            let _ = dumpall(dump_path_ref, &hnsw, &seqdict, &processing_params);
+            let _ = dumpall(dump_path_ref, &hnsw, &seqdict, processing_params);
         }); // end of collector thread
 
     });  // end of pool
@@ -455,11 +455,11 @@ pub fn aa_process_tohnsw(dirpath : &PathBuf, filter_params : &FilterParams, proc
             //
             if kmer_size <= 6 {
                 let sketcher = ProbHash3aSketch::<KmerAA32bit>::new(sketch_params);
-                sketchandstore_dir_compressedkmer::<KmerAA32bit, ProbHash3aSketch::<KmerAA32bit>>(&dirpath, sketcher, &filter_params, &processing_parameters, others_params);
+                sketchandstore_dir_compressedkmer::<KmerAA32bit, ProbHash3aSketch::<KmerAA32bit>>(dirpath, sketcher, filter_params, processing_parameters, others_params);
             }
             else if kmer_size <= 12 {
                 let sketcher = ProbHash3aSketch::<KmerAA64bit>::new(sketch_params);
-                sketchandstore_dir_compressedkmer::<KmerAA64bit, ProbHash3aSketch::<KmerAA64bit>>(&dirpath, sketcher, &filter_params, &processing_parameters, others_params);
+                sketchandstore_dir_compressedkmer::<KmerAA64bit, ProbHash3aSketch::<KmerAA64bit>>(dirpath, sketcher, filter_params, processing_parameters, others_params);
             } else  {
                 panic!("kmer for Amino Acids must be less or equal to 12");
             }
@@ -467,11 +467,11 @@ pub fn aa_process_tohnsw(dirpath : &PathBuf, filter_params : &FilterParams, proc
         SketchAlgo::SUPER => {
             if kmer_size <= 6 {
                 let sketcher = SuperHashSketch::<KmerAA32bit, f32>::new(sketch_params);
-                sketchandstore_dir_compressedkmer::<KmerAA32bit, SuperHashSketch::<KmerAA32bit, f32>>(&dirpath, sketcher, &filter_params, &processing_parameters, others_params);
+                sketchandstore_dir_compressedkmer::<KmerAA32bit, SuperHashSketch::<KmerAA32bit, f32>>(dirpath, sketcher, filter_params, processing_parameters, others_params);
             }
             else if kmer_size <= 12 {
                 let sketcher = SuperHashSketch::<KmerAA64bit, f32>::new(sketch_params);
-                sketchandstore_dir_compressedkmer::<KmerAA64bit, SuperHashSketch::<KmerAA64bit, f32>>(&dirpath, sketcher, &filter_params, &processing_parameters, others_params);                
+                sketchandstore_dir_compressedkmer::<KmerAA64bit, SuperHashSketch::<KmerAA64bit, f32>>(dirpath, sketcher, filter_params, processing_parameters, others_params);                
             }
             else {
                 panic!("kmer for Amino Acids must be less or equal to 12");
@@ -490,11 +490,11 @@ pub fn aa_process_tohnsw(dirpath : &PathBuf, filter_params : &FilterParams, proc
             //
             if kmer_size <= 6 {
                 let sketcher = HyperLogLogSketch::<KmerAA32bit, u16>::new(sketch_params, hll_params, hll_seqs_threading);
-                sketchandstore_dir_compressedkmer::<KmerAA32bit, HyperLogLogSketch::<KmerAA32bit, u16>>(&dirpath, sketcher, &filter_params, &processing_parameters, others_params);
+                sketchandstore_dir_compressedkmer::<KmerAA32bit, HyperLogLogSketch::<KmerAA32bit, u16>>(dirpath, sketcher, filter_params, processing_parameters, others_params);
             }
             else if kmer_size <= 12 {
                 let sketcher =  HyperLogLogSketch::<KmerAA64bit, u16>::new(sketch_params, hll_params, hll_seqs_threading);
-                sketchandstore_dir_compressedkmer::<KmerAA64bit, HyperLogLogSketch::<KmerAA64bit, u16>>(&dirpath, sketcher, &filter_params, &processing_parameters, others_params);                
+                sketchandstore_dir_compressedkmer::<KmerAA64bit, HyperLogLogSketch::<KmerAA64bit, u16>>(dirpath, sketcher, filter_params, processing_parameters, others_params);                
             }
             else {
                 panic!("kmer for Amino Acids must be less or equal to 12");
@@ -506,14 +506,14 @@ pub fn aa_process_tohnsw(dirpath : &PathBuf, filter_params : &FilterParams, proc
                 // we used just in tests
                 let bh = std::hash::BuildHasherDefault::<fxhash::FxHasher32>::default();
                 let sketcher = SuperHash2Sketch::<KmerAA32bit, u32, fxhash::FxHasher32>::new(sketch_params, bh);
-                sketchandstore_dir_compressedkmer::<KmerAA32bit, SuperHash2Sketch::<KmerAA32bit, u32, fxhash::FxHasher32> >(&dirpath, sketcher, 
-                            &filter_params, &processing_parameters, others_params);
+                sketchandstore_dir_compressedkmer::<KmerAA32bit, SuperHash2Sketch::<KmerAA32bit, u32, fxhash::FxHasher32> >(dirpath, sketcher, 
+                            filter_params, processing_parameters, others_params);
             }
             else if kmer_size <= 12 {
                 let bh = std::hash::BuildHasherDefault::<fxhash::FxHasher64>::default();
                 let sketcher = SuperHash2Sketch::<KmerAA64bit, u64, fxhash::FxHasher64>::new(sketch_params, bh);
-                sketchandstore_dir_compressedkmer::<KmerAA64bit, SuperHash2Sketch::<KmerAA64bit, u64, fxhash::FxHasher64> >(&dirpath, sketcher, 
-                            &filter_params, &processing_parameters, others_params);
+                sketchandstore_dir_compressedkmer::<KmerAA64bit, SuperHash2Sketch::<KmerAA64bit, u64, fxhash::FxHasher64> >(dirpath, sketcher, 
+                            filter_params, processing_parameters, others_params);
             }
             else {
                 panic!("kmer for Amino Acids must be less or equal to 12");
@@ -523,11 +523,11 @@ pub fn aa_process_tohnsw(dirpath : &PathBuf, filter_params : &FilterParams, proc
         SketchAlgo::OPTDENS => {
             if kmer_size <= 6 {
                 let sketcher = OptDensHashSketch::<KmerAA32bit, f32>::new(sketch_params);
-                sketchandstore_dir_compressedkmer::<KmerAA32bit, OptDensHashSketch::<KmerAA32bit, f32>>(&dirpath, sketcher, &filter_params, &processing_parameters, others_params);
+                sketchandstore_dir_compressedkmer::<KmerAA32bit, OptDensHashSketch::<KmerAA32bit, f32>>(dirpath, sketcher, filter_params, processing_parameters, others_params);
             }
             else if kmer_size <= 12 {
                 let sketcher = OptDensHashSketch::<KmerAA64bit, f32>::new(sketch_params);
-                sketchandstore_dir_compressedkmer::<KmerAA64bit, OptDensHashSketch::<KmerAA64bit, f32>>(&dirpath, sketcher, &filter_params, &processing_parameters, others_params);                
+                sketchandstore_dir_compressedkmer::<KmerAA64bit, OptDensHashSketch::<KmerAA64bit, f32>>(dirpath, sketcher, filter_params, processing_parameters, others_params);                
             }
             else {
                 panic!("kmer for Amino Acids must be less or equal to 12");
@@ -537,11 +537,11 @@ pub fn aa_process_tohnsw(dirpath : &PathBuf, filter_params : &FilterParams, proc
         SketchAlgo::REVOPTDENS => {
             if kmer_size <= 6 {
                 let sketcher = RevOptDensHashSketch::<KmerAA32bit, f32>::new(sketch_params);
-                sketchandstore_dir_compressedkmer::<KmerAA32bit, RevOptDensHashSketch::<KmerAA32bit, f32>>(&dirpath, sketcher, &filter_params, &processing_parameters, others_params);
+                sketchandstore_dir_compressedkmer::<KmerAA32bit, RevOptDensHashSketch::<KmerAA32bit, f32>>(dirpath, sketcher, filter_params, processing_parameters, others_params);
             }
             else if kmer_size <= 12 {
                 let sketcher = RevOptDensHashSketch::<KmerAA64bit, f32>::new(sketch_params);
-                sketchandstore_dir_compressedkmer::<KmerAA64bit, RevOptDensHashSketch::<KmerAA64bit, f32>>(&dirpath, sketcher, &filter_params, &processing_parameters, others_params);                
+                sketchandstore_dir_compressedkmer::<KmerAA64bit, RevOptDensHashSketch::<KmerAA64bit, f32>>(dirpath, sketcher, filter_params, processing_parameters, others_params);                
             }
             else {
                 panic!("kmer for Amino Acids must be less or equal to 12");

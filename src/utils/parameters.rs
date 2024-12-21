@@ -24,12 +24,7 @@ impl FilterParams {
 
     /// returns true if we filter (garbage the sequence)
     pub fn filter(&self, seq : &[u8]) -> bool {
-        if seq.len() < self.min_seq_size {
-            true
-        }
-        else {
-            false
-        }
+        seq.len() < self.min_seq_size
     }
 }  // end of FilterParams
 
@@ -50,7 +45,7 @@ impl HnswParams {
     }
     //
     pub fn get_ef(&self) -> usize {
-        return self.ef
+        self.ef
     }
 
     pub fn get_max_nb_connection(&self) -> u8 {
@@ -62,6 +57,7 @@ impl HnswParams {
 //======================================================================================
 
 #[derive(Clone, Serialize,Deserialize)]
+#[derive(Default)]
 pub struct AnnParameters {
     /// directory containing the Hnsw previous dmps
     hnsw_dir : Option<String>,
@@ -72,11 +68,7 @@ pub struct AnnParameters {
 } // end of 
 
 
-impl Default for AnnParameters {
-    fn default() -> Self {
-        AnnParameters{hnsw_dir : None, ask_stats:false, embed:false}
-    }
-} // end of default for AnnParameters
+ // end of default for AnnParameters
 
 
 impl AnnParameters {
@@ -191,7 +183,7 @@ impl ProcessingParams {
         }
         // 
         let mut writer = BufWriter::new(fileres.unwrap());
-        let _ = to_writer(&mut writer, &self).unwrap();
+        to_writer(&mut writer, &self).unwrap();
         //
         Ok(())
     } // end of dump_json
@@ -226,6 +218,7 @@ impl ProcessingParams {
 //=====================================================================================
 
 /// Some others parameters or io optimization not necessary for reload
+#[derive(Default)]
 pub struct ComputingParams {
     /// if nb_files_par is > 1, then we uncopress fasta files in // by blocks of size nb_files_par files
     nb_files_par : usize,
@@ -238,11 +231,6 @@ pub struct ComputingParams {
 }
 
 
-impl Default for ComputingParams {
-    fn default() -> Self {
-        ComputingParams{nb_files_par: 0 , nb_threads : 0, adding_mode: false, add_dir : String::from("")}
-    }
-}
 
 
 impl ComputingParams {
@@ -251,14 +239,9 @@ impl ComputingParams {
     }
 
     pub fn get_parallel_io(&self) -> bool {
-        let par = if self.nb_files_par > 0 {
-            true
-        }
-        else {
-            false
-        };
+        
         //
-        return par
+        self.nb_files_par > 0
     } // end of get_parallel_io
 
     /// return the number of files for // io

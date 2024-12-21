@@ -50,7 +50,7 @@ fn main() -> io::Result<()> {
     results.par_sort_by(|a, b| {
         let a_cols: Vec<&str> = a.split('\t').collect();
         let b_cols: Vec<&str> = b.split('\t').collect();
-        a_cols[0].cmp(&b_cols[0])
+        a_cols[0].cmp(b_cols[0])
             .then_with(|| {
                 a_cols[1].parse::<f64>().unwrap_or_default().partial_cmp(&b_cols[1].parse::<f64>().unwrap_or_default()).unwrap()
             })

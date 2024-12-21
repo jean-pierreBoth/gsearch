@@ -37,7 +37,7 @@ impl Id {
 
     /// get sequence id in fasta file
     pub fn get_fasta_id(&self) -> &String {
-        return &self.fasta_id;
+        &self.fasta_id
     }
 } // end of impl Id
 
@@ -86,7 +86,7 @@ impl IdSeq {
         &self.id
     }
 
-    ///
+    /// get rank of sequence in file
     pub fn get_rank(&self) -> usize {
         self.rank
     }
@@ -136,15 +136,15 @@ pub struct ItemDict {
 }
 
 impl ItemDict {
-    ///
+    //
     pub fn new(id: Id, len: usize) -> Self {
         ItemDict { id, len }
     }
-    ///
+    /// get sequence Id
     pub fn get_id(&self) -> &Id {
         &self.id
     }
-    ///
+    /// get sequence length
     pub fn get_len(&self) -> usize {
         self.len
     }
@@ -157,9 +157,7 @@ pub struct SeqDict(pub Vec<ItemDict>);
 
 impl SeqDict {
     pub fn new(size: usize) -> Self {
-        return SeqDict {
-            0: Vec::with_capacity(size),
-        };
+        SeqDict(Vec::with_capacity(size))
     }
 
     /// serialize and dump
@@ -183,12 +181,12 @@ impl SeqDict {
                 "SeqDict dump: could not open file {:?}",
                 filepath.as_os_str()
             );
-            return Err("SeqDict Deserializer dump failed").unwrap();
+            panic!("{:?}", "SeqDict Deserializer dump failed");
         }
         let mut writer = BufWriter::new(fileres.unwrap());
         for v in &self.0 {
             // v is and Id struct
-            let _ = to_writer(&mut writer, &v).unwrap();
+            to_writer(&mut writer, &v).unwrap();
         }
         //
         println!(
@@ -196,7 +194,7 @@ impl SeqDict {
             self.0.len()
         );
         //
-        return Ok(());
+        Ok(())
     } // end of dump
 
     /// reload from dump to avoid parsing again files.
@@ -208,7 +206,7 @@ impl SeqDict {
         //
         println!("reloading database ids from : {}", filepath.display());
         let mut sequences = Vec::<ItemDict>::with_capacity(100000);
-        let fileres = OpenOptions::new().read(true).open(&filepath);
+        let fileres = OpenOptions::new().read(true).open(filepath);
         if fileres.is_err() {
             log::error!(
                 "SeqDict reload : reload could not open file {:?}",
@@ -252,7 +250,7 @@ impl SeqDict {
         let elapsed_t = start_t.elapsed().unwrap().as_secs() as f32;
         log::info!("SeqDict::reload : elapsed system time(s) {}", elapsed_t);
         //
-        return Ok(SeqDict { 0: sequences });
+        Ok(SeqDict(sequences))
     } // end of reload
 
     /// dump a summary in csv file
@@ -268,7 +266,7 @@ impl SeqDict {
             if rec_count <= 10 {
                 println!(" rec : {}, str : {}", rec_count, str);
             }
-            let res = csv_w.write_record(&(vec![str]));
+            let res = csv_w.write_record(vec![str]);
             if res.is_err() {
                 log::error!(
                     "seqdict_jsontocsv failed to write record with path : {}",
@@ -282,7 +280,7 @@ impl SeqDict {
             rec_count += 1;
         }
         csv_w.flush().unwrap();
-        return rec_count;
+        rec_count
     } // end of dump_csv
 
     /// computes totol number of bases of database.

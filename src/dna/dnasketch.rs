@@ -123,7 +123,7 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT+KmerBuilder<Kmer>, Ske
             hnsw = hnsw_res.unwrap();
         }
 
-        let reload_res = ProcessingState::reload_json(&hnsw_pb);
+        let reload_res = ProcessingState::reload_json(hnsw_pb);
         if reload_res.is_ok() {
             state = reload_res.unwrap();
         }
@@ -141,7 +141,7 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT+KmerBuilder<Kmer>, Ske
     }
     //
     let mut seqdict : SeqDict;
-    seqdict = get_seqdict(&hnsw_pb, computing_params).unwrap();
+    seqdict = get_seqdict(hnsw_pb, computing_params).unwrap();
     //
     // where do we dump hnsw* seqdict and so on
     // If in add mode we dump where is already an hnsw database
@@ -161,9 +161,9 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT+KmerBuilder<Kmer>, Ske
     //
     let kmer_hash_fn = | kmer : &Kmer | -> Kmer::Val {
         let canonical =  kmer.reverse_complement().min(*kmer);
-        let mask : Kmer::Val = num::NumCast::from::<u64>((0b1 << 2*kmer.get_nb_base()) - 1).unwrap();
-        let hashval = canonical.get_compressed_value() & mask;
-        hashval
+        let mask : Kmer::Val = num::NumCast::from::<u64>((0b1 << (2*kmer.get_nb_base())) - 1).unwrap();
+        
+        canonical.get_compressed_value() & mask
     };
     //
     let mut nb_sent : usize = 0;       // this variable is moved in sender  io thread
@@ -287,11 +287,11 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT+KmerBuilder<Kmer>, Ske
                     }
                 }
                 // 
-                if read_more == false && sketcher_queue.len() == 0 && thread_token_sender.len() == 0 {
+                if !read_more && sketcher_queue.len() == 0 && thread_token_sender.is_empty() {
                     log::info!("no more read to come, no more data to sketch, no more sketcher running ...");
                     break;
                 }
-                else if read_more == false && sketcher_queue.len() == 0 {
+                else if !read_more && sketcher_queue.len() == 0 {
                     // TODO here we just have to wait all thread end, should use a condvar, now we check every second
                     parker.park_timeout(Duration::from_millis(1000));
                 }
@@ -316,7 +316,7 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT+KmerBuilder<Kmer>, Ske
                         nb_base_in_queue -= nb_popped_bases; 
                     }
                     log::debug!("after popping , nb_base_in_queue : {}", nb_base_in_queue);
-                    assert!(local_queue.len() > 0);
+                    assert!(!local_queue.is_empty());
                     // recall this will thread creation if too many threads already
                     let _ = thread_token_sender.send(1);
                     log::debug!("sending token sender tokens = {:?}, nb_token_reciever : {}", thread_token_sender.len(), thread_token_receiver.len());
@@ -344,20 +344,20 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT+KmerBuilder<Kmer>, Ske
                             }
                             false => { // means we are in seq by seq mode inside a file. We get one signature by msg (or file)
                                 // TODO: This can be further // either by iter or explicit thread
-                                for i in 0..local_queue.len() {
-                                    let sequencegroup_ref : Vec<&Sequence> = local_queue[i].iter().map(|v| v.get_sequence_dna().unwrap()).collect();
+                                for (i,vseq) in local_queue.iter().enumerate() {
+                                    let sequencegroup_ref : Vec<&Sequence> = vseq.iter().map(|v| v.get_sequence_dna().unwrap()).collect();
                                     let seq_len = sequencegroup_ref.iter().fold(0, | acc, s | acc + s.size());
                                     // as we treat the file globally, the signature is indexed by filerank!
                                     // seq_rank has size of sequencegroup_ref but all values in seq_rank should be equal to filerank
-                                    let seq_rank = local_queue[i][0].get_filerank();
-                                    if local_queue[i].len() > 1 {
-                                        assert_eq!(seq_rank, local_queue[i][1].get_filerank());
+                                    let seq_rank = vseq[0].get_filerank();
+                                    if vseq.len() > 1 {
+                                        assert_eq!(seq_rank, vseq[1].get_filerank());
                                     }
                                     let signatures = sketcher_clone.sketch_compressedkmer_seqs(&sequencegroup_ref, kmer_hash_fn);
-                                    log::debug!("sketched msg num : {}, nb sub seq : {}, path : {:?}, file rank : {}", i, local_queue[i].len(), local_queue[i][0].get_path(), seq_rank);
+                                    log::debug!("sketched msg num : {}, nb sub seq : {}, path : {:?}, file rank : {}", i, vseq.len(), vseq[0].get_path(), seq_rank);
                                     assert_eq!(signatures.len(), 1);
                                     // we get the item for the first seq (all sub sequences have same identity)
-                                    let item: ItemDict = ItemDict::new(Id::new(local_queue[i][0].get_path(), local_queue[i][0].get_fasta_id()), seq_len);
+                                    let item: ItemDict = ItemDict::new(Id::new(vseq[0].get_path(), vseq[0].get_fasta_id()), seq_len);
                                     let msg = CollectMsg::new((signatures[0].clone(), seq_rank), item);
                                     let _ = collect_sender_clone.send(msg);
                                 }
@@ -418,7 +418,7 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT+KmerBuilder<Kmer>, Ske
                     }
                 }
                 // we defer all insertion to end of sketching as we observed bad interaction between // iter and threads
-                if read_more == false {
+                if !read_more {
                     let insertion_start_time = SystemTime::now();
                     let insertion_cpu_start: ProcessTime = ProcessTime::now();
                     log::debug!("inserting block in hnsw, nb new points : {:?}", msg_store.len());
@@ -449,7 +449,7 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT+KmerBuilder<Kmer>, Ske
             //
             assert_eq!(seqdict.get_nb_entries(), hnsw.get_nb_point());
             log::debug!("collector thread dumping hnsw , received nb_received : {}", nb_received);
-            let _ = dumpall(dump_path_ref, &hnsw, &seqdict, &processing_params);
+            let _ = dumpall(dump_path_ref, &hnsw, &seqdict, processing_params);
         }); // end of collector thread
 
     });  // end of pool
@@ -481,9 +481,9 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT+KmerBuilder<Kmer>, Ske
 pub (crate) fn kmer_hash<Kmer>( kmer : &Kmer) -> Kmer::Val 
     where Kmer : CompressedKmerT + KmerBuilder<Kmer> {
     //
-    let mask : Kmer::Val = num::NumCast::from::<u64>((0b1 << 2*kmer.get_nb_base()) - 1).unwrap();
-    let hashval = kmer.get_compressed_value() & mask;
-    hashval
+    let mask : Kmer::Val = num::NumCast::from::<u64>((0b1 << (2*kmer.get_nb_base())) - 1).unwrap();
+    
+    kmer.get_compressed_value() & mask
 }
 
 
@@ -500,17 +500,17 @@ pub fn dna_process_tohnsw(dirpath : &PathBuf, filter_params : &FilterParams, pro
                 // allocated the correct sketcher
                 let sketcher = ProbHash3aSketch::<Kmer32bit>::new(sketchparams);
                 sketchandstore_dir_compressedkmer::<Kmer32bit, ProbHash3aSketch::<Kmer32bit> >(dirpath, sketcher, 
-                            &filter_params, &processing_parameters, others_params);
+                            filter_params, processing_parameters, others_params);
             }
             else if kmer_size == 16 {
                 let sketcher = ProbHash3aSketch::<Kmer16b32bit>::new(sketchparams);
                 sketchandstore_dir_compressedkmer::<Kmer16b32bit, ProbHash3aSketch::<Kmer16b32bit>>(dirpath, sketcher, 
-                            &filter_params, &processing_parameters, others_params);
+                            filter_params, processing_parameters, others_params);
             }
             else if  kmer_size <= 32 {
                 let sketcher = ProbHash3aSketch::<Kmer64bit>::new(sketchparams);
                 sketchandstore_dir_compressedkmer::<Kmer64bit, ProbHash3aSketch::<Kmer64bit>>(dirpath, sketcher, 
-                            &filter_params, &processing_parameters, others_params);
+                            filter_params, processing_parameters, others_params);
             }
             else {
                 panic!("kmers cannot be greater than 32");
@@ -520,18 +520,18 @@ pub fn dna_process_tohnsw(dirpath : &PathBuf, filter_params : &FilterParams, pro
             if kmer_size <= 14 {
                 // allocated the correct sketcher
                 let sketcher = SuperHashSketch::<Kmer32bit, f32>::new(sketchparams);
-                sketchandstore_dir_compressedkmer::<Kmer32bit, SuperHashSketch::<Kmer32bit, f32> >(&dirpath, sketcher, 
-                            &filter_params, &processing_parameters, others_params);
+                sketchandstore_dir_compressedkmer::<Kmer32bit, SuperHashSketch::<Kmer32bit, f32> >(dirpath, sketcher, 
+                            filter_params, processing_parameters, others_params);
             }
             else if kmer_size == 16 {
                 let sketcher = SuperHashSketch::<Kmer16b32bit, f32>::new(sketchparams);
-                sketchandstore_dir_compressedkmer::<Kmer16b32bit, SuperHashSketch::<Kmer16b32bit, f32>>(&dirpath, sketcher, 
-                            &filter_params, &processing_parameters, others_params);
+                sketchandstore_dir_compressedkmer::<Kmer16b32bit, SuperHashSketch::<Kmer16b32bit, f32>>(dirpath, sketcher, 
+                            filter_params, processing_parameters, others_params);
             }
             else if  kmer_size <= 32 {
                 let sketcher = SuperHashSketch::<Kmer64bit, f32>::new(sketchparams);
-                sketchandstore_dir_compressedkmer::<Kmer64bit, SuperHashSketch::<Kmer64bit, f32>>(&dirpath, sketcher, 
-                            &filter_params, &processing_parameters, others_params);
+                sketchandstore_dir_compressedkmer::<Kmer64bit, SuperHashSketch::<Kmer64bit, f32>>(dirpath, sketcher, 
+                            filter_params, processing_parameters, others_params);
             }
             else {
                 panic!("kmers cannot be greater than 32");
@@ -554,18 +554,18 @@ pub fn dna_process_tohnsw(dirpath : &PathBuf, filter_params : &FilterParams, pro
             if kmer_size <= 14 {
                 // allocated the correct sketcher
                 let sketcher = HyperLogLogSketch::<Kmer32bit, u16>::new(sketchparams, hll_params, hll_seqs_threading);
-                sketchandstore_dir_compressedkmer::<Kmer32bit, HyperLogLogSketch::<Kmer32bit, u16> >(&dirpath, sketcher, 
-                            &filter_params, &processing_parameters, others_params);
+                sketchandstore_dir_compressedkmer::<Kmer32bit, HyperLogLogSketch::<Kmer32bit, u16> >(dirpath, sketcher, 
+                            filter_params, processing_parameters, others_params);
             }
             else if kmer_size == 16 {
                 let sketcher = HyperLogLogSketch::<Kmer16b32bit, u16>::new(sketchparams, hll_params, hll_seqs_threading);
-                sketchandstore_dir_compressedkmer::<Kmer16b32bit, HyperLogLogSketch::<Kmer16b32bit, u16>>(&dirpath, sketcher, 
-                            &filter_params, &processing_parameters, others_params);
+                sketchandstore_dir_compressedkmer::<Kmer16b32bit, HyperLogLogSketch::<Kmer16b32bit, u16>>(dirpath, sketcher, 
+                            filter_params, processing_parameters, others_params);
             }
             else if  kmer_size <= 32 {
                 let sketcher = HyperLogLogSketch::<Kmer64bit, u16>::new(sketchparams, hll_params, hll_seqs_threading);
-                sketchandstore_dir_compressedkmer::<Kmer64bit, HyperLogLogSketch::<Kmer64bit, u16>>(&dirpath, sketcher, 
-                            &filter_params, &processing_parameters, others_params);
+                sketchandstore_dir_compressedkmer::<Kmer64bit, HyperLogLogSketch::<Kmer64bit, u16>>(dirpath, sketcher, 
+                            filter_params, processing_parameters, others_params);
             }
             else {
                 panic!("kmers cannot be greater than 32");
@@ -577,20 +577,20 @@ pub fn dna_process_tohnsw(dirpath : &PathBuf, filter_params : &FilterParams, pro
                 // we used just in tests
                 let bh = std::hash::BuildHasherDefault::<fxhash::FxHasher32>::default();
                 let sketcher = SuperHash2Sketch::<Kmer32bit, u32, fxhash::FxHasher32>::new(sketchparams, bh);
-                sketchandstore_dir_compressedkmer::<Kmer32bit, SuperHash2Sketch::<Kmer32bit, u32, fxhash::FxHasher32> >(&dirpath, sketcher, 
-                            &filter_params, &processing_parameters, others_params);
+                sketchandstore_dir_compressedkmer::<Kmer32bit, SuperHash2Sketch::<Kmer32bit, u32, fxhash::FxHasher32> >(dirpath, sketcher, 
+                            filter_params, processing_parameters, others_params);
             }
             else if kmer_size == 16 {
                 let bh = std::hash::BuildHasherDefault::<fxhash::FxHasher32>::default();
                 let sketcher = SuperHash2Sketch::<Kmer16b32bit, u32, fxhash::FxHasher32>::new(sketchparams, bh);
-                sketchandstore_dir_compressedkmer::<Kmer16b32bit, SuperHash2Sketch::<Kmer16b32bit, u32, fxhash::FxHasher32>>(&dirpath, sketcher, 
-                            &filter_params, &processing_parameters, others_params);
+                sketchandstore_dir_compressedkmer::<Kmer16b32bit, SuperHash2Sketch::<Kmer16b32bit, u32, fxhash::FxHasher32>>(dirpath, sketcher, 
+                            filter_params, processing_parameters, others_params);
             }
             else if  kmer_size <= 32 {
                 let bh = std::hash::BuildHasherDefault::<fxhash::FxHasher64>::default();
                 let sketcher = SuperHash2Sketch::<Kmer64bit, u64, fxhash::FxHasher64>::new(sketchparams, bh);
-                sketchandstore_dir_compressedkmer::<Kmer64bit, SuperHash2Sketch::<Kmer64bit, u64, fxhash::FxHasher64>>(&dirpath, sketcher, 
-                            &filter_params, &processing_parameters, others_params);
+                sketchandstore_dir_compressedkmer::<Kmer64bit, SuperHash2Sketch::<Kmer64bit, u64, fxhash::FxHasher64>>(dirpath, sketcher, 
+                            filter_params, processing_parameters, others_params);
             }
             else {
                 panic!("kmers cannot be greater than 32");
@@ -600,18 +600,18 @@ pub fn dna_process_tohnsw(dirpath : &PathBuf, filter_params : &FilterParams, pro
             if kmer_size <= 14 {
                 // allocated the correct sketcher
                 let sketcher = OptDensHashSketch::<Kmer32bit, f32>::new(sketchparams);
-                sketchandstore_dir_compressedkmer::<Kmer32bit, OptDensHashSketch::<Kmer32bit, f32> >(&dirpath, sketcher, 
-                            &filter_params, &processing_parameters, others_params);
+                sketchandstore_dir_compressedkmer::<Kmer32bit, OptDensHashSketch::<Kmer32bit, f32> >(dirpath, sketcher, 
+                            filter_params, processing_parameters, others_params);
             }
             else if kmer_size == 16 {
                 let sketcher = OptDensHashSketch::<Kmer16b32bit, f32>::new(sketchparams);
-                sketchandstore_dir_compressedkmer::<Kmer16b32bit, OptDensHashSketch::<Kmer16b32bit, f32>>(&dirpath, sketcher, 
-                            &filter_params, &processing_parameters, others_params);
+                sketchandstore_dir_compressedkmer::<Kmer16b32bit, OptDensHashSketch::<Kmer16b32bit, f32>>(dirpath, sketcher, 
+                            filter_params, processing_parameters, others_params);
             }
             else if  kmer_size <= 32 {
                 let sketcher = OptDensHashSketch::<Kmer64bit, f32>::new(sketchparams);
-                sketchandstore_dir_compressedkmer::<Kmer64bit, OptDensHashSketch::<Kmer64bit, f32>>(&dirpath, sketcher, 
-                            &filter_params, &processing_parameters, others_params);
+                sketchandstore_dir_compressedkmer::<Kmer64bit, OptDensHashSketch::<Kmer64bit, f32>>(dirpath, sketcher, 
+                            filter_params, processing_parameters, others_params);
             }
             else {
                 panic!("kmers cannot be greater than 32");
@@ -622,18 +622,18 @@ pub fn dna_process_tohnsw(dirpath : &PathBuf, filter_params : &FilterParams, pro
             if kmer_size <= 14 {
                 // allocated the correct sketcher
                 let sketcher = RevOptDensHashSketch::<Kmer32bit, f32>::new(sketchparams);
-                sketchandstore_dir_compressedkmer::<Kmer32bit, RevOptDensHashSketch::<Kmer32bit, f32> >(&dirpath, sketcher, 
-                            &filter_params, &processing_parameters, others_params);
+                sketchandstore_dir_compressedkmer::<Kmer32bit, RevOptDensHashSketch::<Kmer32bit, f32> >(dirpath, sketcher, 
+                            filter_params, processing_parameters, others_params);
             }
             else if kmer_size == 16 {
                 let sketcher = RevOptDensHashSketch::<Kmer16b32bit, f32>::new(sketchparams);
-                sketchandstore_dir_compressedkmer::<Kmer16b32bit, RevOptDensHashSketch::<Kmer16b32bit, f32>>(&dirpath, sketcher, 
-                            &filter_params, &processing_parameters, others_params);
+                sketchandstore_dir_compressedkmer::<Kmer16b32bit, RevOptDensHashSketch::<Kmer16b32bit, f32>>(dirpath, sketcher, 
+                            filter_params, processing_parameters, others_params);
             }
             else if  kmer_size <= 32 {
                 let sketcher = RevOptDensHashSketch::<Kmer64bit, f32>::new(sketchparams);
-                sketchandstore_dir_compressedkmer::<Kmer64bit, RevOptDensHashSketch::<Kmer64bit, f32>>(&dirpath, sketcher, 
-                            &filter_params, &processing_parameters, others_params);
+                sketchandstore_dir_compressedkmer::<Kmer64bit, RevOptDensHashSketch::<Kmer64bit, f32>>(dirpath, sketcher, 
+                            filter_params, processing_parameters, others_params);
             }
             else {
                 panic!("kmers cannot be greater than 32");

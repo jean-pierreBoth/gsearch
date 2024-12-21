@@ -27,7 +27,8 @@ where
         hnsw_dump.push("hnswdump");
         let hnswdumpname = String::from(hnsw_dump.to_str().unwrap());
         log::info!("going to dump hnsw with prefix : {:?}", hnswdumpname);
-        let resdump = hnsw.file_dump(&hnswdumpname);
+        let dir = PathBuf::from(".");
+        let resdump = hnsw.file_dump(&dir, &hnswdumpname);
         match resdump {
             Err(msg) => {
                 println!("dump failed error msg : {}", msg);
@@ -62,7 +63,7 @@ where
 
 pub fn reload_seqdict(dump_path_ref: &PathBuf) -> SeqDict {
     // must reload seqdict
-    let mut filepath = PathBuf::from(dump_path_ref.clone());
+    let mut filepath = dump_path_ref.clone();
     filepath.push("seqdict.json");
     let res_reload = SeqDict::reload_json(&filepath);
     if res_reload.is_err() {
@@ -73,8 +74,8 @@ pub fn reload_seqdict(dump_path_ref: &PathBuf) -> SeqDict {
         log::error!("cannot reload SeqDict (file 'seq.json' from current directory");
         std::process::exit(1);
     } else {
-        let seqdict = res_reload.unwrap();
-        return seqdict;
+        
+        res_reload.unwrap()
     }
 } // end of reload_seqdict
 
@@ -94,7 +95,7 @@ pub fn seqdict_jsontocsv(json_path_ref: &PathBuf) -> usize {
     let rec_count = seqdict.dump_csv(&seqdict_csv_path);
     log::info!("seqdict_jsontocsv dumped nb record : {}", rec_count);
     //
-    return rec_count;
+    rec_count
 }
 
 // retrieve or allocate a SeqDict depending on use case
@@ -109,5 +110,5 @@ pub fn get_seqdict(
         SeqDict::new(100000)
     };
     //
-    return Ok(seqdict);
+    Ok(seqdict)
 } // end of get_seqdict

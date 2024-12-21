@@ -100,7 +100,6 @@ use gsearch::utils::*;
 
 use kmerutils::sketcharg::{SeqSketcherParams, SketchAlgo};
 
-use hnsw_rs::prelude::*;
 //mod files;
 use gsearch::aa::aarequest;
 use gsearch::dna::dnarequest;
