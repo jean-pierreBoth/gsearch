@@ -93,6 +93,8 @@ use std::path::{Path, PathBuf};
 // for logging (debug mostly, switched at compile time in cargo.toml)
 use env_logger::Builder;
 
+use hnsw_rs::prelude::DistHamming;
+
 // our crate
 use gsearch::aa::aasketch::aa_process_tohnsw;
 use gsearch::dna::dnasketch::dna_process_tohnsw;
