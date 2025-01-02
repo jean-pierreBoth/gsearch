@@ -37,11 +37,13 @@ pub struct HnswParams {
     /// ef used in construction
     ef : usize,
     max_nb_conn : u8,
+    //scale_modification factor, must be [0.2, 1]
+    scale_modification : f64,
 }
 
 impl HnswParams {
-    pub fn new(capacity : usize, ef : usize, max_nb_conn : u8) -> Self {
-        HnswParams{capacity, ef, max_nb_conn}
+    pub fn new(capacity : usize, ef : usize, max_nb_conn : u8, scale_modification: f64) -> Self {
+        HnswParams{capacity, ef, max_nb_conn, scale_modification}
     }
     //
     pub fn get_ef(&self) -> usize {
@@ -51,6 +53,10 @@ impl HnswParams {
     pub fn get_max_nb_connection(&self) -> u8 {
         self.max_nb_conn
     }
+    pub fn get_scale_modification(&self) -> f64 {
+        self.scale_modification
+    }
+
 }  // end of impl block HnswParams
 
 
