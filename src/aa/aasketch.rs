@@ -129,6 +129,8 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT+KmerBuilder<Kmer>, Ske
         toprocess_path = hnsw_pb.clone();
         let hnsw_params = processing_params.get_hnsw_params();
         hnsw = Hnsw::< <Sketcher as SeqSketcherAAT<Kmer>>::Sig, DistHamming>::new(hnsw_params.get_max_nb_connection() as usize , hnsw_params.capacity , 16, hnsw_params.get_ef(), DistHamming{});
+        // HubNSW idea, add a scale modification factor to build only 1 layer, see https://arxiv.org/abs/2412.01940
+        hnsw.modify_level_scale(hnsw_params.get_scale_modification());
         state = ProcessingState::new();
     }
     //
