@@ -93,15 +93,13 @@ use std::path::{Path, PathBuf};
 // for logging (debug mostly, switched at compile time in cargo.toml)
 use env_logger::Builder;
 
-use hnsw_rs::prelude::DistHamming;
-
 // our crate
 use gsearch::aa::aasketch::aa_process_tohnsw;
 use gsearch::dna::dnasketch::dna_process_tohnsw;
 use gsearch::utils::*;
 
 use kmerutils::sketcharg::{SeqSketcherParams, SketchAlgo};
-
+use hnsw_rs::prelude::DistHamming;
 //mod files;
 use gsearch::aa::aarequest;
 use gsearch::dna::dnarequest;
@@ -224,6 +222,17 @@ fn parse_tohnsw_cmd(matches: &ArgMatches) -> Result<(String, ProcessingParams), 
         ef_construction
     );
 
+    let scale_modify: &f64;
+    let scale_modify_default = 1.0f64;
+    let scale_modify = matches
+        .get_one("scale_modification")
+        .unwrap_or(&scale_modify_default);
+    println!(
+        "scale modification factor in hnsw construction {}",
+        scale_modify
+    );
+
+
     let block_processing = matches.get_flag("block");
     if block_processing {
         log::info!("setting block flag true, block = true, will process files by concatenating seqs of file");
@@ -249,8 +258,9 @@ fn parse_tohnsw_cmd(matches: &ArgMatches) -> Result<(String, ProcessingParams), 
 
     // max_nb_conn must be adapted to the number of neighbours we will want in searches.
     // Maximum allowed nbng for hnswlib-rs is 256. Larger nbng will not work and default to 256.
+    // scale_modify the level modification factor applied so that only 1 layer can be constructed, see paper here: https://arxiv.org/abs/2412.01940.
     let max_nb_conn: u8 = 255.min(*nbng as u8);
-    let hnswparams = HnswParams::new(1_500_000, *ef_construction, max_nb_conn);
+    let hnswparams = HnswParams::new(1_500_000, *ef_construction, max_nb_conn, *scale_modify);
     //
     let processing_params = ProcessingParams::new(hnswparams, sketch_params, block_processing);
     //
@@ -399,7 +409,7 @@ fn main() {
     log::info!("\n gsearch begins at time:{:#?} \n ", start_t);
     //
     let tohnsw_cmd  = Command::new("tohnsw")
-        .about("Build HNSW graph database from a collection of database genomes based on MinHash-like metric")
+        .about("Build HNSW/HubNSW graph database from a collection of database genomes based on MinHash-like metric")
         .arg(Arg::new("hnsw_dir")
             .short('d')
             .long("dir")
@@ -440,6 +450,14 @@ fn main() {
             .value_name("ef")
             .action(ArgAction::Set)
             .value_parser(clap::value_parser!(usize))
+        )
+        .arg(Arg::new("scale_modification")
+            .long("scale_modify_f")
+            .help("scale modification factor in HNSW or HubNSW, must be in [0.2,1]")
+            .value_name("scale_modify")
+            .default_value("1.0")
+            .action(ArgAction::Set)
+            .value_parser(clap::value_parser!(f64))
         )
         .arg(Arg::new("sketch_algo")
             .required(true)
@@ -777,7 +795,8 @@ fn main() {
             #[cfg(any(
                 feature = "annembed_openblas-system",
                 feature = "annembed_openblas-static",
-                feature = "annembed_intel-mkl"
+                feature = "annembed_intel-mkl",
+                feature = "annembed_accelerate"
             ))]
             match type_name.as_str() {
                 "u32" => {
