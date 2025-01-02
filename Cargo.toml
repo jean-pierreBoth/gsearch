@@ -120,6 +120,7 @@ default = ["annembed_openblas-system"]
 annembed_openblas-static = ["annembed/openblas-static"]
 annembed_openblas-system = ["annembed/openblas-system"]
 annembed_intel-mkl = ["annembed/intel-mkl-static"]
+annembed_accelerate = ["annembed/macos-accelerate"]
 
 withzmq = ["kmerutils/withzmq"]
 simdeez_f = ["hnsw_rs/simdeez_f", "kmerutils/simdeez_f"]
