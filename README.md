@@ -3,6 +3,7 @@
 ![](https://anaconda.org/bioconda/gsearch/badges/version.svg)
 ![](https://anaconda.org/bioconda/gsearch/badges/latest_release_relative_date.svg)
 ![](https://anaconda.org/bioconda/gsearch/badges/platforms.svg)
+[![install with conda](https://anaconda.org/bioconda/gsearch/badges/downloads.svg)](https://anaconda.org/bioconda/gsearch)
 [![DOI](https://zenodo.org/badge/187937357.svg)](https://doi.org/10.5281/zenodo.10543594)
 
 [![Latest Version](https://img.shields.io/crates/v/gsearch?style=for-the-badge&color=mediumpurple&logo=rust)](https://crates.io/crates/gsearch)
