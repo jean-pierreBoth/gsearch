@@ -101,7 +101,7 @@ impl ProcessingState {
 // filename are of type GCA[GCF]_000091165.1_genomic.fna.gz
 pub fn is_fasta_dna_file(pathb : &PathBuf) -> bool {
     let filename = pathb.to_str().unwrap();
-    if filename.ends_with("fna.gz")|| filename.ends_with("fa.gz") || 
+    if filename.ends_with("fna.gz")|| filename.ends_with("fa.gz") || filename.ends_with("fa.xz") || filename.ends_with("fna.xz") || filename.ends_with("fasta.xz") || filename.ends_with("fa.bz2") || filename.ends_with("fna.bz2") || filename.ends_with("fasta.bz2") ||
                 filename.ends_with("fasta.gz") || filename.ends_with("fna") || filename.ends_with("fa") || filename.ends_with("fasta") {
         true
     }
@@ -115,7 +115,7 @@ pub fn is_fasta_dna_file(pathb : &PathBuf) -> bool {
 /// returns true if file is a fasta file preotein (possibly gzipped) suffixed by .faa
 pub fn is_fasta_aa_file(pathb : &PathBuf) -> bool {
     let filename = pathb.to_str().unwrap();
-    filename.ends_with("faa.gz") || filename.ends_with("faa")
+    filename.ends_with("faa.gz") || filename.ends_with("faa") || filename.ends_with("faa.xz") || filename.ends_with("faa.bz2")
 }  // end of is_fasta_aa_file
 
 
