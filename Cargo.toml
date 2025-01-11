@@ -11,7 +11,7 @@ description = "genome classification, probminhash hnsw, genome search"
 
 [[bin]]
 
-name = "gsearchbin"
+name = "gsearch"
 path = "src/bin/gsearch.rs"
 
 [[bin]]
