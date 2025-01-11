@@ -115,7 +115,7 @@ csv = { version = "1.1" }
 
 [features]
 
-default = ["annembed_openblas-system"]
+default = []
 
 annembed_openblas-static = ["annembed/openblas-static"]
 annembed_openblas-system = ["annembed/openblas-system"]
