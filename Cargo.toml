@@ -84,8 +84,8 @@ probminhash = { version = "0.1.11" }
 # probminhash = {git = "https://github.com/jean-pierreBoth/probminhash"}
 # probminhash = {path = "../probminhash"}
 
-# hnsw_rs = { version = "0.3" }
-hnsw_rs = { git = "https://github.com/jean-pierreBoth/hnswlib-rs" }
+hnsw_rs = { version = "0.3.1" }
+# hnsw_rs = { git = "https://github.com/jean-pierreBoth/hnswlib-rs" }
 # hnsw_rs = {git = "https://gitlab.com/jpboth/hnswlib-rs.git"}
 # hnsw_rs = { path = "../hnswlib-rs" }
 
