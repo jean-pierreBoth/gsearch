@@ -107,6 +107,7 @@ Options:
   -s, --sketch <sketch_size>  sketch size of minhash to use
   -n, --nbng <neighbours>     Maximum allowed number of neighbors (M) in HNSW
       --ef <ef>               ef_construct in HNSW
+      --scale_modify_f <scale_modify>  scale modification factor in HNSW or HubNSW, must be in [0.2,1] [default: 1.0]
       --algo <sketch_algo>    specifiy the algorithm to use for sketching: prob, super/super2, hll or optdens/revoptdens
       --aa                    --aa Specificy amino acid processing, require no value
       --block                 --block : sketching is done concatenating sequences
@@ -290,7 +291,7 @@ chmod a+x ./hnswcore
 ```
 1. First, we need to build a database via MinHash sketch and have nearest neighbors for each database genome.
 ```bash
-gsearch --pio 4000 --nbthreads 60 tohnsw -d ../files -k 16 -s 18000 -n 128 --ef 1600 --algo optdens
+gsearch --pio 4000 --nbthreads 60 tohnsw -d ../files -k 16 -s 18000 -n 128 --ef 1600 --algo optdens 
 
 ```
 2. Second, we use the output from the step 1 to run Coreset clustering, --dir is the current directory in step 1.
@@ -498,10 +499,10 @@ https://doi.org/10.6084/m9.figshare.22681939.v1
 
 ### Building database. database is huge in size, users are welcome to download gtdb database here: (<https://data.ace.uq.edu.au/public/gtdb/data/releases/release207/207.0/genomic_files_reps/gtdb_genomes_reps_r207.tar.gz>) and here (<https://data.ace.uq.edu.au/public/gtdb/data/releases/release207/207.0/genomic_files_reps/gtdb_proteins_aa_reps_r207.tar.gz>) or go to NCBI/RefSeq to download all available prokaryotic genomes
 
-### build database given genome file directory, fna.gz was expected. L for nt and .faa or .faa.gz for --aa. Limit for k is 32 (15 not work due to compression), for s is 65535 (u16) and for n is 255 (u8)
+### build database given genome file directory, .fna/.fasta/.fa/.fna.gz/.fna.xz/.fna.bz2/.fa.gz/.fa.xz/.fa.bz2/.fasta.gz/.fasta.xz/.fasta.bz2 was expected for nt and .faa or .faa.gz/.faa.xz/.faa.bz2 for --aa. Limit for k is 32 (15 not work due to compression), for s is 65535 (u16) and for n is 255 (u8). We recommended optimal densification for its speed and accuracy. --scale_modify_f can be used to adjust number of layers. Hub NSW can be achieved using a small value (e.g.0.25)
 
-gsearch --pio 2000 --nbthreads 24 tohnsw -d db_dir_nt -s 12000 -k 16 --ef 1600 -n 128 --algo prob
-gsearch --pio 2000 --nbthreads 24 tohnsw -d db_dir_aa -s 12000 -k 7 --ef 1600 -n 128 --aa --algo prob
+gsearch --pio 2000 --nbthreads 24 tohnsw -d db_dir_nt -s 12000 -k 16 --ef 1600 -n 128 --algo optdens --scale_modify_f 0.25
+gsearch --pio 2000 --nbthreads 24 tohnsw -d db_dir_aa -s 12000 -k 7 --ef 1600 -n 128 --aa --algo optdens --scale_modify_f 0.25
 
 ### When there are new genomes  after comparing with the current database (GTDB v207, e.g. ANI < 95% with any genome after searcing, corresponding to >0.875 ProbMinHash distance), those genomes can be added to the database
 
