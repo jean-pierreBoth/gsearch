@@ -32,7 +32,7 @@ impl<'a> ReqAnswer<'a> {
     /// dump answers to a File.
     /// We dump only answers with distance less than threshold to help visual synthesis of reult.
     /// Typically keep only distance less than 0.98 with kmer size=12 is sufficient to get rid of garbage.
-    pub(crate) fn dump(
+    pub fn dump(
         &self,
         seqdict: &SeqDict,
         threshold: f32,
