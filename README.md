@@ -16,17 +16,33 @@
   <img width="50%" src ="GSearch-logo.svg">
 </div>
 
-## Quick install on Linux
-```bash
-### pre-combiled binary
-wget https://github.com/jean-pierreBoth/gsearch/releases/download/v0.1.5/gsearch_Linux_x86-64_v0.1.5.zip
-unzip gsearch_Linux_x86-64_v0.1.5.zip
-chmod a+x ./gsearch_Linux_x86-64_v0.1.5/*
-cd gsearch_Linux_x86-64_v0.1.5
-./gsearch -h
+If you find GSearch useful, please cite the following paper:
+```
+@article{zhao2024gsearch,
+  title={GSearch: ultra-fast and scalable genome search by combining K-mer hashing with hierarchical navigable small world graphs},
+  author={Zhao, Jianshu and Both, Jean Pierre and Rodriguez-R, Luis M and Konstantinidis, Konstantinos T},
+  journal={Nucleic Acids Research},
+  volume={52},
+  number={16},
+  pages={e74--e74},
+  year={2024},
+  publisher={Oxford University Press}
+}
+```
 
-### Install via bioconda (hmmsearch_rs and hnswcore not available for now)
+## Quick install on Linux
+### Install via bioconda
+```bash
 conda install -c conda-forge -c bioconda gsearch
+```
+
+### pre-combiled binary
+```bash
+wget https://github.com/jean-pierreBoth/gsearch/releases/download/v0.2.1/GSearch_Linux_x86-64-v0.2.2.zip
+unzip GSearch_Linux_x86-64-v0.2.2.zip
+chmod a+x ./GSearch_Linux_x86-64-v0.2.2/*
+cd GSearch_Linux_x86-64-v0.2.2
+./gsearch -h
 ```
 
 GSearch stands for **genomic search**.  
