@@ -57,7 +57,7 @@ impl<'a> ReqAnswer<'a> {
                     let database_id = seqdict.0[n.d_id].get_id().get_path();
                     write!(
                         out,
-                        "\nquery_id:\t{}\tdistance:\t{:.5E}\tanswer_fasta_path\t{}",
+                        "\nquery_id:\t{}\tdistance:\t{:.5E}\tanswer_fasta_path\t{}\t",
                         self.req_item.get_id().get_path(),
                         n.distance,
                         database_id
