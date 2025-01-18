@@ -463,13 +463,13 @@ tar -xzvf k16_s12000_n128_ef1600.prob.tar.gz
 # request neighbors for nt genomes (here -n is how many neighbors you want to return for each of your query genome, output will be gsearch.neighbors.txt in the current folder)
 gsearch --pio 100 --nbthreads 24 request -b ./k16_s12000_n128_ef1600_canonical -r ../../test_data/query_dir_nt -n 50
 ## reformat output to have ANI
-../../gsearch/scripts/reformat.sh 16 1 ./gsearch.neighbors.txt ./clean_ANI.txt
+reformat 16 1 ./gsearch.neighbors.txt ./clean_ANI.txt
 
 ## SetSketch/hll database
 tar -xzvf k16_s4096_n128_ef1600.hll.tar.gz
 gsearch --pio 100 --nbthreads 24 request -b ./k16_s4096_n128_ef1600_canonical_hll -r ../../test_data/query_dir_nt -n 50
 ## reformat output to have ANI
-../../gsearch/scripts/reformat.sh 16 1 ./gsearch.neighbors.txt ./clean_ANI.txt
+reformat.sh 16 1 ./gsearch.neighbors.txt ./clean_ANI.txt
 
 ## Densified MinHash, download first, see above
 cd GTDB_optdens
@@ -479,7 +479,7 @@ cd GTDB
 tar -xzvf k16_s18000_n128_ef1600_optdens.tar.gz
 gsearch --pio 100 --nbthreads 24 request -b ./k16_s18000_n128_ef1600_optdens -r ../../test_data/query_dir_nt -n 50
 ## reformat output to have ANI
-../../gsearch/scripts/reformat.sh 16 1 ./gsearch.neighbors.txt ./clean_ANI.txt
+reformat 16 1 ./gsearch.neighbors.txt ./clean_ANI.txt
 
 ### or request neighbors for aa genomes (predicted by Prodigal or FragGeneScanRs), probminhash and SetSketch/hll
 
@@ -487,7 +487,7 @@ cd ./GTDB/prot
 tar xzvf k7_s12000_n128_ef1600.prob.tar.gz
 gsearch --pio 100 --nbthreads 24 request -b ./k7_s12000_n128_ef1600_gsearch -r ../../test_data/query_dir_aa -n 50
 ## reformat output to have AAI
-../../gsearch/scripts/reformat.sh 16 1 ./gsearch.neighbors.txt ./clean_AAI.txt
+reformat 16 1 ./gsearch.neighbors.txt ./clean_AAI.txt
 
 #aa densified MinHash
 cd ./GTDB_optdens
@@ -495,7 +495,7 @@ cd GTDB
 tar -xzvf k7_s12000_n128_ef1600_optdens.tar.gz
 gsearch --pio 100 --nbthreads 24 request -b ./k7_s12000_n128_ef1600_optdens -r ../../test_data/query_dir_aa -n 50
 ## reformat output to have AAI
-../../gsearch/scripts/reformat.sh 16 1 ./gsearch.neighbors.txt ./clean_ANI.txt
+reformat 16 1 ./gsearch.neighbors.txt ./clean_ANI.txt
 
 ### or request neighbors for aa universal gene (extracted by hmmer according to hmm files from gtdb, we also provide one in release page)
 
