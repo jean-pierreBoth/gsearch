@@ -1,5 +1,5 @@
-// GSEARCH v0.1.1
-// Copyright 2021-2022, Jean Pierre Both and Jianshu Zhao.
+// GSEARCH v0.2.1
+// Copyright 2021-2025, Jean Pierre Both and Jianshu Zhao.
 // Licensed under the MIT license (http://opensource.org/licenses/MIT).
 // This file may not be copied, modified, or distributed except according to those terms.
 
@@ -42,6 +42,8 @@
 //!
 //!     * \--ef optional integer value to optimize hnsw structure creation (default to 400)  
 //!
+//!     * \--scale_modify_f scale modification factor in HubNSW or HNSW, must be in [0.2,1]
+//!
 //!     * \--block if we want a processing by concatenating sequences each file will be concatenating in a large sequence.(default is seq by seq)
 //!  
 //!
@@ -77,7 +79,7 @@
 //!  It comes at a cost: if you have large files associated to large kmer the (hash) structure to store the count of billions of kmers needs much memory.  
 //!  In this case consider using SuperMinHash or HyperLogLog which just record presence of kmers.  
 //!  SuperMinHash in its present form sketch into f32 vectors but is quite fast. HyperLogLog is slower but sketch into u16 vector and can store billions
-//!  of kmers. See the crate [probminhash](https://crates.io/crates/probminhash)
+//!  of kmers. Additionally, One Permutation Hashing with optimal densification can be used for much faster MinHash.  See the crate [probminhash](https://crates.io/crates/probminhash)
 //!      
 //!
 //!
@@ -231,7 +233,11 @@ fn parse_tohnsw_cmd(matches: &ArgMatches) -> Result<(String, ProcessingParams), 
         "scale modification factor in hnsw construction {}",
         scale_modify
     );
-
+    // Check if the scale modification factor is out of the allowed range
+    if *scale_modify > 1.0 || *scale_modify < 0.2 {
+        eprintln!("Error: scale modification factor must be between 0.2 and 1.0");
+        std::process::exit(1);
+    }
 
     let block_processing = matches.get_flag("block");
     if block_processing {
