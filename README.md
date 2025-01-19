@@ -38,10 +38,10 @@ conda install -c conda-forge -c bioconda gsearch
 
 ### pre-combiled binary
 ```bash
-wget https://github.com/jean-pierreBoth/gsearch/releases/download/v0.2.1/GSearch_Linux_x86-64-v0.2.2.zip
-unzip GSearch_Linux_x86-64-v0.2.2.zip
-chmod a+x ./GSearch_Linux_x86-64-v0.2.2/*
-cd GSearch_Linux_x86-64-v0.2.2
+wget https://github.com/jean-pierreBoth/gsearch/releases/download/v0.1.5/gsearch_Linux_x86-64_v0.1.5.zip
+unzip gsearch_Linux_x86-64_v0.1.5.zip
+chmod a+x ./gsearch_Linux_x86-64_v0.1.5/*
+cd gsearch_Linux_x86-64_v0.1.5
 ./gsearch -h
 ```
 
