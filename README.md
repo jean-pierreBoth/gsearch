@@ -30,7 +30,7 @@ If you find GSearch useful, please cite the following paper:
 }
 ```
 
-## Quick install on Linux
+## Quick install on Linux (Stable version)
 ### Install via bioconda
 ```bash
 conda install -c conda-forge -c bioconda gsearch=0.2.2
@@ -43,6 +43,21 @@ unzip gsearch_Linux_x86-64_v0.1.5.zip
 chmod a+x ./gsearch_Linux_x86-64_v0.1.5/*
 cd gsearch_Linux_x86-64_v0.1.5
 ./gsearch -h
+```
+
+## Install development version (Linux)
+Note that pre-built databases will not work for development version, you need to rebuild database yourself
+```bash
+conda install -c bioconda -c conda-forge gsearch
+
+##or via cargo, install cargo:
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+
+## install via cargo
+cargo install gsearch --features annembed_intel-mkl,simdeez_f --force
+
+## For macOS see below install section for details
+
 ```
 
 GSearch stands for **genomic search**.  
