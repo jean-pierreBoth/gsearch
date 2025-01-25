@@ -222,6 +222,25 @@ Query_Name is your query genomes, Distance is genomic Jaccard distance (1-J/Jp),
 
 We also provide scripts for analyzing output from request and compare with other ANI based methods here: https://github.com/jianshu93/gsearch_analysis
 
+## hnsw2knn
+Extract nearest neighbor genomes in the pre-built database. For each genome, nearest neighbor genomes to it will printed from samllest distance (largest ANI) to largest distance (smallest ANI)
+```bash
+$hnsw2knn -h
+
+ ************** initializing logger *****************
+
+Extract K Nearest Neighbors (K-NN) from HNSW graph.
+
+Usage: hnsw2knn [OPTIONS] --hnsw <DATADIR> --output <OUTPUT_PATH>
+
+Options:
+  -b, --hnsw <DATADIR>             Directory containing pre-built HNSW database files
+  -o, --output <OUTPUT_PATH>       Output path to write the neighbor list
+  -n, --k-nearest-neighbors <KNN>  Number of k-nearest-neighbors to extract [default: 32]
+  -h, --help                       Print help
+  -V, --version                    Print version
+```
+
 
 ## SuperANI
 Additional ANI calculation (if you do not want to use MinHash estimated ANI) for the query genomes and nearest neighbor genomes can be performed via the program superani:
