@@ -13,7 +13,7 @@
 
 # GSearch: Ultra-fast and Scalable Genome Search based on Various MinHash-like Metrics and HNSW
 <div align="center">
-  <img width="50%" src ="GSearch-logo.svg">
+  <img width="75%" src ="GSearch-logo.svg">
 </div>
 
 If you find GSearch useful, please cite the following paper:
