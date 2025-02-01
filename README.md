@@ -407,6 +407,40 @@ Salmonella_enterica_salamae_b_Ar0560	./refs/Ar0560.fasta
 Salmonella_enterica_houtenae_Type	./refs/NCTC10401.fasta
 Salmonella_bongori_Type-NCTC12419	./refs/S_bongoriType_NCTC12419.fasta
 ```
+output explain (a PacBio long reads metagenomic dataset): 
+the PREFIX_reads.txt: The first column contains the name of the read, the second column the taxonomic classification (database genome name), the third column the number of minimizers supporting this classification, the fourth column the total number of minim-zers used as input for the classification and the fifth column indicates if this classification is rejected or accepted given the false positive probability (default is 0.001). There are 2 cases where a read classification can be rejected: 1. not enough minimzers found in any of the genomes in the database, which mean this the read is from new genus at least, if there are so many such reads, which indicate taxonomic novelty. You should perform reads assembly to obtain population genomes; 2. many minimizers found in multiple genomes, which indicate a very conserved read, read level classification is not possible in this case. 
+
+```bash
+>m54119U_190516_061409/2/ccs	GCA_900546835.1_genomic.fna	980	1099	accept	1
+>m54119U_190516_061409/9/ccs	GCA_900546835.1_genomic.fna	1015	1342	accept	1
+>m54119U_190516_061409/1095/ccs	no_significant_hits	0	728	reject	0
+>m54119U_190516_061409/73400366/ccs	GCA_004562975.1_genomic.fna,GCF_000210075.1_genomic.fna,GCF_000382445.1_genomic.fna,GCA_004555245.1_genomic.fna,GCF_900079775.1_genomic.fna	1351	1358	reject	5
+```
+
+The PREFIX_counts.txt summarizes the total counts per taxon. you can use sort and head to get the top hits: sort -grk2 PREFIX_counts.txt | head -10
+```bash
+GCA_900546835.1_genomic.fna	106435
+GCA_000437595.1_genomic.fna	83967
+GCF_013009555.1_genomic.fna	66368
+GCA_025147485.1_genomic.fna	50485
+GCF_000012825.1_genomic.fna	40636
+GCF_020687245.1_genomic.fna	28853
+GCF_000158035.1_genomic.fna	28151
+GCA_025146925.1_genomic.fna	28035
+GCA_902363145.1_genomic.fna	25749
+GCA_900544265.1_genomic.fna	23938
+GCF_000233955.1_genomic.fna	23078
+GCF_000723465.1_genomic.fna	21830
+GCA_025145845.1_genomic.fna	21329
+GCF_003461625.1_genomic.fna	17235
+GCA_003486385.1_genomic.fna	15961
+GCF_003287405.1_genomic.fna	15101
+GCA_019414665.1_genomic.fna	14663
+reject	14325
+GCA_001917135.1_genomic.fna	14149
+GCF_023347255.1_genomic.fna	13664
+
+```
 ## Simple case for install
 
 **Pre-built binaries** will be available on release page [binaries](https://github.com/jean-pierreBoth/gsearch/releases/tag/v0.1.5) for major platforms (no need to install but just download and make it executable). We recommend you use the linux one (gsearch_Linux_x86-64_v0.1.5.zip) for linux system in this release page for convenience (only system libraries are required). For macOS, we recommend the universal binary mac-binaries (gsearch_Darwin_universal_v0.1.5.tar.gz). Or GSearch_pc-windows-msvc_x86-64_v0.1.5.zip for Windows.
