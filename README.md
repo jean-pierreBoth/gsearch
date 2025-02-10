@@ -218,7 +218,11 @@ You will then see the clean output like this:
 | test03.fasta.gz | 8.83E-01 | GCA_007713455.1_genomic.fna.gz | 4711826          | 90.2361 |
 | test03.fasta.gz | 8.86E-01 | GCF_003696315.1_genomic.fna.gz | 4321164          | 90.1098 |
 
-Query_Name is your query genomes, Distance is genomic Jaccard distance (1-J/Jp), Neighbor_Fasta_name is the nearest neighbors based on the genomic Jaccard distance, ranked by distance. ANI is calculated from genomic Jaccard distance according the equaiton above between you query genome and nearest database genomes.
+Query_Name is your query genomes, Distance is genomic Jaccard distance (1-J/Jp), Neighbor_Fasta_name is the nearest neighbors based on the genomic Jaccard distance, ranked by distance. ANI is calculated from genomic Jaccard distance according the equaiton above between you query genome and nearest database genomes. You can then simply extract the best one match according to the highest ANI from the above output:
+
+```bash
+awk 'BEGIN{FS=OFS="\t"} NR == 1 {print; next} {if (!max[$1] || $5 > max[$1]) {max[$1] = $5; line[$1] = $0}} END {for (x in line) print line[x]}' clean.txt > clean_best_hit.txt
+```
 
 We also provide scripts for analyzing output from request and compare with other ANI based methods here: https://github.com/jianshu93/gsearch_analysis
 
