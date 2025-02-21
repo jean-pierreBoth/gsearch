@@ -45,7 +45,7 @@ cd gsearch_Linux_x86-64_v0.1.5
 ./gsearch -h
 ```
 
-## Install development version (Linux)
+## Install developmental version (Linux)
 Note that pre-built databases will not work for development version, you need to rebuild database yourself
 ```bash
 conda install -c bioconda -c conda-forge gsearch
