@@ -1,17 +1,17 @@
 use clap::{Arg, ArgAction, Command};
-use gsearch::utils::SeqDict;
 use gsearch::utils::reloadhnsw;
+use gsearch::utils::SeqDict;
 use log::info;
 use std::fs::File;
 use std::io::{BufWriter, Write};
 use std::path::Path;
 
-use hnsw_rs::prelude::*;
 use annembed::fromhnsw::kgraph::KGraph;
 use annembed::fromhnsw::kgraph_from_hnsw_all;
-use num::Float;
+use hnsw_rs::prelude::DistHamming;
 use kmerutils::base::Kmer32bit;
 use kmerutils::sketching::setsketchert::*;
+use num::Float;
 use num_traits::cast::FromPrimitive;
 
 fn main() {
@@ -140,7 +140,6 @@ where
             // The HNSW data ID is used as an index into seqdict.0[..]
             let node_item = &seqdict.0[*node_data_id];
             let node_path = node_item.get_id().get_path();
-            let node_fasta_id = node_item.get_id().get_fasta_id();
 
             // Write the node's actual sequence ID
             // Format: path|fasta_id:
@@ -156,7 +155,6 @@ where
                 if let Some(neighbor_data_id) = kgraph.get_data_id_from_idx(neighbor_idx) {
                     let neighbor_item = &seqdict.0[*neighbor_data_id];
                     let neighbor_path = neighbor_item.get_id().get_path();
-                    let neighbor_fasta_id = neighbor_item.get_id().get_fasta_id();
 
                     // Write neighbor's path|fasta_id plus the edge weight/distance
                     write!(

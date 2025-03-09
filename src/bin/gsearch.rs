@@ -101,7 +101,6 @@ use gsearch::dna::dnasketch::dna_process_tohnsw;
 use gsearch::utils::*;
 
 use kmerutils::sketcharg::{SeqSketcherParams, SketchAlgo};
-use hnsw_rs::prelude::DistHamming;
 //mod files;
 use gsearch::aa::aarequest;
 use gsearch::dna::dnarequest;
@@ -224,7 +223,6 @@ fn parse_tohnsw_cmd(matches: &ArgMatches) -> Result<(String, ProcessingParams), 
         ef_construction
     );
 
-    let scale_modify: &f64;
     let scale_modify_default = 1.0f64;
     let scale_modify = matches
         .get_one("scale_modification")

@@ -1,0 +1,45 @@
+[package]
+name = "binaux"
+version = "0.1.5"
+authors = ["jianshuzhao@yahoo.com"]
+edition = "2021"
+license = "MIT OR Apache-2.0"
+description = "genome classification, complementary binaries for genome search"
+
+[[bin]]
+name = "superani"
+path = "src/bin/superani.rs"
+
+[[bin]]
+name = "FragGeneScanRs"
+path = "src/bin/FragGeneScanRs.rs"
+
+
+[[bin]]
+
+name = "superaai"
+path = "src/bin/superaai.rs"
+
+[[bin]]
+
+name = "bigsig"
+path = "src/bin/bigsig.rs"
+
+[dependencies]
+
+clap = { workspace = true }
+rayon = {workspace = true }
+env_logger = { workspace = true }
+log = {workspace = true}
+anyhow = {workspace = true}
+chrono = { version = "0.4" }
+
+needletail = {workspace = true}
+seq_io = "0.3"
+
+#frag_gene_scan_rs = "1.1.0"
+frag_gene_scan_rs = { git = "https://gitlab.com/Jianshu_Zhao/fraggenescanrs" }
+# skani = "0.1.1"
+skani = { path = "../../../Softs/skani" }
+sourmash = "0.19"
+bigsig = "0.1.0"

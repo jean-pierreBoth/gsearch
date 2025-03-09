@@ -8,6 +8,51 @@ edition = "2021"
 license = "MIT OR Apache-2.0"
 description = "genome classification, probminhash hnsw, genome search"
 
+[dependencies]
+
+clap = {workspace = true}
+log = { workspace = true }
+env_logger = { workspace = true }
+anyhow = { workspace = true}
+cpu-time = { workspace = true }
+chrono = {workspace = true}
+num_cpus = { version = "1.14" }
+num-traits = { workspace = true}
+
+serde = { version = "1.0", features = ["derive"] }
+serde_json = { version = "1.0" }
+csv = { version = "1.1" }
+
+# hash and related
+fxhash = { version = "0.2" }
+
+# for //
+
+crossbeam-utils = { version = "0.8" }
+crossbeam-channel = { version = "0.5" }
+crossbeam = { version = "0.8" }
+concurrent-queue = { version = "2.5" }
+rayon = {workspace = true}
+
+num = { version = "0.4" }
+memory-stats = { version = "1.1", features = ["always_use_statm"] }
+
+needletail = { workspace = true}
+
+
+probminhash = { version = "0.1.11" }
+# probminhash = {git = "https://github.com/jean-pierreBoth/probminhash"}
+# probminhash = {path = "../probminhash"}
+
+
+# optional dependency to embed hnsw graph
+annembed = { version = "0.1"}
+# annembed = { git = "https://github.com/jean-pierreBoth/annembed", optional = true }
+# annembed = { path = "../annembed"}
+kmerutils = { version = "0.0.13" }
+hnsw_rs = {workspace = true}
+
+
 
 [[bin]]
 
@@ -19,25 +64,6 @@ path = "src/bin/gsearch.rs"
 name = "reformat"
 path = "src/bin/reformat.rs"
 
-[[bin]]
-
-name = "superani"
-path = "src/bin/superani.rs"
-
-[[bin]]
-name = "FragGeneScanRs"
-path = "src/bin/FragGeneScanRs.rs"
-
-
-[[bin]]
-
-name = "superaai"
-path = "src/bin/superaai.rs"
-
-[[bin]]
-
-name = "bigsig"
-path = "src/bin/bigsig.rs"
 
 [[bin]]
 
@@ -48,48 +74,28 @@ path = "src/bin/hnsw2knn.rs"
 
 path = "src/lib.rs"
 
+[workspace]
+members = ["binaux"]
 
-[dependencies]
+
+[workspace.dependencies]
 # default is version spec is ^ meaning can update up to max non null version number
 # cargo doc --no-deps avoid dependencies doc generation
 #
 
-serde = { version = "1.0", features = ["derive"] }
-serde_json = { version = "1.0" }
 
-num = { version = "0.4" }
 chrono = { version = "0.4" }
-memory-stats = { version = "1.1", features = ["always_use_statm"] }
+num = { version = "0.4" }
 
-# for //
-crossbeam-utils = { version = "0.8" }
-crossbeam-channel = { version = "0.5" }
-crossbeam = { version = "0.8" }
-concurrent-queue = { version = "2.5" }
-parking_lot = { version = "0.12" }
+
+# parking_lot = { version = "0.12" }
 rayon = { version = "1.10" }
-num_cpus = { version = "1.13.0" }
 
 cpu-time = { version = "1.0" }
-needletail = { version = "0.5" }
+needletail = { version = "0.6" }
 clap = { version = "4.5" }
-fxhash = { version = "0.2" }
-##
-seq_io = "0.3.1"
-thiserror = "1.0.25"
-strum = "0.21.0"
-strum_macros = "0.21.0"
-#frag_gene_scan_rs = "1.1.0"
-frag_gene_scan_rs = { git = "https://gitlab.com/Jianshu_Zhao/fraggenescanrs" }
-skani = "0.1.0"
-sourmash = "0.15.1"
-bigsig = "0.1.0"
-#hmmer-rs-2 = "0.2.1"
-probminhash = { version = "0.1.11" }
-# probminhash = {git = "https://github.com/jean-pierreBoth/probminhash"}
-# probminhash = {path = "../probminhash"}
 
-hnsw_rs = { version = "=0.3.1" }
+hnsw_rs = { version = "0.3" }
 # hnsw_rs = { git = "https://github.com/jean-pierreBoth/hnswlib-rs" }
 # hnsw_rs = {git = "https://gitlab.com/jpboth/hnswlib-rs.git"}
 # hnsw_rs = { path = "../hnswlib-rs" }
@@ -97,7 +103,7 @@ hnsw_rs = { version = "=0.3.1" }
 # kmerutils = { path = "../kmerutils" }
 # kmerutils = { git = "https://github.com/jean-pierreBoth/kmerutils" }
 # kmerutils = {git = "https://gitlab.com/jpboth/kmerutils.git"}
-kmerutils = { version = "=0.0.12" }
+kmerutils = { version = "0.0.13" }
 
 lazy_static = { version = "1.4" }
 
@@ -107,16 +113,12 @@ lazy_static = { version = "1.4" }
 log = { version = "0.4" }
 env_logger = { version = "0.11" }
 
-# optional dependency to embed hnsw graph
-annembed = { version = "=0.1.4", optional = true }
-# annembed = { git = "https://github.com/jean-pierreBoth/annembed", optional = true }
-#annembed = { path = "../annembed", optional = true }
+
 
 
 # no more pb with between anyhow intel-mkl-src
-anyhow = { version = "1.0.58" }
-csv = { version = "1.1" }
-num-traits = "0.2.19"
+anyhow = { version = ">=1.0.58" }
+num-traits = "0.2"
 
 [features]
 
