@@ -100,6 +100,8 @@ use gsearch::aa::aasketch::aa_process_tohnsw;
 use gsearch::dna::dnasketch::dna_process_tohnsw;
 use gsearch::utils::*;
 
+#[allow(unused)]
+use hnsw_rs::prelude::DistHamming;
 use kmerutils::sketcharg::{SeqSketcherParams, SketchAlgo};
 //mod files;
 use gsearch::aa::aarequest;
