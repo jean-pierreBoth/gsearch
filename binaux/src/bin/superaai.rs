@@ -84,7 +84,7 @@ fn main() -> io::Result<()> {
         .unwrap()
         .parse()
         .expect("Invalid k-mer size");
-    let scaled: u64 = matches
+    let scaled: u32 = matches
         .get_one::<String>("scaled")
         .unwrap()
         .parse()

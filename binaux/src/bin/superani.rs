@@ -30,8 +30,10 @@ fn default_params(mode: Mode) -> (Arc<CommandParams>, Arc<SketchParams>) {
         keep_refs: false,
         est_ci: false,
         learned_ani: true,
-        learned_ani_cmd: false,
         detailed_out: false,
+        diagonal: false,
+        rescue_small: false,
+        distance: false,
     });
 
     let m = 1000;
@@ -102,7 +104,7 @@ fn main() -> io::Result<()> {
     let output_file = Arc::new(Mutex::new(File::create(output_file_path)?));
 
     let (command_params, sketch_params) = default_params(Mode::Dist);
-    let model_opt = Arc::new(regression::get_model(sketch_params.c, true));
+    let model_opt = regression::get_model(sketch_params.c, true);
 
     refs.par_iter().for_each(|ref_file| {
         let ref_sketches =
@@ -110,17 +112,21 @@ fn main() -> io::Result<()> {
         let queries_clone = queries.clone();
         let output_file_clone = output_file.clone();
         let command_params_clone = command_params.clone();
-        let model_opt_clone = model_opt.clone();
+        // let model_opt_clone = model_opt.clone();
         let sketch_params_clone = sketch_params.clone(); // Clone Arc for use inside the nested closure
-        queries_clone.par_iter().for_each(move |query_file| {
+        queries_clone.par_iter().for_each(|query_file| {
             let query_sketches =
                 file_io::fastx_to_sketches(&vec![query_file.clone()], &sketch_params_clone, true);
             for ref_sketch in ref_sketches.iter() {
                 for query_sketch in query_sketches.iter() {
-                    let map_params =
-                        chain::map_params_from_sketch(ref_sketch, false, &command_params_clone);
+                    let map_params = chain::map_params_from_sketch(
+                        ref_sketch,
+                        false,
+                        &command_params_clone,
+                        &model_opt,
+                    );
                     let mut ani_result = chain::chain_seeds(ref_sketch, query_sketch, map_params);
-                    if let Some(model) = model_opt_clone.as_ref() {
+                    if let Some(model) = model_opt.as_ref() {
                         regression::predict_from_ani_res(&mut ani_result, model);
                     }
                     let output = format!(
