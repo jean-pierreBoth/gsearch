@@ -40,6 +40,7 @@ seq_io = "0.3"
 #frag_gene_scan_rs = "1.1.0"
 frag_gene_scan_rs = { git = "https://gitlab.com/Jianshu_Zhao/fraggenescanrs" }
 # skani = "0.1.1"
-skani = { path = "../../../Softs/skani" }
+# skani = { path = "../../skani" }
+skani = {git = "https://github.com/jean-pierreBoth/skani"}
 sourmash = "0.19"
 bigsig = "0.1.0"
