@@ -667,7 +667,7 @@ So you need to run:
 - direct installation from github:
   
 ```bash
-    cargo install gsearch --features="annembed_intel-mkl" --git https://github.com/jean-pierreBoth/gsearch
+    cargo install gsearch --features="annembed_intel-mkl,simdeez_f" --git https://github.com/jean-pierreBoth/gsearch
 ```
 
 - download and compilation
@@ -676,10 +676,10 @@ So you need to run:
 git clone https://github.com/jean-pierreBoth/gsearch
 cd gsearch
 #### build
-cargo build --release --features="annembed_openblas-static"
-cargo build --release --features="annembed_intel-mkl"
+cargo build --release --all --features="annembed_openblas-static,simdeez_f"
+cargo build --release --all --features="annembed_intel-mkl,simdeez_f"
 ###on MacOS, which requires dynamic library link (install openblas first, see above):
-cargo build --release --features="annembed_openblas-system"
+cargo build --all --release --features="annembed_openblas-system, stdsimd"
 ```
 
 #### Documentation generation
