@@ -62,7 +62,7 @@ cargo install gsearch --features annembed_intel-mkl,simdeez_f --force
 
 GSearch stands for **genomic search**.  
 
-This package (**currently in development**) compute MinHash-like signatures of  bacteria and archaea (or virus and fungi) genomes and stores the id of bacteria and MinHash-like signatures in a Hnsw structure for searching of new request genomes. A total of ~50,000 to ~60,000 lines of highly optimized Rust code were provided in this repo and several other crates/libraries develped for this repo, such as [kmerutils](https://github.com/jean-pierreBoth/kmerutils), [probminhash](https://github.com/jean-pierreBoth/probminhash), [hnswlib-rs](https://github.com/jean-pierreBoth/hnswlib-rs) and [annembed](https://github.com/jean-pierreBoth/annembed), see below for details. Some of the libraries are very popular and have been used about ~40 thousand times, see [here](https://crates.io/crates/hnsw_rs).
+This package (**currently in development**) compute MinHash-like signatures of  bacteria and archaea (or virus and fungi) genomes and stores the id of bacteria and MinHash-like signatures in a HNSW structure for searching of new request genomes. The HNSW structure can also be reduced to a flat NSW (also knonw as HubNSW) for better space requirement and accuracy for high-dimension datasets. A total of ~50,000 to ~60,000 lines of highly optimized Rust code were provided in this repo and several other crates/libraries develped for this repo, such as [kmerutils](https://github.com/jean-pierreBoth/kmerutils), [probminhash](https://github.com/jean-pierreBoth/probminhash), [hnswlib-rs](https://github.com/jean-pierreBoth/hnswlib-rs) and [annembed](https://github.com/jean-pierreBoth/annembed), see below for details. Some of the libraries are very popular and have been used about ~50 thousand times, see [here](https://crates.io/crates/hnsw_rs).
 
 This package is developped by Jean-Pierre Both [jpboth](https://github.com/jean-pierreBoth) for the software part and [Jianshu Zhao](https://github.com/jianshu93) for the genomics part. We also created a mirror of this repo on [GitLab](https://gitlab.com/Jianshu_Zhao/gsearch) and [Gitee](https://gitee.com/jianshuzhao/gsearch) (You need to log in first to see the content), just in case Github service is not available in some region.
 
@@ -101,7 +101,7 @@ or
 $$ANI=(\frac{2*J}{1+J})^{\frac{1}{k}}$$
 
 where J is Jaccard-like index (e.g. Jp from ProbMinHash or J from SuperMinHash, SetSketch or Densified MinHash, a class of locality sensitive hashing algorithms, suitable for nearest neighbor search,  see below) and k is k-mer size.
-To achieve this we use sketching. We generate kmers along genome DNA or amino acid sequences and sketch the kmer distribution encountered (weighted or not) in a file, see [kmerutils](https://github.com/jean-pierreBoth/kmerutils). Then final sketch is stored in a Hnsw database See here [hnsw](https://arxiv.org/abs/1603.09320) or here [hnsw](https://ieeexplore.ieee.org/abstract/document/8594636).
+To achieve this we use sketching. We generate kmers along genome DNA or amino acid sequences and sketch the kmer distribution encountered (weighted or not) in a file, see [kmerutils](https://github.com/jean-pierreBoth/kmerutils). Then final sketch is stored in a Hnsw database See here [hnsw](https://arxiv.org/abs/1603.09320) or here [hnsw](https://ieeexplore.ieee.org/abstract/document/8594636). For HubNSW/FlatNSW, see [here](https://arxiv.org/abs/2412.01940)
 
 The sketching and HNSW graph database building is done by the subcommand ***tohnsw***.
 
