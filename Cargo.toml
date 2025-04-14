@@ -136,3 +136,4 @@ annembed_accelerate = ["annembed/macos-accelerate"]
 
 withzmq = ["kmerutils/withzmq"]
 simdeez_f = ["hnsw_rs/simdeez_f", "kmerutils/simdeez_f"]
+stdsimd_f = ["hnsw_rs/stdsimd", "kmerutils/stdsimd"]
