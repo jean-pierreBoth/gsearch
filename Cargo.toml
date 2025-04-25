@@ -9,7 +9,7 @@ license = "MIT OR Apache-2.0"
 description = "genome classification, probminhash hnsw, genome search"
 
 [dependencies]
-
+hnsw_rs = { workspace = true }
 clap = {workspace = true}
 log = { workspace = true }
 env_logger = { workspace = true }
@@ -18,7 +18,6 @@ cpu-time = { workspace = true }
 chrono = {workspace = true}
 num_cpus = { version = "1.14" }
 num-traits = { workspace = true}
-
 serde = { version = "1.0", features = ["derive"] }
 serde_json = { version = "1.0" }
 csv = { version = "1.1" }
@@ -46,13 +45,12 @@ probminhash = {workspace = true}
 
 
 # optional dependency to embed hnsw graph
-annembed = { version = "0.1"}
+annembed = { version = "0.1.4"}
 # annembed = { git = "https://github.com/jean-pierreBoth/annembed", optional = true }
 # annembed = { path = "../annembed"}
 
 # kmerutils = { version = "0.0.13" }
 kmerutils = {workspace = true}
-hnsw_rs = {workspace = true}
 
 
 
@@ -97,7 +95,8 @@ cpu-time = { version = "1.0" }
 needletail = { version = "0.6" }
 clap = { version = "4.5" }
 
-hnsw_rs = { version = "0.3" }
+hnsw_rs = { version = "0.3.1" }
+
 # hnsw_rs = { git = "https://github.com/jean-pierreBoth/hnswlib-rs" }
 # hnsw_rs = {git = "https://gitlab.com/jpboth/hnswlib-rs.git"}
 # hnsw_rs = { path = "../hnswlib-rs" }
