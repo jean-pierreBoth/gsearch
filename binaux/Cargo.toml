@@ -25,6 +25,11 @@ path = "src/bin/superaai.rs"
 name = "bigsig"
 path = "src/bin/bigsig.rs"
 
+[[bin]]
+
+name = "hnswcore"
+path = "src/bin/hnswcore.rs"
+
 [dependencies]
 
 clap = { workspace = true }
@@ -32,15 +37,26 @@ rayon = {workspace = true }
 env_logger = { workspace = true }
 log = {workspace = true}
 anyhow = {workspace = true}
-chrono = { version = "0.4" }
-
 needletail = {workspace = true}
-seq_io = "0.3"
+hnsw_rs = { workspace = true }
+cpu-time = { workspace = true }
 
-#frag_gene_scan_rs = "1.1.0"
-frag_gene_scan_rs = { git = "https://gitlab.com/Jianshu_Zhao/fraggenescanrs" }
+
+quantiles = { version = "0.7.1" }
+rand = { version = "0.9.1" }
+indexmap = { version = "2.9.0"}
+
+
+
+
+seq_io = "0.3"
+chrono = { version = "0.4" }
+frag_gene_scan_rs = "1.1.0"
+#frag_gene_scan_rs = { git = "https://gitlab.com/Jianshu_Zhao/fraggenescanrs" }
 # skani = "0.1.1"
 # skani = { path = "../../skani" }
 skani = {git = "https://github.com/jean-pierreBoth/skani"}
 sourmash = "0.19"
 bigsig = "0.1.0"
+coreset = "0.0.1"
+
