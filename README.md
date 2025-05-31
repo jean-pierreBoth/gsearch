@@ -33,7 +33,7 @@ If you find GSearch useful, please cite the following paper:
 ## Quick install on Linux (Stable version)
 ### Install via bioconda
 ```bash
-conda install -c conda-forge -c bioconda gsearch=0.2.2
+conda install -c conda-forge -c bioconda gsearch
 ```
 
 ### pre-combiled binary
@@ -48,7 +48,7 @@ cd gsearch_Linux_x86-64_v0.1.5
 ## Install developmental version (Linux)
 Note that pre-built databases will not work for development version, you need to rebuild database yourself
 ```bash
-conda install -c bioconda -c conda-forge gsearch=0.2.4
+conda install -c bioconda -c conda-forge gsearch=0.2.8
 
 ##or via cargo, install cargo:
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
