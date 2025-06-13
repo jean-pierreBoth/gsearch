@@ -5,7 +5,7 @@
 ![](https://anaconda.org/bioconda/gsearch/badges/platforms.svg)
 [![install with conda](https://anaconda.org/bioconda/gsearch/badges/downloads.svg)](https://anaconda.org/bioconda/gsearch)
 [![DOI](https://zenodo.org/badge/187937357.svg)](https://doi.org/10.5281/zenodo.10543594)
-[![](https://img.shields.io/badge/Discord-%235865F2.svg?style=for-the-badge&logo=discord&logoColor=white)](https://discord.gg/QHfX7NAJ)
+[![](https://img.shields.io/badge/Discord-%235865F2.svg?style=for-the-badge&logo=discord&logoColor=white)](https://discord.gg/5cXSA8bMcW)
 
 
 [![Latest Version](https://img.shields.io/crates/v/gsearch?style=for-the-badge&color=mediumpurple&logo=rust)](https://crates.io/crates/gsearch)
