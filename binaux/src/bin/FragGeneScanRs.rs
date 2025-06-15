@@ -26,7 +26,7 @@ pub fn init_log() -> u64 {
 fn main() -> Result<()> {
     let _ = init_log();
     let matches = Command::new("FragGeneScanRs")
-        .version("0.0.1")
+        .version("0.2.9")
         .author("Felix Van der Jeugt <felix.vanderjeugt@ugent.be>")
         .about("Scalable high-throughput short-read open reading frame prediction.")
         .arg(Arg::new("seq-file")
