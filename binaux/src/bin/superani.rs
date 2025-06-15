@@ -56,7 +56,7 @@ fn main() -> io::Result<()> {
 
     let matches = Command::new("SuperANI")
     .about("Computing average nucleotide identity between reference and query genomes via sparse kmer chaining or Open Syncmer with Densified MinHash")
-    .version("0.2.0")
+    .version("0.2.9")
     .arg(
         Arg::new("query_list")
             .short('q')
