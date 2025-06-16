@@ -11,11 +11,14 @@ use kmerutils::base::sequence::*;
 /// clones the sequence filtering out non ATCG
 pub fn filter_out_n(seq: &[u8]) -> Vec<u8> {
     let mut filtered = Vec::<u8>::with_capacity(seq.len());
+
     for c in seq {
-        if ['A', 'C', 'T', 'G'].contains(&(*c as char)) {
-            filtered.push(*c);
+        let ch_up = (*c as char).to_ascii_uppercase();
+        if ['A', 'C', 'T', 'G'].contains(&ch_up) {
+            filtered.push(ch_up as u8);   // push the upper-case byte
         }
     }
+
     if log::log_enabled!(log::Level::Trace) && filtered.len() < seq.len() {
         let nb_n = seq.len() - filtered.len();
         log::trace!(
