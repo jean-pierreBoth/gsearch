@@ -8,17 +8,15 @@ use crate::utils::parameters::*;
 use kmerutils::base::sequence::*;
 
 #[inline]
-/// clones the sequence filtering out non ATCG
+/// clones the sequence filtering out non ATCG and change to upper case
 pub fn filter_out_n(seq: &[u8]) -> Vec<u8> {
     let mut filtered = Vec::<u8>::with_capacity(seq.len());
-
     for c in seq {
-        let ch_up = (*c as char).to_ascii_uppercase();
-        if ['A', 'C', 'T', 'G'].contains(&ch_up) {
-            filtered.push(ch_up as u8);   // push the upper-case byte
+        let base = c.to_ascii_uppercase();
+        if [b'A', b'C', b'T', b'G'].contains(&base) {
+            filtered.push(base);
         }
     }
-
     if log::log_enabled!(log::Level::Trace) && filtered.len() < seq.len() {
         let nb_n = seq.len() - filtered.len();
         log::trace!(
@@ -39,6 +37,7 @@ pub fn filter_out_n(seq: &[u8]) -> Vec<u8> {
 /// opens parse fna files with needletail
 /// extracts records , filters out capsid and send sequences to function process_dir to execute file_task to produce sequence
 /// for any client.
+/// The function uses 2 bit encoding so it filters out non ACGT bases. It accepts lower case actg.  
 /// This function returns as many IdSeq as there are sequences in file
 pub fn process_file_by_sequence(pathb: &PathBuf, filter_params: &FilterParams) -> Vec<IdSeq> {
     let mut to_sketch = Vec::<IdSeq>::new();
@@ -70,17 +69,19 @@ pub fn process_file_by_sequence(pathb: &PathBuf, filter_params: &FilterParams) -
                 let mut new_seq = Sequence::with_capacity(2, nb_bases);
                 new_seq.encode_and_add(&file_seq, &alphabet2b);
                 nb_bases_encoded += new_seq.size();
-                // we have DNA seq for now
-                // we encode path only fo the first seq. For files with hundreds millions of seq , memory
-                let nullstr = String::from(""); // we will sketch the whole and loose id, so we spare memory
-                let path = if to_sketch.is_empty() {
-                    pathb.to_str().unwrap().to_string()
-                } else {
-                    nullstr.clone()
-                };
-                // we will sketch the whole and loose fasta id, so we spare memory
-                let seqwithid = IdSeq::new(path, nullstr, SequenceType::SequenceDNA(new_seq));
-                to_sketch.push(seqwithid);
+                // we have DNA seq for now. transmit only non null sequences
+                if new_seq.size() > 0 {
+                    // we encode path only fo the first seq. For files with hundreds millions of seq , memory
+                    let nullstr = String::from(""); // we will sketch the whole and loose id, so we spare memory
+                    let path = if to_sketch.is_empty() {
+                        pathb.to_str().unwrap().to_string()
+                    } else {
+                        nullstr.clone()
+                    };
+                    // we will sketch the whole and loose fasta id, so we spare memory
+                    let seqwithid = IdSeq::new(path, nullstr, SequenceType::SequenceDNA(new_seq));
+                    to_sketch.push(seqwithid);
+                }
             }
         } else {
             log::error!(
@@ -149,16 +150,19 @@ pub fn process_buffer_by_sequence(
                 assert!(new_seq.size() <= nb_bases);
                 // we have DNA seq for now
                 nb_bases_encoded += new_seq.size();
-                // we encode path only fo the first seq. For files with hundreds millions of seq , memory
-                let nullstr = String::from("");
-                let path = if to_sketch.is_empty() {
-                    pathb.to_str().unwrap().to_string()
-                } else {
-                    nullstr.clone()
-                };
-                // we will sketch the whole and loose fasta id, so we spare memory
-                let seqwithid = IdSeq::new(path, nullstr, SequenceType::SequenceDNA(new_seq));
-                to_sketch.push(seqwithid);
+                // if a record has false base, encoded can be empty!
+                if new_seq.size() > 0 {
+                    // we encode path only fo the first seq. For files with hundreds millions of seq , memory
+                    let nullstr = String::from("");
+                    let path = if to_sketch.is_empty() {
+                        pathb.to_str().unwrap().to_string()
+                    } else {
+                        nullstr.clone()
+                    };
+                    // we will sketch the whole and loose fasta id, so we spare memory
+                    let seqwithid = IdSeq::new(path, nullstr, SequenceType::SequenceDNA(new_seq));
+                    to_sketch.push(seqwithid);
+                }
             }
         } else {
             log::error!(
