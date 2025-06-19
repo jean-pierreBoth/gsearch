@@ -1,33 +1,27 @@
 use clap::{Arg, ArgAction, Command};
 use rayon::prelude::*;
 use rayon::ThreadPoolBuilder;
-use std::fs::File;
-use std::io::{self, BufRead, BufReader, BufWriter, Write};
 use std::collections::HashMap;
 use std::fmt::Debug;
+use std::fs::File;
+use std::io::{self, BufRead, BufReader, BufWriter, Write};
 use std::path::Path;
 
 use needletail::{parse_fastx_file, Sequence};
 use num;
 
-use kmerutils::sketcharg::{SeqSketcherParams, SketchAlgo, DataType};
 use kmerutils::base::{
-    alphabet::Alphabet2b,
-    sequence::Sequence as SequenceStruct,
-    kmergenerator::*,
-    Kmer32bit,
-    Kmer16b32bit,
-    Kmer64bit,
-    CompressedKmerT,
-    KmerBuilder,
+    alphabet::Alphabet2b, kmergenerator::*, sequence::Sequence as SequenceStruct, CompressedKmerT,
+    Kmer16b32bit, Kmer32bit, Kmer64bit, KmerBuilder,
 };
+use kmerutils::sketcharg::{DataType, SeqSketcherParams, SketchAlgo};
 use kmerutils::sketching::setsketchert::{
-    SeqSketcherT, // trait
     OptDensHashSketch,
     RevOptDensHashSketch,
+    SeqSketcherT, // trait
 };
 
-use anndists::dist::{Distance, DistHamming};
+use anndists::dist::{DistHamming, Distance};
 
 /// Converts ASCII-encoded bases (from Needletail) into our `SequenceStruct`.
 fn ascii_to_seq(bases: &[u8]) -> Result<SequenceStruct, ()> {
@@ -55,7 +49,7 @@ fn read_genome_list(filepath: &str) -> Vec<String> {
 /// across threads. We also pass `kmer_hash_fn` by value (requires `Copy + Send + Sync`).
 fn sketch_files<Kmer, F>(
     file_paths: &[String],
-    sketcher: &(impl SeqSketcherT<Kmer, Sig = f32> + Sync), 
+    sketcher: &(impl SeqSketcherT<Kmer, Sig = f32> + Sync),
     kmer_hash_fn: F,
 ) -> HashMap<String, Vec<f32>>
 where
@@ -122,9 +116,9 @@ fn write_results(
     kmer_size: usize,
 ) {
     let mut output_writer: Box<dyn Write> = match output {
-        Some(filename) => {
-            Box::new(BufWriter::new(File::create(&filename).expect("Cannot create output file")))
-        }
+        Some(filename) => Box::new(BufWriter::new(
+            File::create(&filename).expect("Cannot create output file"),
+        )),
         None => Box::new(BufWriter::new(io::stdout())),
     };
 
@@ -135,7 +129,9 @@ fn write_results(
     let all_pairs: Vec<(String, String)> = query_genomes
         .iter()
         .flat_map(|q| {
-            reference_genomes.iter().map(move |r| (q.clone(), r.clone()))
+            reference_genomes
+                .iter()
+                .map(move |r| (q.clone(), r.clone()))
         })
         .collect();
 
@@ -182,7 +178,7 @@ fn write_results(
 /// - `dens = 1` => `RevOptDensHashSketch`
 ///
 /// The `kmer_hash_fn` is taken by value (and must be `Copy + Send + Sync`).
-fn sketching_kmerType<Kmer, F>(
+fn sketching_kmer_type<Kmer, F>(
     query_genomes: &[String],
     reference_genomes: &[String],
     sketch_args: &SeqSketcherParams,
@@ -366,7 +362,7 @@ fn main() {
             kmer.get_compressed_value() & mask
         };
 
-        sketching_kmerType::<Kmer32bit, _>(
+        sketching_kmer_type::<Kmer32bit, _>(
             &query_genomes,
             &reference_genomes,
             &sketch_args,
@@ -375,20 +371,21 @@ fn main() {
             output,
             kmer_size,
         );
-
     } else if kmer_size == 16 {
         // Kmer16b32bit
         let nb_alphabet_bits = 2;
-        let kmer_hash_fn_16b32bit = move |kmer: &Kmer16b32bit| -> <Kmer16b32bit as CompressedKmerT>::Val {
-            // canonical
-            let canonical = kmer.reverse_complement().min(*kmer);
-            let mask: <Kmer16b32bit as CompressedKmerT>::Val =
-                num::NumCast::from::<u64>((1u64 << (nb_alphabet_bits * kmer.get_nb_base())) - 1)
-                    .unwrap();
-            canonical.get_compressed_value() & mask
-        };
+        let kmer_hash_fn_16b32bit =
+            move |kmer: &Kmer16b32bit| -> <Kmer16b32bit as CompressedKmerT>::Val {
+                // canonical
+                let canonical = kmer.reverse_complement().min(*kmer);
+                let mask: <Kmer16b32bit as CompressedKmerT>::Val = num::NumCast::from::<u64>(
+                    (1u64 << (nb_alphabet_bits * kmer.get_nb_base())) - 1,
+                )
+                .unwrap();
+                canonical.get_compressed_value() & mask
+            };
 
-        sketching_kmerType::<Kmer16b32bit, _>(
+        sketching_kmer_type::<Kmer16b32bit, _>(
             &query_genomes,
             &reference_genomes,
             &sketch_args,
@@ -397,7 +394,6 @@ fn main() {
             output,
             kmer_size,
         );
-
     } else if kmer_size <= 32 {
         // Kmer64bit
         let nb_alphabet_bits = 2;
@@ -409,7 +405,7 @@ fn main() {
             canonical.get_compressed_value() & mask
         };
 
-        sketching_kmerType::<Kmer64bit, _>(
+        sketching_kmer_type::<Kmer64bit, _>(
             &query_genomes,
             &reference_genomes,
             &sketch_args,
@@ -418,7 +414,6 @@ fn main() {
             output,
             kmer_size,
         );
-
     } else {
         panic!("kmer_size must not be 15 and cannot exceed 32!");
     }

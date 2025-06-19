@@ -43,8 +43,8 @@ cpu-time = { workspace = true }
 
 
 quantiles = { version = "0.7.1" }
-rand = { version = "0.9.1" }
-indexmap = { version = "2.9.0"}
+rand = { version = "0.9" }
+indexmap = { version = "2.9"}
 
 
 
@@ -58,5 +58,5 @@ frag_gene_scan_rs = "1.1.0"
 skani = {git = "https://github.com/jean-pierreBoth/skani"}
 sourmash = "0.19"
 bigsig = "0.1.0"
-coreset = "0.0.1"
+coreset = "0.1"
 

@@ -223,10 +223,10 @@ where
     // now sample indexes and compute dists
     let nb_sample = 50000;
     let mut sampled = 0;
-    let mut rng = rand::thread_rng();
+    let mut rng = rand::rng();
     while sampled < nb_sample {
-        let i = rng.gen_range(0..nb_to_load);
-        let j = rng.gen_range(0..nb_to_load);
+        let i = rng.random_range(0..nb_to_load);
+        let j = rng.random_range(0..nb_to_load);
         if i != j {
             let dist = distance.eval(&data_v[i], &data_v[j]);
             q_dist.insert(dist);

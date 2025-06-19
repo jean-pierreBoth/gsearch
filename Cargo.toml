@@ -45,14 +45,18 @@ probminhash = {workspace = true}
 
 
 # optional dependency to embed hnsw graph
-annembed = { version = "0.1.4"}
+annembed = { version = "0.1"}
 # annembed = { git = "https://github.com/jean-pierreBoth/annembed", optional = true }
 # annembed = { path = "../annembed"}
 
 # kmerutils = { version = "0.0.13" }
 kmerutils = {workspace = true}
 
-anndists = { git = "https://github.com/jean-pierreBoth/anndists" }
+# anndists = { git = "https://github.com/jean-pierreBoth/anndists" }
+anndists = { version = "0.1"}
+
+
+
 xxhash-rust = "0.8"
 hyperminhash = "0.1.3"
 
@@ -114,13 +118,13 @@ hnsw_rs = { version = "0.3.1" }
 # hnsw_rs = {git = "https://gitlab.com/jpboth/hnswlib-rs.git"}
 # hnsw_rs = { path = "../hnswlib-rs" }
 
-probminhash = { git = "https://github.com/jean-pierreBoth/probminhash" }
-# probminhash = { version = "0.1"}
+# probminhash = { git = "https://github.com/jean-pierreBoth/probminhash" }
+probminhash = { version = "0.1"}
 
-# kmerutils = { path = "../kmerutils" }
-kmerutils = { git = "https://github.com/jean-pierreBoth/kmerutils" }
+kmerutils = { path = "../kmerutils" }
+# kmerutils = { git = "https://github.com/jean-pierreBoth/kmerutils" }
 # kmerutils = {git = "https://gitlab.com/jpboth/kmerutils.git"}
-# kmerutils = { version = "0.0.13" }
+# kmerutils = { version = "0.0.14" }
 
 lazy_static = { version = "1.4" }
 
