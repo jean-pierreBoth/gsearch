@@ -59,7 +59,7 @@ impl <Sig> RequestMsg<Sig> {
 
 
 
-fn sketch_and_request_dir_compressedkmer<Kmer:CompressedKmerT + KmerBuilder<Kmer>,Sketcher : SeqSketcherAAT<Kmer> + Send + Sync>(request_dirpath : &Path, 
+fn sketch_and_request_dir_compressedkmer<Kmer:CompressedKmerT + KmerBuilder<Kmer>,Sketcher>(request_dirpath : &Path, 
                 sketcher : Sketcher,
                 filter_params: &FilterParams, seqdict : &SeqDict, 
                 processing_parameters : &ProcessingParams,

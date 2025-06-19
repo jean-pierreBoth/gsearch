@@ -23,10 +23,10 @@ pub struct Id {
 }
 
 impl Id {
-    pub fn new(path: &String, id: &String) -> Self {
+    pub fn new(path: &String, id: &str) -> Self {
         Id {
             path: path.clone(),
-            fasta_id: id.clone(),
+            fasta_id: id.to_owned(),
         }
     }
 
@@ -51,7 +51,6 @@ pub enum SequenceType {
 /// This structure is used for returning info from function process_file
 /// It stores all info on treated sequences
 ///
-
 pub struct IdSeq {
     /// as read is sequential we can identify uniquely sequence in hnsw
     pub(crate) rank: usize,
