@@ -1,4 +1,5 @@
-//! This binary is dedicated to coreset computations on data stored in Hnsw created by crate [hnsw_rs](https://crates.io/crates/hnsw_rs)
+//! This binary is dedicated to coreset computations on data stored in Hnsw created by crate [hnsw_rs](https://crates.io/crates/hnsw_rs).  
+//! It is cloned from crate [fromhnsw](https://crates.io/crates/fromhnsw) in workspace [coreset](https://crates.io/crates/coreset)
 //!
 //! 1. The simple default command just computes a coreset
 //! The command is:
@@ -50,11 +51,11 @@ use coreset::prelude::*;
 use clap::{Arg, ArgAction, ArgMatches, Command};
 use std::default::Default;
 
-use binaux::getdatamap::get_typed_datamap;
 use hnsw_rs::datamap::*;
 use hnsw_rs::prelude::*;
 
-use binaux::hnswiter::HnswMakeIter;
+use fromhnsw::getdatamap::get_typed_datamap;
+use fromhnsw::hnswiter::HnswMakeIter;
 
 use quantiles::ckms::CKMS;
 use rand::Rng;
@@ -131,16 +132,6 @@ impl Default for CoresetParams {
     }
 }
 
-#[doc(hidden)]
-#[allow(unused)]
-#[derive(Clone, Debug)]
-struct HnswCore {
-    // paths
-    hparams: HnswParams,
-    // algo parameters
-    coreparams: CoresetParams,
-}
-
 //===========================================================
 
 fn parse_coreset_cmd(matches: &ArgMatches) -> Result<CoresetParams, anyhow::Error> {
@@ -191,17 +182,6 @@ pub fn get_datamap(directory: String, basename: String, typename: &str) -> anyho
     datamap
 }
 
-//=========================================================================================
-//
-
-#[doc(hidden)]
-#[allow(unused)]
-macro_rules! gen_coreset1 {
-    ($t:ty , $d:ty ,  &$a1:tt ,  &$a2:expr) => {
-        coreset1::<$t, $d>(&$a1, &$a2)
-    };
-}
-
 //===========================================================
 
 #[allow(unused)]
@@ -235,9 +215,16 @@ where
     }
     //
     println!("statistics on sampled distances : ");
-    println!("\n distance quantiles at  0.005 : {:.2e} , 0.01 :  {:.2e} , 0.025 : {:.2e}, 0.25 : {:.2e}, 0.5 : {:.2e}, 0.75 : {:.2e}   0.99 : {:.2e}\n", 
-    q_dist.query(0.005).unwrap().1, q_dist.query(0.01).unwrap().1,  q_dist.query(0.025).unwrap().1, q_dist.query(0.25).unwrap().1,
-    q_dist.query(0.5).unwrap().1, q_dist.query(0.75).unwrap().1, q_dist.query(0.99).unwrap().1);
+    println!(
+        "\n distance quantiles at  0.005 : {:.2e} , 0.01 :  {:.2e} , 0.025 : {:.2e}, 0.25 : {:.2e}, 0.5 : {:.2e}, 0.75 : {:.2e}   0.99 : {:.2e}\n",
+        q_dist.query(0.005).unwrap().1,
+        q_dist.query(0.01).unwrap().1,
+        q_dist.query(0.025).unwrap().1,
+        q_dist.query(0.25).unwrap().1,
+        q_dist.query(0.5).unwrap().1,
+        q_dist.query(0.75).unwrap().1,
+        q_dist.query(0.99).unwrap().1
+    );
 }
 
 //===========================================================

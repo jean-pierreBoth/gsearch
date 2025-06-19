@@ -4,7 +4,7 @@ version = "0.1.6"
 authors = ["jeanpierre.both@gmail.com", "jianshuzhao@yahoo.com"]
 repository = "https://github.com/jean-pierreBoth/gsearch"
 keywords = ["hnsw", "probminhash", "bacteria"]
-edition = "2021"
+edition = "2024"
 license = "MIT OR Apache-2.0"
 description = "genome classification, probminhash hnsw, genome search"
 
@@ -112,7 +112,7 @@ cpu-time = { version = "1.0" }
 needletail = { version = "0.6" }
 clap = { version = "4.5" }
 
-hnsw_rs = { version = "0.3.1" }
+hnsw_rs = { version = "0.3" }
 
 # hnsw_rs = { git = "https://github.com/jean-pierreBoth/hnswlib-rs" }
 # hnsw_rs = {git = "https://gitlab.com/jpboth/hnswlib-rs.git"}
@@ -121,8 +121,8 @@ hnsw_rs = { version = "0.3.1" }
 # probminhash = { git = "https://github.com/jean-pierreBoth/probminhash" }
 probminhash = { version = "0.1"}
 
-kmerutils = { path = "../kmerutils" }
-# kmerutils = { git = "https://github.com/jean-pierreBoth/kmerutils" }
+# kmerutils = { path = "../kmerutils" }
+kmerutils = { git = "https://github.com/jean-pierreBoth/kmerutils" }
 # kmerutils = {git = "https://gitlab.com/jpboth/kmerutils.git"}
 # kmerutils = { version = "0.0.14" }
 

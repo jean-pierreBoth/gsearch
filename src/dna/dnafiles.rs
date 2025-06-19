@@ -8,8 +8,9 @@ use crate::utils::parameters::*;
 use kmerutils::base::sequence::*;
 
 #[inline]
+#[allow(unused)]
 /// clones the sequence filtering out non ATCG and change to upper case
-pub fn filter_out_n(seq: &[u8]) -> Vec<u8> {
+fn filter_out_n(seq: &[u8]) -> Vec<u8> {
     let mut filtered = Vec::<u8>::with_capacity(seq.len());
     for c in seq {
         let base = c.to_ascii_uppercase();
@@ -92,7 +93,7 @@ pub fn process_file_by_sequence(pathb: &PathBuf, filter_params: &FilterParams) -
         }
         //
     } // end while
-      //
+    //
     log::debug!(
         "process_file_by_sequence,  file : {:?}, nb_bases_encoded : {}, nb_record : {}",
         pathb,
@@ -173,9 +174,14 @@ pub fn process_buffer_by_sequence(
         }
         record_num += 1;
     } // end while
-      //
-    log::debug!("process_buffer_by_sequence file : {:?}, nb_bases_file : {} nb_bases_encoded : {}, nb_record : {}", 
-                        pathb, nb_bases_file, nb_bases_encoded, nb_record);
+    //
+    log::debug!(
+        "process_buffer_by_sequence file : {:?}, nb_bases_file : {} nb_bases_encoded : {}, nb_record : {}",
+        pathb,
+        nb_bases_file,
+        nb_bases_encoded,
+        nb_record
+    );
     log::debug!("nb total bases in file (with non ATCG) : {}", nb_bases_file);
     assert!(nb_bases_file >= nb_bases_encoded);
     //
@@ -333,7 +339,13 @@ pub fn process_buffer_in_one_block(
     //
     new_seq.shrink_to_fit();
     // we are at end of file, we have one large sequence for the whole file
-    log::debug!("decompressed seq for file : {:?}, nb bases encoded : {}, estimated nb bases : {}, nb_record : {}", pathb.file_name().unwrap_or_default(), new_seq.size(), nb_bases, nb_record);
+    log::debug!(
+        "decompressed seq for file : {:?}, nb bases encoded : {}, estimated nb bases : {}, nb_record : {}",
+        pathb.file_name().unwrap_or_default(),
+        new_seq.size(),
+        nb_bases,
+        nb_record
+    );
     log::debug!("nb total bases in file (with non ATCG) : {}", nb_bases_file);
     assert!(nb_bases_file >= new_seq.size());
     // we have DNA seq for now
