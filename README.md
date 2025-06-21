@@ -52,7 +52,7 @@ cd gsearch_Linux_x86-64_v0.1.5
 ## Install developmental version (Linux)
 Note that pre-built databases will not work for development version, you need to rebuild database yourself
 ```bash
-conda install -c bioconda -c conda-forge gsearch=0.2.4
+conda install -c bioconda -c conda-forge gsearch
 
 ##or via cargo, install cargo:
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
@@ -650,12 +650,24 @@ https://doi.org/10.6084/m9.figshare.24615792.v1
 #aa graph database, densified MinHash, go to below link to download GSearch_k7_s12000_n128_ef1600_optdens.tar.gz
 https://doi.org/10.6084/m9.figshare.22681939.v1
 
-### Building database. database is huge in size, users are welcome to download gtdb database here: (<https://data.ace.uq.edu.au/public/gtdb/data/releases/release207/207.0/genomic_files_reps/gtdb_genomes_reps_r207.tar.gz>) and here (<https://data.ace.uq.edu.au/public/gtdb/data/releases/release207/207.0/genomic_files_reps/gtdb_proteins_aa_reps_r207.tar.gz>) or go to NCBI/RefSeq to download all available prokaryotic genomes
+### Building database. database is huge in size, users are welcome to download gtdb database here: (<https://data.ace.uq.edu.au/public/gtdb/data/releases/release207/207.0/genomic_files_reps/gtdb_genomes_reps_r207.tar.gz>) and here (<https://data.ace.uq.edu.au/public/gtdb/data/releases/release207/207.0/genomic_files_reps/gtdb_proteins_aa_reps_r207.tar.gz>) or download all NCBI/RefSeq  prokaryotic genomes via genome_updater (https://github.com/pirovc/genome_updater):
+conda install -c bioconda -c conda-forge genome_updater 
+genome_updater.sh -d "refseq,genbank" -g "archaea,bacteria" -f "genomic.fna.gz" -o "GTDB_complete" -M "gtdb" -t 24 -m
 
 ### build database given genome file directory, .fna/.fasta/.fa/.fna.gz/.fna.xz/.fna.bz2/.fa.gz/.fa.xz/.fa.bz2/.fasta.gz/.fasta.xz/.fasta.bz2 was expected for nt and .faa or .faa.gz/.faa.xz/.faa.bz2 for --aa. Limit for k is 32 (15 not work due to compression), for s is 65535 (u16) and for n is 255 (u8). We recommended optimal densification for its speed and accuracy. --scale_modify_f can be used to adjust number of layers. Hub NSW can be achieved using a small value (e.g.0.25)
 
+# nt
+## Use One Permutation MinHash with optimal densification (the fastest)
 gsearch --pio 2000 --nbthreads 24 tohnsw -d db_dir_nt -s 12000 -k 16 --ef 1600 -n 128 --algo optdens --scale_modify_f 0.25
+## Use SetSketch, slower but very space efficient
+gsearch --pio 2000 --nbthreads 24 tohnsw -d db_dir_nt -s 4096 -k 16 --ef 1600 -n 128 --algo hll --scale_modify_f 0.25
+## Use ProbMinHash, slightly slower but consider kmer weight
+gsearch --pio 2000 --nbthreads 24 tohnsw -d db_dir_nt -s 12000 -k 16 --ef 1600 -n 128 --algo prob --scale_modify_f 0.25
+
+## protein
 gsearch --pio 2000 --nbthreads 24 tohnsw -d db_dir_aa -s 12000 -k 7 --ef 1600 -n 128 --aa --algo optdens --scale_modify_f 0.25
+gsearch --pio 2000 --nbthreads 24 tohnsw -d db_dir_aa -s 4096 -k 7 --ef 1600 -n 128 --aa --algo hll --scale_modify_f 0.25
+gsearch --pio 2000 --nbthreads 24 tohnsw -d db_dir_aa -s 12000 -k 7 --ef 1600 -n 128 --aa --algo prob --scale_modify_f 0.25
 
 ### When there are new genomes  after comparing with the current database (GTDB v207, e.g. ANI < 95% with any genome after searcing, corresponding to >0.875 ProbMinHash distance), those genomes can be added to the database
 
@@ -733,6 +745,7 @@ So you need to run:
   
 ```bash
     cargo install gsearch --features="annembed_intel-mkl,simdeez_f" --git https://github.com/jean-pierreBoth/gsearch
+    cargo install binaux --git https://github.com/jean-pierreBoth/gsearch
 ```
 
 - download and compilation
