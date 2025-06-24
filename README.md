@@ -52,7 +52,6 @@ cd gsearch_Linux_x86-64_v0.1.5
 ## Install developmental version (Linux)
 Note that pre-built databases will not work for development version, you need to rebuild database yourself
 ```bash
-conda install -c bioconda -c conda-forge gsearch
 
 ##or via cargo, install cargo:
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
@@ -63,6 +62,17 @@ cargo install gsearch --features annembed_intel-mkl,simdeez_f --force
 ## For macOS see below install section for details
 
 ```
+
+## Quick start
+```bash
+## build a database of genomes (all genomes in folds and subfolds of files_folder), files will be saved to the current directory
+gsearch --pio 2000 --nbthreads 24 tohnsw -d ./files_fold -k 21 -s 48000 -n 128 --ef 1600 --algo optdens --scale_modify_f 0.25
+## Search genomes against this database, all genomes in query_genome_folder
+gsearch --pio 2000 --nbthreads 24 request -b . -r ./query_genome_folder -n 50
+## add genomes to existing database, all database files will be modified, save before this step
+gsearch --pio 2000 --nbthreads 24 add -b . -n ./new_genome_folder
+```
+
 
 GSearch stands for **genomic search**.  
 
