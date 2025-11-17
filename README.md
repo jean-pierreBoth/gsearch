@@ -66,7 +66,7 @@ cargo install gsearch --features annembed_intel-mkl,simdeez_f --force
 ## Quick start
 ```bash
 ## build a database of genomes (all genomes in folds and subfolds of files_folder), files will be saved to the current directory
-gsearch --pio 2000 --nbthreads 24 tohnsw -d ./files_fold -k 21 -s 48000 -n 128 --ef 1600 --algo optdens --scale_modify_f 0.25
+gsearch --pio 2000 --nbthreads 24 tohnsw -d ./files_fold -k 21 -s 18000 -n 128 --ef 1600 --algo optdens --scale_modify_f 0.25
 ## Search genomes against this database, all genomes in query_genome_folder
 gsearch --pio 2000 --nbthreads 24 request -b . -r ./query_genome_folder -n 50
 ## add genomes to existing database, all database files will be modified, save before this step
