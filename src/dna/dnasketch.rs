@@ -223,7 +223,6 @@ fn sketchandstore_dir_compressedkmer<Kmer:CompressedKmerT+KmerBuilder<Kmer>, Ske
                     println!("process_dir processed nb files (msg): {}", nb_sent);
                 }
                 Err(_) => {
-                    nb_sent = 0;
                     println!("some error occured in process_dir");
                     log::error!("some error occured in process_dir, aborting in thread sending files/sequences");
                     std::process::abort();
