@@ -19,7 +19,7 @@ fn main() -> io::Result<()> {
     let _ = init_log();
 
     let matches = Command::new("superaai")
-        .version("0.2.9")
+        .version("0.3.2")
         .about("Compute Average Amino Acid Identity (AAI) via FracMinHash/Sourmash for genomes")
         .arg(
             Arg::new("query_list")
