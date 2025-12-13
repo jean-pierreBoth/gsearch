@@ -42,7 +42,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let _ = env_logger::Builder::from_default_env().init();
 
     let matches = Command::new("Genome Sketching via HyperMinHash")
-        .version("0.2.9")
+        .version("0.3.2")
         .about("Fast and Memory Efficient Genome/Metagenome Sketching via HyperMinhash")
         .arg(
             Arg::new("query_files")
@@ -258,8 +258,9 @@ fn main() -> Result<(), Box<dyn Error>> {
     let results: Vec<(String,String,f64)> = pairs
         .par_iter()
         .map(|(qn,qs,rn,rs)| {
-            let sim  = qs.similarity(rs).max(f64::EPSILON);
-            let dist = -(2.0*sim/(1.0+sim)).ln() / (kmer_length as f64);
+            let sim  = qs.similarity(rs);
+            let dist = 1.0 - (2.0 * sim / (1.0 + sim))
+                .powf(1.0 / kmer_length as f64);
             (qn.to_string(), rn.to_string(), dist)   // ← own the strings
         })
         .collect();
