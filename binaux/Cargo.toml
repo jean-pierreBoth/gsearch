@@ -57,7 +57,7 @@ frag_gene_scan_rs = "1.1.0"
 # skani = { path = "../../skani" }
 skani = {git = "https://github.com/jean-pierreBoth/skani"}
 sourmash = "0.19"
-bigsig = "0.1.0"
+bigsig = "0.3.2"
 fromhnsw = "0.1.1"
 coreset = "0.1.1"
 
