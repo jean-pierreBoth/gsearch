@@ -208,7 +208,7 @@ Options:
 
 A tabular file will be saved to disk in current directory (gsearch.neighbors.txt) with 3 key columns: query genome path, database genome path (ranked by distance) and distance. The distance can be transformed into ANI or AAI according to the equation above. We provide the program reformat (also parallel implementation) to do that: 
 ```bash
-reformat -h
+$ reformat -h
 Processes input files for ANI calculation
 
 Usage: reformat <kmer> <model> <input_file> <output_file>
@@ -252,7 +252,7 @@ We also provide scripts for analyzing output from request and compare with other
 ## hnsw2knn
 Extract nearest neighbor genomes in the pre-built database. For each genome, nearest neighbor genomes to it will printed from samllest distance (largest ANI) to largest distance (smallest ANI)
 ```bash
-$hnsw2knn -h
+$ hnsw2knn -h
 
  ************** initializing logger *****************
 
@@ -268,9 +268,10 @@ Options:
   -V, --version                    Print version
 ```
 
-## BinDash
+## BinDash-rs
 bindash command is the Rust version of BinDash 2 paper.
 ```bash
+$ bindash-rs --help
  ************** initializing logger *****************
 
 Binwise Densified MinHash for Genome/Metagenome/Pangenome Comparisons
@@ -303,6 +304,7 @@ The input is query genome path and reference genome path and output is ANI betwe
 hypermash is a memory efficient version of MinHash, which relies on the hyperminhash algorithm. It can be use for comparing large metagenomes without consuming large amount of memory.
 
 ```bash
+$ hypermash --help
 ************** initializing logger *****************
 
 Fast and Memory Efficient Genome/Metagenome Sketching via HyperMinhash
@@ -452,7 +454,7 @@ hnswcore --dir ./ --fname hnswdump --type f32 coreset --cluster 5
 3. Use the dictjsontocsv.ipynb python notebook in scripts folder to transfrom the cluster membership information id in HNSW to actual genome id.
 
 ## Seqeunce search
-We also provide general purpose sequence search via BigSig(BItsliced Genomic Signature Index), which can be used to quickly identify reads against a reference genome database.
+We also provide general purpose sequence search via BigSig(BItsliced Genomic Signature Index) based on kmers or minimizers, which can be used to quickly identify reads against a reference genome database.
 ```bash
  ************** initializing logger *****************
 
@@ -463,7 +465,6 @@ Usage: bigsig [COMMAND]
 Commands:
   construct  Construct a BIGSIG
   query      Query a BIGSIG on one or more fasta/fastq.gz files
-  identify   Identify reads based on probability
   help       Print this message or the help of the given subcommand(s)
 
 Options:
@@ -486,15 +487,23 @@ Salmonella_enterica_salamae_b_Ar0560	./refs/Ar0560.fasta
 Salmonella_enterica_houtenae_Type	./refs/NCTC10401.fasta
 Salmonella_bongori_Type-NCTC12419	./refs/S_bongoriType_NCTC12419.fasta
 ```
-output explain (a PacBio long reads metagenomic dataset): 
-the PREFIX_reads.txt: The first column contains the name of the read, the second column the taxonomic classification (database genome name), the third column the number of minimizers supporting this classification, the fourth column the total number of minimizers used as input for the classification and the fifth column indicates if this classification is rejected or accepted given the false positive probability (default is 0.001). There are 2 cases where a read classification can be rejected: 1. not enough minimzers found in any of the genomes in the database, which mean this the read is from new genus at least, if there are so many such reads, which indicate taxonomic novelty. You should perform reads assembly to obtain population genomes; 2. many minimizers found in multiple genomes, which indicate a very conserved read, read level classification is not reliable in this case. 
+
 
 ```bash
->m54119U_190516_061409/2/ccs	GCA_900546835.1_genomic.fna	980	1099	accept	1
->m54119U_190516_061409/9/ccs	GCA_900546835.1_genomic.fna	1015	1342	accept	1
->m54119U_190516_061409/1095/ccs	no_significant_hits	0	728	reject	0
->m54119U_190516_061409/73400366/ccs	GCA_004562975.1_genomic.fna,GCF_000210075.1_genomic.fna,GCF_000382445.1_genomic.fna,GCA_004555245.1_genomic.fna,GCF_900079775.1_genomic.fna	1351	1358	reject	5
+@m84137_250807_202000_s4/244911914/ccs	Ecoli_CE98,Ecoli_224,Ecoli_OB20	29	891	reject	3
+@m84137_250807_202000_s4/244911147/ccs	no_significant_hits	0	4226	reject	0
+@m84137_250807_202000_s4/256971887/ccs	Ecoli_CE98	152	762	accept	1
+@m84137_250807_202000_s4/245240131/ccs	Ecoli_CE98,Ecoli_224,Ecoli_tEPEC,Ecoli_OB20	27	1454	reject	4
+@m84137_250807_202000_s4/245503310/ccs	Ecoli_CE98	503	510	accept	1
+@m84137_250807_202000_s4/245765017/ccs	Ecoli_224	42	1578	accept	1
+@m84137_250807_202000_s4/244846078/ccs	Ecoli_CE98,Ecoli_OB20	20	1786	reject	2
 ```
+Interpretation:
+
+The identify command writes one line per read (or read pair) with six tab-separated fields: the read ID, an assignment/status (either a single reference, a comma-separated list of references, or special values like no_hits, no_significant_hits, or too_short), the number of supporting kmers/minimizers for the top hit(s), the total number of k-mers/minimizers used from that read after masking/down-sampling, a decision flag (accept or reject), and finally the number of tied top hits. Conceptually, accept means “this line is usable as-is for downstream counting”: either the read has a unique, statistically significant best match to one reference, or it has no hits / is too short but is still a clean, unambiguous outcome. In contrast, reject marks reads where the evidence is ambiguous or unreliable — either multiple references tie for the top score, or no hit passes the false-positive correction — so these are grouped together as “reject” in the summary counts rather than being credited to any specific reference.
+
+BIGSIG models and controls Bloom-filter false positives for each reference in the index. For every reference, BIGSIG computes its theoretical Bloom filter false positive rate from the filter length, number of hash functions, and the number of kmers/minimizers stored for that reference, using the standard approximation for Bloom filters. During classification, the algorithm asks: “If this reference were not truly present, how many k-mer hits would I expect to see just from Bloom filter false positives?” and evaluates this with a binomial model. The --fp_correct parameter sets a per-read significance threshold on this probability (as −log10 p; the default 3.0 corresponds to p = 10⁻³). A read is marked accept only if its top hit has more supporting kmers/minimizers than expected under the false-positive-only model at this threshold; otherwise the read is labeled reject (including ambiguous multi-hit cases). In practice, BIGSIG indices are typically configured so the per-k-mer Bloom false positive rate is on the order of 10⁻³ or lower, and because each read contributes many independent kmers/minimizers, the effective per-read false positive rate is usually orders of magnitude smaller than the underlying Bloom filter rate.
+
 
 The PREFIX_counts.txt summarizes the total counts per taxon. you can use sort and head to get the top hits: sort -grk2 PREFIX_counts.txt | head -10
 ```bash
