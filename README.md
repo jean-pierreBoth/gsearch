@@ -37,7 +37,7 @@ If you find GSearch useful, please cite the following paper:
 ## Quick install on Linux (Stable version)
 ### Install via bioconda
 ```bash
-conda install -c conda-forge -c bioconda gsearch=0.2.2
+conda install -c conda-forge -c bioconda gsearch
 ```
 
 ### pre-combiled binary
@@ -538,9 +538,9 @@ GCF_023347255.1_genomic.fna	13664
 [![install with bioconda](https://img.shields.io/badge/install%20with-bioconda-brightgreen.svg?style=flat)](http://bioconda.github.io/recipes/gsearch/README.html)
 
 ```bash
-    ### we suggest python 3.8, so if you do not have one, you can create a new one
-    conda create -n python38 python=3.8
-    conda activate python38
+    ### we suggest python 3.13, so if you do not have one, you can create a new one
+    conda create -n python313 python=3.13
+    conda activate python313
     conda config --add channels bioconda
     conda install -c conda-forge -c bioconda gsearch
     gsearch -h
