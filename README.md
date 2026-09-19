@@ -34,7 +34,7 @@ If you find GSearch useful, please cite the following paper:
 }
 ```
 
-***Some of the libraries we developed are very popular (e.g., hnsw_rs) and have been used >0.5 million times for vector database search and semantic search in LLM applications, see [here](https://crates.io/crates/hnsw_rs).***
+***Some of the libraries we developed are very popular (e.g., hnsw_rs) and have been used ~1 million times for vector database search and semantic search in LLM applications, see [here](https://crates.io/crates/hnsw_rs).***
 
 ## Quick install on Linux (Stable version)
 ### Install via bioconda
